@@ -10,13 +10,17 @@ public final class WorkspaceRpc {
     public static final int MAX_READ_CHARACTERS = 65_536;
     private final WorkspaceQueryService workspace;
     private final WorkspaceProposalRpc proposals;
+    private final ApplicationStatus status;
 
     public WorkspaceRpc(WorkspaceQueryService workspace) { this(workspace, null); }
 
     WorkspaceRpc(WorkspaceQueryService workspace, WorkspaceProposalService proposals) {
         this.workspace = Objects.requireNonNull(workspace);
         this.proposals = proposals == null ? null : new WorkspaceProposalRpc(workspace, proposals);
+        this.status = null;
     }
+
+    WorkspaceRpc(ApplicationStatus status) { this.status = Objects.requireNonNull(status); this.workspace = null; this.proposals = null; }
 
     /** Null is a valid notification's no-response result. */
     public String handle(String json) {
@@ -31,6 +35,7 @@ public final class WorkspaceRpc {
         if (!validEnvelope(request))
             return error(id, -32600, "Expected a supported JSON-RPC 2.0 request envelope", Map.of("code", "INVALID_REQUEST"));
         String method = (String) request.get("method");
+        if (status != null) return status(request, id, notification, method);
         if (!WorkspaceQueryService.OPERATIONS.contains(method) && (proposals == null || !WorkspaceProposalRpc.OPERATIONS.contains(method))) return notification ? null
             : error(id, -32601, "Workspace operation is not supported", Map.of("code", "UNSUPPORTED", "method", method));
         try {
@@ -44,6 +49,18 @@ public final class WorkspaceRpc {
         } catch (RuntimeException failure) {
             return notification ? null : error(id, -32603, "Internal workspace error", Map.of("code", "IO_ERROR"));
         }
+    }
+
+    private String status(Map<String, Object> request, Object id, boolean notification, String method) {
+        if (notification || id == null) return error(null, -32600, "Status requires a request ID", Map.of("code", "INVALID_REQUEST"));
+        if (!"editor/status".equals(method)) return error(id, -32601, "Status operation is not supported", Map.of("code", "UNSUPPORTED"));
+        var params = MiniJson.asObject(request.get("params"));
+        if (params == null || !params.keySet().equals(Set.of("schemaVersion")))
+            return error(id, -32602, "Invalid status parameters", Map.of("code", "INVALID_REQUEST"));
+        if (!Long.valueOf(1).equals(params.get("schemaVersion")))
+            return error(id, -32000, "Unsupported status schema", Map.of("code", "UNSUPPORTED_PROTOCOL"));
+        try { return MiniJson.stringify(response(id, "result", status.snapshot())); }
+        catch (WorkspaceApiException unavailable) { return error(id, -32000, unavailable.getMessage(), unavailable.toMap()); }
     }
 
     static boolean expectsResponse(String json) {

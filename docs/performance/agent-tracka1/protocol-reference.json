@@ -1,0 +1,46 @@
+{
+  "construction": "A0 role-separated nonce/HMAC; JDK HmacSHA256; fixed length-prefixed UTF-8 transcript",
+  "transcript_fields": [
+    "shed-status-v2",
+    "role",
+    "2",
+    "instanceId",
+    "windowId",
+    "attachmentId",
+    "decimal-port",
+    "decimal-expiresAt",
+    "status",
+    "clientNonce",
+    "serverNonce",
+    "sessionId",
+    "decimal-sequence",
+    "exact-payload"
+  ],
+  "independent_test_vector": {
+    "key": "public fixture bytes 00 through 1f",
+    "instanceId": "00000000-0000-0000-0000-000000000001",
+    "windowId": "00000000-0000-0000-0000-000000000002",
+    "attachmentId": "00000000-0000-0000-0000-000000000003",
+    "port": 12345,
+    "expiresAt": 1700000000000,
+    "clientNonce": "a repeated 64",
+    "serverNonce": "b repeated 64",
+    "sessionId": "00000000-0000-0000-0000-000000000004",
+    "role": "server",
+    "sequence": 0,
+    "payload": "",
+    "expected_hmac_sha256": "bcaa3f346a53c9c316d81bca7aa2806f60f7e7c425b7997a46245842a7c846a3",
+    "reference": "Python standard hmac/hashlib/struct, >I byte lengths; matched by JUnit"
+  },
+  "references": [
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc2104",
+      "use": "HMAC construction"
+    },
+    {
+      "url": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/Mac.html",
+      "use": "JDK HmacSHA256 facility"
+    }
+  ],
+  "caveat": "public synthetic vector, not runtime credentials; no independent external protocol audit"
+}

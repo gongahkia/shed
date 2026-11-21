@@ -1,0 +1,18 @@
+{
+  "development_failure": {
+    "run": "stage-b",
+    "cases": 16,
+    "passes": 15,
+    "failures": 1,
+    "test": "logicalExpirationIsRejectedAndTimedExpirationRemovesOwnedFiles",
+    "cause": "expiration task called shutdownNow on its own deadline executor before private-file cleanup; self-interruption affected file I/O",
+    "correction": "cleanup owned files before deadline executor shutdown",
+    "verification": "same assertion passes in stage-b-corrected and all later profiles; no relaxed assertion/deadline"
+  },
+  "compatibility_review": {
+    "cause": "testing args.contains(--status) in error handling conflated a legacy argument value with the parsed control flag",
+    "correction": "use the parsed flag; regression assertion checks legacy stdout/stderr separation",
+    "verification": "release-safe-tests passes; no separate pre-correction failed run claimed"
+  },
+  "qualification": "no native desktop or kernel process-confinement claim"
+}

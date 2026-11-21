@@ -1,0 +1,18 @@
+{
+  "recorded_utc": "2026-11-21T01:54:32.623085+00:00",
+  "system": "Darwin",
+  "release": "25.5.0",
+  "machine": "arm64",
+  "python": "3.15.0",
+  "jdk": {
+    "IMPLEMENTOR": "Eclipse Adoptium",
+    "JAVA_VERSION": "21.0.13",
+    "OS_ARCH": "aarch64",
+    "OS_NAME": "Darwin"
+  },
+  "maven": "3.9.11",
+  "execution": "source-reviewed headless tests in disposable fixture; no new performance benchmark",
+  "load_memory_pressure": "not sampled; no new latency or whole-process memory result claimed",
+  "native_desktop": "not exercised",
+  "native_shell_benchmarks": "BLOCKED"
+}

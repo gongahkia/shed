@@ -1,0 +1,4031 @@
+{
+  "inputs": [
+    {
+      "path": "docs/AGENT_WORKSPACE.md",
+      "sha256": "bc6874a00579fe0f59a704e757a579a95fef4260ab2f31837dbdf597d5162f95",
+      "source_snapshot": "source-versions/docs__AGENT_WORKSPACE.md.gz",
+      "anchors": []
+    },
+    {
+      "path": "scripts/run-portable-tests.py",
+      "sha256": "0c21725254e9e5d3ff2bb94ef68c246218724484f5664f2c3c139f57a17bc0c6",
+      "source_snapshot": "source-versions/scripts__run-portable-tests.py.gz",
+      "anchors": [
+        {
+          "line": 22,
+          "source": "for path in source.rglob('*'):"
+        },
+        {
+          "line": 68,
+          "source": "if not selected or any(name not in reviewed for name in selected):"
+        },
+        {
+          "line": 74,
+          "source": "for name, expected in (line.split('=', 1) for line in HELPERS.read_text().splitlines()):"
+        },
+        {
+          "line": 78,
+          "source": "if bool(args.gutter_baseline) != args.measure_gutter:"
+        },
+        {
+          "line": 80,
+          "source": "if args.package_only and (args.compile_only or args.verify_gate or args.tests or args.measure_lsp or args.measure_glyph or args.measure_gutter or args.measure_status):"
+        },
+        {
+          "line": 87,
+          "source": "if output.exists() or output.resolve() != output:"
+        },
+        {
+          "line": 89,
+          "source": "jdk, maven, repository = (p.resolve(strict=True) for p in [args.jdk, args.maven, args.repository])"
+        },
+        {
+          "line": 91,
+          "source": "if len(boot) != 1 or not (jdk / 'bin/java').is_file() or not repository.is_dir():"
+        },
+        {
+          "line": 143,
+          "source": "raise SystemExit(main())"
+        }
+      ]
+    },
+    {
+      "path": "scripts/test_native_fixture.py",
+      "sha256": "f16952cdb9b3a4e5c4836f5e49ccd80feab92942e985ae9a7df5284fd2f4f7d9",
+      "source_snapshot": "source-versions/scripts__test_native_fixture.py.gz",
+      "anchors": [
+        {
+          "line": 13,
+          "source": "def setUp(self):"
+        },
+        {
+          "line": 17,
+          "source": "def test_empty_home_and_private_root(self):"
+        },
+        {
+          "line": 23,
+          "source": "def test_existing_owned_disposable_home(self):"
+        },
+        {
+          "line": 29,
+          "source": "def test_no_parent_environment_inheritance(self):"
+        },
+        {
+          "line": 38,
+          "source": "def test_missing_history_rejected_before_launch(self):"
+        },
+        {
+          "line": 47,
+          "source": "def test_external_history_rejected(self):"
+        },
+        {
+          "line": 52,
+          "source": "def test_explicit_internal_history(self):"
+        },
+        {
+          "line": 55,
+          "source": "def test_injected_credentials_rejected_without_exposing_value(self):"
+        },
+        {
+          "line": 61,
+          "source": "def test_injected_shell_startup_rejected(self):"
+        },
+        {
+          "line": 66,
+          "source": "def test_unexpected_working_directory_rejected(self):"
+        },
+        {
+          "line": 70,
+          "source": "def test_missing_home_rejected(self):"
+        },
+        {
+          "line": 80,
+          "source": "def test_readonly_home_rejected(self):"
+        },
+        {
+          "line": 89,
+          "source": "def test_symlink_escape_rejected(self):"
+        },
+        {
+          "line": 95,
+          "source": "def test_hardlink_rejected(self):"
+        },
+        {
+          "line": 104,
+          "source": "def test_parent_traversal_rejected(self):"
+        },
+        {
+          "line": 108,
+          "source": "def test_prefix_collision_rejected(self):"
+        },
+        {
+          "line": 112,
+          "source": "def test_relative_root_rejected(self):"
+        },
+        {
+          "line": 116,
+          "source": "def test_symlink_parent_rejected(self):"
+        },
+        {
+          "line": 122,
+          "source": "def test_wrong_owner_marker_rejected(self):"
+        },
+        {
+          "line": 132,
+          "source": "def test_unsafe_execution_rejected_without_popen(self):"
+        },
+        {
+          "line": 142,
+          "source": "def test_unsupported_platform_fail_closed(self):"
+        },
+        {
+          "line": 146,
+          "source": "def test_global_zshenv_rejected(self):"
+        },
+        {
+          "line": 153,
+          "source": "def test_profile_no_fork_network_or_user_home_access(self):"
+        },
+        {
+          "line": 160,
+          "source": "def test_cleanup_preserves_external_synthetic_sentinel(self):"
+        },
+        {
+          "line": 169,
+          "source": "def test_cleanup_idempotent(self):"
+        },
+        {
+          "line": 175,
+          "source": "def test_cleanup_rejects_changed_marker(self):"
+        },
+        {
+          "line": 186,
+          "source": "def test_permission_error_propagates_no_launch(self):"
+        },
+        {
+          "line": 191,
+          "source": "def test_repeated_creation_cleanup(self):"
+        },
+        {
+          "line": 199,
+          "source": "def test_whole_ide_runtime_rejects_before_toolchain_or_native_work(self):"
+        },
+        {
+          "line": 212,
+          "source": "def test_portable_runner_rejects_native_test_before_tool_lookup(self):"
+        },
+        {
+          "line": 226,
+          "source": "def test_reviewed_test_manifest_matches_sources(self):"
+        },
+        {
+          "line": 295,
+          "source": "def load_runner(self):"
+        },
+        {
+          "line": 302,
+          "source": "def test_dependency_copy_cannot_write_through_to_source(self):"
+        },
+        {
+          "line": 313,
+          "source": "def test_dependency_symlinks_rejected_before_copy(self):"
+        },
+        {
+          "line": 323,
+          "source": "def test_dependency_copy_budget_rejected_before_copy(self):"
+        },
+        {
+          "line": 335,
+          "source": "def test_gutter_measurements_require_explicit_control_artifact(self):"
+        },
+        {
+          "line": 350,
+          "source": "def test_packaging_cannot_be_combined_with_test_execution_modes(self):"
+        },
+        {
+          "line": 364,
+          "source": "def test_media_smoke_redirects_compiler_and_runtime_java_state(self):"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/AgentWorkspaceController.java",
+      "sha256": "14c579218bcbc110aad5d3add2fc94f17118f3856037c824551ea3d5257c8b01",
+      "source_snapshot": "source-versions/src__main__java__shed__AgentWorkspaceController.java.gz",
+      "anchors": [
+        {
+          "line": 14,
+          "source": "private final Set<WorkspaceBridgeServer> owned = ConcurrentHashMap.newKeySet();"
+        },
+        {
+          "line": 15,
+          "source": "private final Set<WorkspaceBridgeServer> releasing = ConcurrentHashMap.newKeySet();"
+        },
+        {
+          "line": 16,
+          "source": "private final AtomicLong generation = new AtomicLong();"
+        },
+        {
+          "line": 17,
+          "source": "private final AtomicBoolean disposed = new AtomicBoolean();"
+        },
+        {
+          "line": 18,
+          "source": "private final AgentSessionRegistry sessions = new AgentSessionRegistry();"
+        },
+        {
+          "line": 29,
+          "source": "void ownSession(AgentSessionService session) { sessions.own(session); }"
+        },
+        {
+          "line": 30,
+          "source": "void applicationReady() { applicationReady = true; if (applicationStatus != null) applicationStatus.ready(); }"
+        },
+        {
+          "line": 32,
+          "source": "String handle(String argument) {"
+        },
+        {
+          "line": 53,
+          "source": "private String start(boolean allowProposals, boolean statusOnly) {"
+        },
+        {
+          "line": 117,
+          "source": "private String stop() {"
+        },
+        {
+          "line": 128,
+          "source": "private void release(WorkspaceBridgeServer server) {"
+        },
+        {
+          "line": 145,
+          "source": "@Override public void close() {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/ApplicationStatus.java",
+      "sha256": "91901e5ec234c8f64f49cdeca4007a58446d154dfa1e00e6180b2783384f4b0f",
+      "source_snapshot": "source-versions/src__main__java__shed__ApplicationStatus.java.gz",
+      "anchors": [
+        {
+          "line": 11,
+          "source": "private static final class ProcessIdentity { static final String ID = UUID.randomUUID().toString(); }"
+        },
+        {
+          "line": 13,
+          "source": "final String windowId = UUID.randomUUID().toString();"
+        },
+        {
+          "line": 17,
+          "source": "void ready() { state.compareAndSet(State.STARTING, State.READY); }"
+        },
+        {
+          "line": 18,
+          "source": "void stopping() { state.set(State.STOPPING); }"
+        },
+        {
+          "line": 20,
+          "source": "Map<String, Object> snapshot() {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/HelpService.java",
+      "sha256": "82ebd26c008b2aa217f7f3ecf05a3bad81e09239fb7884b14874c8ae48805800",
+      "source_snapshot": "source-versions/src__main__java__shed__HelpService.java.gz",
+      "anchors": [
+        {
+          "line": 4,
+          "source": "public String getHelpText(String topic, String version) {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/Texteditor.java",
+      "sha256": "abee3c31cd3feab41db9a2d0f54cb48440f466fd2163ed54afea7598165b115f",
+      "source_snapshot": "source-versions/src__main__java__shed__Texteditor.java.gz",
+      "anchors": [
+        {
+          "line": 132,
+          "source": "final WorkspaceRoots workspaceRoots = new WorkspaceRoots();"
+        },
+        {
+          "line": 133,
+          "source": "final DocumentNavigation documentNavigation = new DocumentNavigation();"
+        },
+        {
+          "line": 206,
+          "source": "final List<MultiSelection> extraSelections = new ArrayList<>();"
+        },
+        {
+          "line": 207,
+          "source": "final List<Object> extraSelectionHighlightTags = new ArrayList<>();"
+        },
+        {
+          "line": 233,
+          "source": "List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]"
+        },
+        {
+          "line": 237,
+          "source": "final List<Object> matchBracketTags = new ArrayList<>();"
+        },
+        {
+          "line": 244,
+          "source": "static final Pattern QUICKFIX_PATTERN = Pattern.compile(\"^(.+?):(\\\\d+)(?::(\\\\d+))?:(.*)$\");"
+        },
+        {
+          "line": 245,
+          "source": "static final Pattern HEX_COLOR_VALUE_PATTERN = Pattern.compile(\"^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$\");"
+        },
+        {
+          "line": 252,
+          "source": "void installAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.install(area); }"
+        },
+        {
+          "line": 253,
+          "source": "void disposeAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.remove(area); }"
+        },
+        {
+          "line": 254,
+          "source": "boolean hasAiCompletion(JTextArea area) { return inlineCompletionController != null && inlineCompletionController.visible(area); }"
+        },
+        {
+          "line": 255,
+          "source": "boolean handleAiCompletionKey(KeyEvent event) { return inlineCompletionController != null && inlineCompletionController.keyPressed(event); }"
+        },
+        {
+          "line": 256,
+          "source": "boolean allowsAiCompletion() { return inputController != null && inputController.allowsAiCompletion(); }"
+        },
+        {
+          "line": 257,
+          "source": "void stopAiCompletionRequests() { if (inlineCompletionController != null) inlineCompletionController.stopRequests(); }"
+        },
+        {
+          "line": 258,
+          "source": "void dismissAiCompletion() { if (inlineCompletionController != null) inlineCompletionController.dismiss(); }"
+        },
+        {
+          "line": 259,
+          "source": "String requestAiCompletion() { return inlineCompletionController == null ? \"Inline completion is unavailable.\" : inlineCompletionController.request(); }"
+        },
+        {
+          "line": 262,
+          "source": "WorkspaceQueryService workspaceQueries(Path root, AgentPolicy policy) {"
+        },
+        {
+          "line": 266,
+          "source": "WorkspaceDocumentEditor workspaceDocuments() { return workspaceDocumentSource; }"
+        },
+        {
+          "line": 268,
+          "source": "java.util.function.Supplier<AgentSelection> captureAgentSelection() {"
+        },
+        {
+          "line": 278,
+          "source": "void ownAgentSession(AgentSessionService session) { agentWorkspaceController.ownSession(session); }"
+        },
+        {
+          "line": 280,
+          "source": "String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }"
+        },
+        {
+          "line": 282,
+          "source": "private void applyWorkspaceTextBatch(Runnable mutation) {"
+        },
+        {
+          "line": 325,
+          "source": "public Texteditor(String[] args) {"
+        },
+        {
+          "line": 573,
+          "source": "private boolean openStartupTargets(String[] arguments, long startupStartedAt) {"
+        },
+        {
+          "line": 616,
+          "source": "private void openStartupFilesAsync(List<File> files, int index, long startedAt, EditorPane pane, boolean allLoaded) {"
+        },
+        {
+          "line": 636,
+          "source": "void initializeUI() {"
+        },
+        {
+          "line": 640,
+          "source": "EditorPane createEditorPane(Dimension screenSize) {"
+        },
+        {
+          "line": 644,
+          "source": "void bindActivePane(EditorPane pane) {"
+        },
+        {
+          "line": 648,
+          "source": "EditorPane getActivePane() {"
+        },
+        {
+          "line": 652,
+          "source": "void activateEditorPane(EditorPane pane) {"
+        },
+        {
+          "line": 656,
+          "source": "void requestActivePaneFocus() {"
+        },
+        {
+          "line": 660,
+          "source": "void renderWindowLayout() {"
+        },
+        {
+          "line": 664,
+          "source": "void showToolWindow() {"
+        },
+        {
+          "line": 668,
+          "source": "void hideToolWindow() {"
+        },
+        {
+          "line": 674,
+          "source": "void showToolWindow(ToolWindowHost.Tab tab) {"
+        },
+        {
+          "line": 679,
+          "source": "Font resolveEditorFont() {"
+        },
+        {
+          "line": 683,
+          "source": "Font resolveUiFont() {"
+        },
+        {
+          "line": 687,
+          "source": "Font resolveTerminalFont() {"
+        },
+        {
+          "line": 691,
+          "source": "void applyUiFont() {"
+        },
+        {
+          "line": 695,
+          "source": "Font resolveInstalledFont(String family, int fontSize) {"
+        },
+        {
+          "line": 701,
+          "source": "public void keyPressed(KeyEvent e) {"
+        },
+        {
+          "line": 706,
+          "source": "boolean applyConfiguredKeybinding(KeyEvent e) {"
+        },
+        {
+          "line": 710,
+          "source": "String modeKey(EditorMode mode) {"
+        },
+        {
+          "line": 714,
+          "source": "String keySpecFromEvent(KeyEvent e) {"
+        },
+        {
+          "line": 718,
+          "source": "String ctrlTarget(int keyCode, char keyChar) {"
+        },
+        {
+          "line": 722,
+          "source": "List<String> parseKeySequence(String mapping) {"
+        },
+        {
+          "line": 726,
+          "source": "KeyEvent keyEventFromToken(String token) {"
+        },
+        {
+          "line": 730,
+          "source": "KeyStrokeSpec keyStrokeSpec(String token) {"
+        },
+        {
+          "line": 735,
+          "source": "void handleNormalMode(KeyEvent e) {"
+        },
+        {
+          "line": 739,
+          "source": "boolean supportsCountPrefix(KeyEvent e) {"
+        },
+        {
+          "line": 743,
+          "source": "void setPendingKeyWithHint(char pendingKey) {"
+        },
+        {
+          "line": 747,
+          "source": "void showWhichKeyHint(char pendingKey) {"
+        },
+        {
+          "line": 751,
+          "source": "String whichKeyHintText(char pendingKey) {"
+        },
+        {
+          "line": 756,
+          "source": "void handlePendingKey(char c, int code) {"
+        },
+        {
+          "line": 761,
+          "source": "void handleInsertMode(KeyEvent e) {"
+        },
+        {
+          "line": 766,
+          "source": "void handleVisualMode(KeyEvent e) {"
+        },
+        {
+          "line": 770,
+          "source": "void normalizeVisualLineCaretForMotion() {"
+        },
+        {
+          "line": 774,
+          "source": "void applyVisualLineOperator(char operator) {"
+        },
+        {
+          "line": 778,
+          "source": "void joinVisualSelection() {"
+        },
+        {
+          "line": 782,
+          "source": "void surroundVisualSelection(char surroundChar) {"
+        },
+        {
+          "line": 786,
+          "source": "void toggleCommentSelection() {"
+        },
+        {
+          "line": 790,
+          "source": "void toggleCommentLineRange(int startLine, int endLine) {"
+        },
+        {
+          "line": 795,
+          "source": "void handleReplaceMode(KeyEvent e) {"
+        },
+        {
+          "line": 800,
+          "source": "void handleCommandMode(KeyEvent e) {"
+        },
+        {
+          "line": 804,
+          "source": "void openCommandHistorySearch() {"
+        },
+        {
+          "line": 808,
+          "source": "void handleSearchMode(KeyEvent e) {"
+        },
+        {
+          "line": 812,
+          "source": "void incrementalSearchPreview() {"
+        },
+        {
+          "line": 816,
+          "source": "static int vimCharClass(char c) {"
+        },
+        {
+          "line": 823,
+          "source": "void moveUp() {"
+        },
+        {
+          "line": 827,
+          "source": "void moveDown() {"
+        },
+        {
+          "line": 831,
+          "source": "void moveLeft() {"
+        },
+        {
+          "line": 835,
+          "source": "void moveRight() {"
+        },
+        {
+          "line": 839,
+          "source": "void moveWordForward() {"
+        },
+        {
+          "line": 843,
+          "source": "void moveWordBackward() {"
+        },
+        {
+          "line": 847,
+          "source": "void moveWordEnd() {"
+        },
+        {
+          "line": 851,
+          "source": "void moveWordForwardBig() {"
+        },
+        {
+          "line": 855,
+          "source": "void moveWordBackwardBig() {"
+        },
+        {
+          "line": 859,
+          "source": "void moveWordEndBig() {"
+        },
+        {
+          "line": 863,
+          "source": "void moveWordEndBackward() {"
+        },
+        {
+          "line": 867,
+          "source": "void moveWordEndBackwardBig() {"
+        },
+        {
+          "line": 871,
+          "source": "void moveWordEndBackwardInternal(boolean bigWord) {"
+        },
+        {
+          "line": 875,
+          "source": "boolean isMotionWordChar(char c, boolean bigWord) {"
+        },
+        {
+          "line": 879,
+          "source": "void moveLineStart() {"
+        },
+        {
+          "line": 883,
+          "source": "void moveLineEnd() {"
+        },
+        {
+          "line": 887,
+          "source": "void moveLineFirstNonBlank() {"
+        },
+        {
+          "line": 891,
+          "source": "void moveLineLastNonBlank() {"
+        },
+        {
+          "line": 895,
+          "source": "void moveFileStart() {"
+        },
+        {
+          "line": 899,
+          "source": "void moveFileEnd() {"
+        },
+        {
+          "line": 903,
+          "source": "void moveParagraphForward() {"
+        },
+        {
+          "line": 907,
+          "source": "void moveParagraphBackward() {"
+        },
+        {
+          "line": 911,
+          "source": "void moveSentenceForward() {"
+        },
+        {
+          "line": 915,
+          "source": "void moveSentenceBackward() {"
+        },
+        {
+          "line": 919,
+          "source": "void moveMatchingBracket() {"
+        },
+        {
+          "line": 923,
+          "source": "void moveToFilePercent(int percent) {"
+        },
+        {
+          "line": 927,
+          "source": "void moveToScreenPosition(char position) {"
+        },
+        {
+          "line": 931,
+          "source": "void scrollCurrentLineTo(char anchor) {"
+        },
+        {
+          "line": 935,
+          "source": "String lineText(int line) throws BadLocationException {"
+        },
+        {
+          "line": 939,
+          "source": "void scrollHalfPageDown() {"
+        },
+        {
+          "line": 943,
+          "source": "void scrollHalfPageUp() {"
+        },
+        {
+          "line": 947,
+          "source": "void scrollFullPageDown() {"
+        },
+        {
+          "line": 951,
+          "source": "void scrollFullPageUp() {"
+        },
+        {
+          "line": 955,
+          "source": "void scrollLineDown() {"
+        },
+        {
+          "line": 959,
+          "source": "void scrollLineUp() {"
+        },
+        {
+          "line": 963,
+          "source": "String showFileInfo() {"
+        },
+        {
+          "line": 967,
+          "source": "String goToFileUnderCursor() {"
+        },
+        {
+          "line": 971,
+          "source": "String openBrowserUrl() {"
+        },
+        {
+          "line": 975,
+          "source": "void selectCurrentLine() {"
+        },
+        {
+          "line": 979,
+          "source": "void selectLineRange(int anchorPosition, int currentPosition) {"
+        },
+        {
+          "line": 983,
+          "source": "void ensureCaretVisible(JTextArea area) {"
+        },
+        {
+          "line": 987,
+          "source": "boolean isPrintableKey(KeyEvent e) {"
+        },
+        {
+          "line": 991,
+          "source": "String searchWordUnderCursor(boolean forward) {"
+        },
+        {
+          "line": 995,
+          "source": "boolean isWordCharacter(char c) {"
+        },
+        {
+          "line": 999,
+          "source": "void browseCommandHistory(int direction) {"
+        },
+        {
+          "line": 1003,
+          "source": "void addCommandHistory(String entry) {"
+        },
+        {
+          "line": 1007,
+          "source": "String completeCommand(String input) {"
+        },
+        {
+          "line": 1011,
+          "source": "String completePath(String prefix, String partialPath) {"
+        },
+        {
+          "line": 1015,
+          "source": "void updateCurrentLineHighlight() {"
+        },
+        {
+          "line": 1019,
+          "source": "void invalidateCurrentLineHighlight() {"
+        },
+        {
+          "line": 1023,
+          "source": "String getGitBlameForCurrentLine(FileBuffer buffer) {"
+        },
+        {
+          "line": 1027,
+          "source": "void invalidateGitBlame(FileBuffer buffer) {"
+        },
+        {
+          "line": 1031,
+          "source": "void clearGitBlameCache() {"
+        },
+        {
+          "line": 1035,
+          "source": "String findCurrentBreadcrumb() {"
+        },
+        {
+          "line": 1039,
+          "source": "String findCurrentScopeHeuristic() {"
+        },
+        {
+          "line": 1043,
+          "source": "void updateMatchingBracketHighlight() {"
+        },
+        {
+          "line": 1047,
+          "source": "boolean isBracketChar(char c) {"
+        },
+        {
+          "line": 1051,
+          "source": "int findMatchingBracketPos(String text, int pos, char bracket) {"
+        },
+        {
+          "line": 1055,
+          "source": "void refreshLineNumberPanel() {"
+        },
+        {
+          "line": 1059,
+          "source": "void applyThemeColors() {"
+        },
+        {
+          "line": 1063,
+          "source": "void applySyntaxHighlighting() {"
+        },
+        {
+          "line": 1067,
+          "source": "void scheduleSyntaxHighlighting() {"
+        },
+        {
+          "line": 1071,
+          "source": "void scheduleSymbolRefresh() {"
+        },
+        {
+          "line": 1075,
+          "source": "void shutdownSyntaxUi() {"
+        },
+        {
+          "line": 1079,
+          "source": "void clearSyntaxHighlighting() {"
+        },
+        {
+          "line": 1083,
+          "source": "String[] syntaxKeywordsFor(FileType fileType) {"
+        },
+        {
+          "line": 1087,
+          "source": "void highlightJavaAnnotations(String text, boolean[] masked) {"
+        },
+        {
+          "line": 1091,
+          "source": "void highlightKeywords(String text, String[] keywords, boolean[] masked) {"
+        },
+        {
+          "line": 1095,
+          "source": "boolean isKeywordMatch(String text, int start, String keyword, boolean[] masked) {"
+        },
+        {
+          "line": 1099,
+          "source": "void highlightComments(String text, FileType fileType, boolean[] masked) {"
+        },
+        {
+          "line": 1103,
+          "source": "void highlightStrings(String text, FileType fileType, boolean[] masked) {"
+        },
+        {
+          "line": 1107,
+          "source": "void highlightTrailingWhitespace(Highlighter highlighter, String text) {"
+        },
+        {
+          "line": 1111,
+          "source": "void highlightScopeRules(String text, FileType fileType, boolean[] masked) {"
+        },
+        {
+          "line": 1115,
+          "source": "void highlightNumbers(String text, boolean[] masked) {"
+        },
+        {
+          "line": 1119,
+          "source": "void addSyntaxHighlight(int start, int end, Color color, boolean[] masked) {"
+        },
+        {
+          "line": 1123,
+          "source": "boolean isMasked(boolean[] masked, int start, int end) {"
+        },
+        {
+          "line": 1127,
+          "source": "void markMasked(boolean[] masked, int start, int end) {"
+        },
+        {
+          "line": 1131,
+          "source": "boolean matchesAt(String text, int index, String token) {"
+        },
+        {
+          "line": 1135,
+          "source": "boolean isIdentifierChar(char c) {"
+        },
+        {
+          "line": 1139,
+          "source": "boolean isStringDelimiter(FileType fileType, char c) {"
+        },
+        {
+          "line": 1143,
+          "source": "String[] lineCommentPrefixesFor(FileType fileType) {"
+        },
+        {
+          "line": 1147,
+          "source": "String[][] blockCommentPairsFor(FileType fileType) {"
+        },
+        {
+          "line": 1151,
+          "source": "void updateSubstitutePreview() {"
+        },
+        {
+          "line": 1155,
+          "source": "void clearSubstitutePreview() {"
+        },
+        {
+          "line": 1159,
+          "source": "SubstitutePreview parseSubstitutePreview(String command) {"
+        },
+        {
+          "line": 1163,
+          "source": "int findRangeCommandStart(String command) {"
+        },
+        {
+          "line": 1167,
+          "source": "int getCurrentCaretLine() {"
+        },
+        {
+          "line": 1171,
+          "source": "String resolveGitBranch() {"
+        },
+        {
+          "line": 1198,
+          "source": "void showInlineCompletion() {"
+        },
+        {
+          "line": 1201,
+          "source": "void dismissCompletionPopup() {"
+        },
+        {
+          "line": 1204,
+          "source": "void dismissCompletionPopupForCaretMove() {"
+        },
+        {
+          "line": 1207,
+          "source": "boolean isCompletionPopupVisible() {"
+        },
+        {
+          "line": 1210,
+          "source": "void completionPopupNavigate(int direction) {"
+        },
+        {
+          "line": 1213,
+          "source": "void completionPopupAccept() {"
+        },
+        {
+          "line": 1216,
+          "source": "List<String> gatherCompletions(String prefix) {"
+        },
+        {
+          "line": 1220,
+          "source": "void addCursorAtNextMatch() {"
+        },
+        {
+          "line": 1224,
+          "source": "String formatParagraph() {"
+        },
+        {
+          "line": 1227,
+          "source": "void moveDisplayLineDown() {"
+        },
+        {
+          "line": 1230,
+          "source": "void moveDisplayLineUp() {"
+        },
+        {
+          "line": 1233,
+          "source": "void enterVisualBlockMode() {"
+        },
+        {
+          "line": 1237,
+          "source": "int[] getVisualBlockBounds() {"
+        },
+        {
+          "line": 1241,
+          "source": "void deleteVisualBlock() {"
+        },
+        {
+          "line": 1245,
+          "source": "void yankVisualBlock() {"
+        },
+        {
+          "line": 1249,
+          "source": "static Character autoPairCloser(char c) {"
+        },
+        {
+          "line": 1260,
+          "source": "static boolean isClosingPairChar(char c) {"
+        },
+        {
+          "line": 1263,
+          "source": "void applyMultiCursorInsert(char c) {"
+        },
+        {
+          "line": 1267,
+          "source": "void applyMultiCursorBackspace() {"
+        },
+        {
+          "line": 1270,
+          "source": "void applyMultiCursorDelete() {"
+        },
+        {
+          "line": 1273,
+          "source": "void addCursorAbove() {"
+        },
+        {
+          "line": 1276,
+          "source": "void addCursorBelow() {"
+        },
+        {
+          "line": 1279,
+          "source": "void clearExtraCursors() {"
+        },
+        {
+          "line": 1282,
+          "source": "void refreshExtraSelectionHighlights() {"
+        },
+        {
+          "line": 1286,
+          "source": "void deleteWordBackwardInsert() {"
+        },
+        {
+          "line": 1290,
+          "source": "void deleteToLineStartInsert() {"
+        },
+        {
+          "line": 1294,
+          "source": "String currentLineIndentation() {"
+        },
+        {
+          "line": 1298,
+          "source": "String indentationForNewLine() {"
+        },
+        {
+          "line": 1305,
+          "source": "void moveLineIndentStart() {"
+        },
+        {
+          "line": 1309,
+          "source": "void openLineBelow() {"
+        },
+        {
+          "line": 1313,
+          "source": "void openLineAbove() {"
+        },
+        {
+          "line": 1317,
+          "source": "void joinCurrentLine(boolean withSpace) {"
+        },
+        {
+          "line": 1321,
+          "source": "String applyLineOperator(char operator) {"
+        },
+        {
+          "line": 1325,
+          "source": "int leadingWhitespace(String text) {"
+        },
+        {
+          "line": 1329,
+          "source": "String indentationForLine(int line) {"
+        },
+        {
+          "line": 1333,
+          "source": "String findCharacter(char type, char target) {"
+        },
+        {
+          "line": 1337,
+          "source": "String repeatFind(boolean reverse) {"
+        },
+        {
+          "line": 1341,
+          "source": "void recordJumpPosition() {"
+        },
+        {
+          "line": 1345,
+          "source": "void jumpBack() {"
+        },
+        {
+          "line": 1349,
+          "source": "void jumpForward() {"
+        },
+        {
+          "line": 1353,
+          "source": "void recordChangePosition() {"
+        },
+        {
+          "line": 1357,
+          "source": "void changePrev() {"
+        },
+        {
+          "line": 1361,
+          "source": "void changeNext() {"
+        },
+        {
+          "line": 1365,
+          "source": "void checkForExternalChanges() {"
+        },
+        {
+          "line": 1369,
+          "source": "void promptExternalConflictForModifiedBuffer(FileBuffer buffer) {"
+        },
+        {
+          "line": 1373,
+          "source": "void showExternalConflictPreview(FileBuffer buffer) {"
+        },
+        {
+          "line": 1377,
+          "source": "void startRecoverySnapshotTimer() {"
+        },
+        {
+          "line": 1381,
+          "source": "void persistRecoverySnapshotsSafely() {"
+        },
+        {
+          "line": 1385,
+          "source": "void scheduleRecoverySnapshotCapture() {"
+        },
+        {
+          "line": 1389,
+          "source": "void flushScheduledRecoverySnapshotCapture() {"
+        },
+        {
+          "line": 1393,
+          "source": "void persistRecoverySnapshots() throws IOException {"
+        },
+        {
+          "line": 1397,
+          "source": "void clearRecoverySnapshots() {"
+        },
+        {
+          "line": 1401,
+          "source": "void shutdownRecoveryJournalScheduling() {"
+        },
+        {
+          "line": 1405,
+          "source": "void promptRecoveryRestoreIfAvailable() {"
+        },
+        {
+          "line": 1409,
+          "source": "String handleMarkdownPreview(String args) {"
+        },
+        {
+          "line": 1413,
+          "source": "String openMarkdownPreview() {"
+        },
+        {
+          "line": 1417,
+          "source": "void closeMarkdownPreviewForSource(EditorPane sourcePane) {"
+        },
+        {
+          "line": 1421,
+          "source": "boolean hasMarkdownPreviewForSource(EditorPane sourcePane) {"
+        },
+        {
+          "line": 1425,
+          "source": "void detachMarkdownPreview(EditorPane pane) {"
+        },
+        {
+          "line": 1430,
+          "source": "MarkdownProjectLinks markdownLinks() {"
+        },
+        {
+          "line": 1444,
+          "source": "void markdownLinksChanged(FileBuffer buffer, boolean diskChanged) {"
+        },
+        {
+          "line": 1449,
+          "source": "void markdownLinkRootsChanged() {"
+        },
+        {
+          "line": 1454,
+          "source": "void disposeMarkdownPreviews() {"
+        },
+        {
+          "line": 1459,
+          "source": "void requestMarkdownHeadings(Object owner, FileBuffer buffer, java.util.function.BooleanSupplier current,"
+        },
+        {
+          "line": 1464,
+          "source": "void cancelMarkdownHeadings(Object owner) { markdownController.cancelHeadings(owner); }"
+        },
+        {
+          "line": 1466,
+          "source": "void cancelMarkdownHeadingEdit() { markdownController.cancelHeadingEdit(); }"
+        },
+        {
+          "line": 1468,
+          "source": "void cancelMarkdownLinkNavigation() { markdownController.cancelLinkNavigation(); }"
+        },
+        {
+          "line": 1470,
+          "source": "void markdownSourceClosed(FileBuffer buffer) {"
+        },
+        {
+          "line": 1475,
+          "source": "void releaseClosedBufferResources(FileBuffer buffer) {"
+        },
+        {
+          "line": 1480,
+          "source": "boolean isMarkdownSourceCurrent(FileBuffer buffer, MarkdownSemanticSnapshot.Source source) {"
+        },
+        {
+          "line": 1485,
+          "source": "String gotoMarkdownHeading(FileBuffer buffer, MarkdownSemanticSnapshot.Source source, MarkdownHeadingAnalysis.Heading heading) {"
+        },
+        {
+          "line": 1497,
+          "source": "String showMarkdownSymbols(String argument) { return markdownController.showSemanticSymbols(argument); }"
+        },
+        {
+          "line": 1499,
+          "source": "String showMarkdownSymbolResults(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {"
+        },
+        {
+          "line": 1503,
+          "source": "void refreshMarkdownPreviews() {"
+        },
+        {
+          "line": 1509,
+          "source": "String[] getCurrentLines() {"
+        },
+        {
+          "line": 1515,
+          "source": "String toggleFoldAtCursor() {"
+        },
+        {
+          "line": 1519,
+          "source": "String foldHeading(int headingLine, MarkdownService.FoldRange range, String[] lines) {"
+        },
+        {
+          "line": 1523,
+          "source": "String unfoldHeading(int headingLine, String[] lines) {"
+        },
+        {
+          "line": 1527,
+          "source": "String foldAll() {"
+        },
+        {
+          "line": 1531,
+          "source": "String unfoldAll() {"
+        },
+        {
+          "line": 1535,
+          "source": "String globalFoldCycle() {"
+        },
+        {
+          "line": 1541,
+          "source": "String navigateHeading(boolean forward) {"
+        },
+        {
+          "line": 1545,
+          "source": "String navigateHeadingAtLevel(boolean forward, int level) {"
+        },
+        {
+          "line": 1549,
+          "source": "public String showTableOfContents() {"
+        },
+        {
+          "line": 1553,
+          "source": "public String showOutline() {"
+        },
+        {
+          "line": 1559,
+          "source": "String markdownHeadingShift(boolean demote) {"
+        },
+        {
+          "line": 1563,
+          "source": "String markdownSubtreeShift(boolean demote) {"
+        },
+        {
+          "line": 1569,
+          "source": "boolean isOnTableLine() {"
+        },
+        {
+          "line": 1573,
+          "source": "String markdownTableNextCell(boolean reverse) {"
+        },
+        {
+          "line": 1577,
+          "source": "public String alignMarkdownTable() {"
+        },
+        {
+          "line": 1581,
+          "source": "public String sortMarkdownTable(String args) {"
+        },
+        {
+          "line": 1585,
+          "source": "public String insertTableColumn(String args) {"
+        },
+        {
+          "line": 1589,
+          "source": "public String deleteTableColumn(String args) {"
+        },
+        {
+          "line": 1593,
+          "source": "public String insertTableTemplate(String args) {"
+        },
+        {
+          "line": 1599,
+          "source": "public String toggleCheckbox() {"
+        },
+        {
+          "line": 1605,
+          "source": "String handleMarkdownEnter() {"
+        },
+        {
+          "line": 1611,
+          "source": "public String insertLink() {"
+        },
+        {
+          "line": 1615,
+          "source": "public String insertImage() {"
+        },
+        {
+          "line": 1619,
+          "source": "String showMarkdownLinks(boolean incoming) { return markdownController.showLinks(incoming); }"
+        },
+        {
+          "line": 1621,
+          "source": "public String goToMarkdownLink() {"
+        },
+        {
+          "line": 1627,
+          "source": "public String setConcealLevel(int level) {"
+        },
+        {
+          "line": 1633,
+          "source": "boolean isOnCodeFenceLine() {"
+        },
+        {
+          "line": 1637,
+          "source": "String completeCodeFenceLanguage() {"
+        },
+        {
+          "line": 1641,
+          "source": "String expandSnippetAtCursor() {"
+        },
+        {
+          "line": 1645,
+          "source": "public String listSnippets() {"
+        },
+        {
+          "line": 1651,
+          "source": "public String toggleBracketColors() {"
+        },
+        {
+          "line": 1655,
+          "source": "void applyBracketHighlighting() {"
+        },
+        {
+          "line": 1659,
+          "source": "void clearBracketHighlighting() {"
+        },
+        {
+          "line": 1665,
+          "source": "public void registerFileWatch(FileBuffer buffer) {"
+        },
+        {
+          "line": 1671,
+          "source": "public List<String> fuzzyCompleteCommand(String prefix) {"
+        },
+        {
+          "line": 1676,
+          "source": "List<String> getAllCommandNames() {"
+        },
+        {
+          "line": 1685,
+          "source": "public String openTerminal() {"
+        },
+        {
+          "line": 1689,
+          "source": "String handleTerminalCommand(String argument) {"
+        },
+        {
+          "line": 1693,
+          "source": "File resolveTerminalStartDirectory() {"
+        },
+        {
+          "line": 1697,
+          "source": "void closeTerminalSession(FileBuffer buffer) {"
+        },
+        {
+          "line": 1701,
+          "source": "void closeAllTerminalSessions() {"
+        },
+        {
+          "line": 1705,
+          "source": "List<Map<String, Object>> serializeTerminalSessionMetadata() {"
+        },
+        {
+          "line": 1709,
+          "source": "String restoreTerminalSessionMetadata(Object value) {"
+        },
+        {
+          "line": 1713,
+          "source": "void closeExitedTerminal(FileBuffer buffer) {"
+        },
+        {
+          "line": 1719,
+          "source": "public String deleteLineRange(int startLine, int endLine) {"
+        },
+        {
+          "line": 1723,
+          "source": "public String substituteRange(String pattern, String replacement, int startLine, int endLine, boolean replaceAll) {"
+        },
+        {
+          "line": 1727,
+          "source": "public String runShellCommand(String command) {"
+        },
+        {
+          "line": 1731,
+          "source": "public String runDropCommand(String command) {"
+        },
+        {
+          "line": 1735,
+          "source": "public String handleTaskCommand(String argument) {"
+        },
+        {
+          "line": 1750,
+          "source": "public String handleTestCommand(String argument) {"
+        },
+        {
+          "line": 1754,
+          "source": "public String handleCoverageCommand(String argument) {"
+        },
+        {
+          "line": 1758,
+          "source": "public String handleToolchainCommand(String argument) {"
+        },
+        {
+          "line": 1762,
+          "source": "File resolveTaskProjectRoot() {"
+        },
+        {
+          "line": 1766,
+          "source": "File detectTaskProjectRoot(File file) {"
+        },
+        {
+          "line": 1770,
+          "source": "String showProjectTasks(File projectRoot, Map<String, String> tasks) {"
+        },
+        {
+          "line": 1774,
+          "source": "String saveProjectTask(File projectRoot, String name, String command) {"
+        },
+        {
+          "line": 1778,
+          "source": "String removeProjectTask(File projectRoot, String name) {"
+        },
+        {
+          "line": 1782,
+          "source": "String runNamedTask(String taskName, File projectRoot, Map<String, String> tasks) {"
+        },
+        {
+          "line": 1786,
+          "source": "String inferBuiltInTaskCommand(String taskName, File projectRoot) {"
+        },
+        {
+          "line": 1790,
+          "source": "void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {"
+        },
+        {
+          "line": 1794,
+          "source": "public String filterRangeWithCommand(int startLine, int endLine, String command) {"
+        },
+        {
+          "line": 1798,
+          "source": "public String showPerfReport() {"
+        },
+        {
+          "line": 1802,
+          "source": "public String showPerfReport(String argument) {"
+        },
+        {
+          "line": 1821,
+          "source": "public String showAbout() {"
+        },
+        {
+          "line": 1826,
+          "source": "public String showConfigLoadStatus() {"
+        },
+        {
+          "line": 1831,
+          "source": "String cancelJob(String jobIdArgument) {"
+        },
+        {
+          "line": 1835,
+          "source": "public String openQuickfixList() {"
+        },
+        {
+          "line": 1839,
+          "source": "public String quickfixNext() {"
+        },
+        {
+          "line": 1843,
+          "source": "public String quickfixPrev() {"
+        },
+        {
+          "line": 1847,
+          "source": "public String quickfixFirst() {"
+        },
+        {
+          "line": 1851,
+          "source": "public String quickfixLast() {"
+        },
+        {
+          "line": 1855,
+          "source": "public String quickfixCurrent(String argument) {"
+        },
+        {
+          "line": 1859,
+          "source": "public String closeQuickfixList() {"
+        },
+        {
+          "line": 1863,
+          "source": "void pruneSpecialBufferReturns(FileBuffer scratchBuffer) {"
+        },
+        {
+          "line": 1867,
+          "source": "boolean isQuickfixBufferActive() {"
+        },
+        {
+          "line": 1871,
+          "source": "String openQuickfixSelection() {"
+        },
+        {
+          "line": 1875,
+          "source": "boolean isInteractiveGitBufferActive() {"
+        },
+        {
+          "line": 1879,
+          "source": "String openInteractiveGitSelection() {"
+        },
+        {
+          "line": 1883,
+          "source": "String openGitLogSelectionAtCaret() {"
+        },
+        {
+          "line": 1887,
+          "source": "String jumpToQuickfixEntry(QuickfixService.Entry entry) {"
+        },
+        {
+          "line": 1891,
+          "source": "void updateQuickfixEntries(String title, List<QuickfixService.Entry> entries) {"
+        },
+        {
+          "line": 1895,
+          "source": "List<QuickfixService.Entry> parseQuickfixEntries(String output, String defaultSource) {"
+        },
+        {
+          "line": 1899,
+          "source": "String validateShellCommand(String command) {"
+        },
+        {
+          "line": 1903,
+          "source": "CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {"
+        },
+        {
+          "line": 1907,
+          "source": "CommandResult runExternalCommand( List<String> command, File workingDirectory, String input, AsyncJobService.JobToken token, int timeoutMs, int outputLimitBytes, boolean redirectErrorStream ) {"
+        },
+        {
+          "line": 1911,
+          "source": "void readInputStreamCapped(InputStream stream, ByteArrayOutputStream out, int maxBytes, boolean[] truncated) {"
+        },
+        {
+          "line": 1915,
+          "source": "void handleShellJobCompletion(AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {"
+        },
+        {
+          "line": 1919,
+          "source": "void handleFilterJobCompletion( AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error, FileBuffer targetBuffer, int startOffset, int endOffset, String originalInput, int startLine, int endLine ) {"
+        },
+        {
+          "line": 1923,
+          "source": "public String showFileFinder() {"
+        },
+        {
+          "line": 1927,
+          "source": "void collectProjectFiles(File dir, String rootPath, List<String> result, int limit) {"
+        },
+        {
+          "line": 1931,
+          "source": "public String showFolderFinder() {"
+        },
+        {
+          "line": 1935,
+          "source": "String openFolder() {"
+        },
+        {
+          "line": 1939,
+          "source": "String showFileFinderFromFolder(File folder) {"
+        },
+        {
+          "line": 1943,
+          "source": "File chooseWithNavigator(int selectionMode, File startDirectory, String title) {"
+        },
+        {
+          "line": 1947,
+          "source": "File resolveNavigatorStartDirectory(File preferred) {"
+        },
+        {
+          "line": 1951,
+          "source": "public String handleTreeCommand(String argument) {"
+        },
+        {
+          "line": 1955,
+          "source": "String revealCurrentInTree() {"
+        },
+        {
+          "line": 1959,
+          "source": "String treeCreateFile(String pathArgument) {"
+        },
+        {
+          "line": 1963,
+          "source": "String treeCreateDirectory(String pathArgument) {"
+        },
+        {
+          "line": 1967,
+          "source": "String treeRename(String argument) {"
+        },
+        {
+          "line": 1971,
+          "source": "String treeDelete(String argument, boolean force) {"
+        },
+        {
+          "line": 1975,
+          "source": "String validateTreeDeleteTarget(File target) {"
+        },
+        {
+          "line": 1979,
+          "source": "public String showFileTree(String pathArgument) {"
+        },
+        {
+          "line": 1983,
+          "source": "String closeTreePane() {"
+        },
+        {
+          "line": 1987,
+          "source": "void appendTreeEntry(StringBuilder builder, List<String> lineTargets, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {"
+        },
+        {
+          "line": 1991,
+          "source": "void appendTreeLine(StringBuilder builder, List<String> lineTargets, String text, String targetPath) {"
+        },
+        {
+          "line": 1995,
+          "source": "File[] listTreeChildren(File directory) {"
+        },
+        {
+          "line": 1999,
+          "source": "String treeTitleSuffix(File root) {"
+        },
+        {
+          "line": 2003,
+          "source": "FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {"
+        },
+        {
+          "line": 2007,
+          "source": "EditorPane resolveTreeContentPaneForTreeCommand() {"
+        },
+        {
+          "line": 2011,
+          "source": "EditorPane ensureTreePane(EditorPane contentPane) {"
+        },
+        {
+          "line": 2015,
+          "source": "boolean isTreePaneActive() {"
+        },
+        {
+          "line": 2019,
+          "source": "boolean isTreeBuffer(FileBuffer buffer) {"
+        },
+        {
+          "line": 2023,
+          "source": "String openTreeSelection() {"
+        },
+        {
+          "line": 2027,
+          "source": "EditorPane resolveTreeContentPaneForOpen() {"
+        },
+        {
+          "line": 2031,
+          "source": "public String handleGitCommand(String argument) {"
+        },
+        {
+          "line": 2035,
+          "source": "String handleScmCommand(String argument) {"
+        },
+        {
+          "line": 2039,
+          "source": "String handleNotebookCommand(String argument) {"
+        },
+        {
+          "line": 2043,
+          "source": "String handleContainerCommand(String argument) {"
+        },
+        {
+          "line": 2047,
+          "source": "String handleDockerCommand(String argument) {"
+        },
+        {
+          "line": 2051,
+          "source": "String handleComposeCommand(String argument) {"
+        },
+        {
+          "line": 2055,
+          "source": "String handleDatabaseCommand(String argument) {"
+        },
+        {
+          "line": 2059,
+          "source": "boolean showAlternateSurfaceIfAvailable(EditorPane pane, FileBuffer buffer) {"
+        },
+        {
+          "line": 2063,
+          "source": "String handleRemoteWorkspaceCommand(String argument) {"
+        },
+        {
+          "line": 2067,
+          "source": "public String handleGitHubCommand(String argument) {"
+        },
+        {
+          "line": 2071,
+          "source": "public String handleUpdateCommand(String argument) {"
+        },
+        {
+          "line": 2075,
+          "source": "File resolveGitRoot() {"
+        },
+        {
+          "line": 2079,
+          "source": "String showGitStatus(File gitRoot) {"
+        },
+        {
+          "line": 2083,
+          "source": "String showGitDiff(File gitRoot, String args) {"
+        },
+        {
+          "line": 2087,
+          "source": "void refreshGitGutter() {"
+        },
+        {
+          "line": 2091,
+          "source": "void parseUnifiedDiffForGutter(String diff, Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {"
+        },
+        {
+          "line": 2095,
+          "source": "String showGitLog(File gitRoot, String args) {"
+        },
+        {
+          "line": 2099,
+          "source": "String showGitBranches(File gitRoot) {"
+        },
+        {
+          "line": 2103,
+          "source": "String runGitAdd(File gitRoot, String args) {"
+        },
+        {
+          "line": 2107,
+          "source": "String runGitRestoreStaged(File gitRoot, String args) {"
+        },
+        {
+          "line": 2111,
+          "source": "String runGitCommit(File gitRoot, String message) {"
+        },
+        {
+          "line": 2115,
+          "source": "String runGitAmend(File gitRoot, String argument) {"
+        },
+        {
+          "line": 2119,
+          "source": "boolean gitHeadExists(File gitRoot) {"
+        },
+        {
+          "line": 2123,
+          "source": "String runGitCheckout(File gitRoot, String argument) {"
+        },
+        {
+          "line": 2127,
+          "source": "String runGitSwitch(File gitRoot, String argument) {"
+        },
+        {
+          "line": 2131,
+          "source": "String runGitHunkCommand(File gitRoot, String argument) {"
+        },
+        {
+          "line": 2135,
+          "source": "String selectGitHunkPatch(String diff, int line) {"
+        },
+        {
+          "line": 2139,
+          "source": "boolean gitHunkContainsLine(String marker, int line) {"
+        },
+        {
+          "line": 2143,
+          "source": "String relativizeAgainstGitRoot(File gitRoot, File file) {"
+        },
+        {
+          "line": 2147,
+          "source": "String showGitHelp() {"
+        },
+        {
+          "line": 2151,
+          "source": "List<String> splitWhitespaceArgs(String args) {"
+        },
+        {
+          "line": 2155,
+          "source": "List<String> parseQuotedArguments(String raw) {"
+        },
+        {
+          "line": 2159,
+          "source": "CommandResult runCommand(File workingDirectory, List<String> command) {"
+        },
+        {
+          "line": 2163,
+          "source": "String gitError(CommandResult result) {"
+        },
+        {
+          "line": 2167,
+          "source": "public String showCommandPalette() {"
+        },
+        {
+          "line": 2171,
+          "source": "public String showBufferFinder() {"
+        },
+        {
+          "line": 2175,
+          "source": "public String showGrepFinder(String pattern) {"
+        },
+        {
+          "line": 2179,
+          "source": "public String handleProjectReplace(String argument) {"
+        },
+        {
+          "line": 2183,
+          "source": "WorkspaceReplaceCoordinator workspaceReplaceCoordinator() { return paletteController.workspaceReplaceCoordinator(); }"
+        },
+        {
+          "line": 2185,
+          "source": "public String showSymbols(String argument) {"
+        },
+        {
+          "line": 2189,
+          "source": "public String showWorkspaceSymbols(String argument) {"
+        },
+        {
+          "line": 2193,
+          "source": "String showHeuristicSymbols(String argument) {"
+        },
+        {
+          "line": 2197,
+          "source": "String showLspSymbols(List<LspClient.NavigationSymbol> symbols, String query, boolean workspace) {"
+        },
+        {
+          "line": 2201,
+          "source": "String showWorkspaceHeuristicSymbols(List<WorkspaceSymbolService.Match> symbols, String query, boolean truncated) {"
+        },
+        {
+          "line": 2205,
+          "source": "String openLspSymbol(LspClient.NavigationSymbol symbol) {"
+        },
+        {
+          "line": 2209,
+          "source": "public String handleProblemsCommand(String argument) {"
+        },
+        {
+          "line": 2213,
+          "source": "String formatSymbolCandidate(SymbolService.Symbol symbol) {"
+        },
+        {
+          "line": 2217,
+          "source": "String describeSymbolCandidate( String selection, Map<String, SymbolService.Symbol> candidateMap, List<SymbolService.Symbol> allSymbols ) {"
+        },
+        {
+          "line": 2221,
+          "source": "void collectFiles(File directory, List<String> results) {"
+        },
+        {
+          "line": 2225,
+          "source": "List<String> grepFiles(String pattern) {"
+        },
+        {
+          "line": 2229,
+          "source": "void grepFilesRecursive(File directory, String pattern, List<String> results) {"
+        },
+        {
+          "line": 2233,
+          "source": "String describeCommandPaletteCandidate(String selection) {"
+        },
+        {
+          "line": 2237,
+          "source": "String describeGrepCandidate(String selection) {"
+        },
+        {
+          "line": 2241,
+          "source": "String showPaletteDialog(String title, List<String> candidates) {"
+        },
+        {
+          "line": 2245,
+          "source": "String showPaletteDialog(String title, List<String> candidates, ListCellRenderer<? super String> renderer) {"
+        },
+        {
+          "line": 2249,
+          "source": "String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {"
+        },
+        {
+          "line": 2253,
+          "source": "boolean shouldSkipHiddenPath(File file) {"
+        },
+        {
+          "line": 2257,
+          "source": "public String showRegisters() {"
+        },
+        {
+          "line": 2261,
+          "source": "public String showMarks() {"
+        },
+        {
+          "line": 2265,
+          "source": "String trimForRegisterDisplay(String value) {"
+        },
+        {
+          "line": 2269,
+          "source": "String describeOffset(int offset) {"
+        },
+        {
+          "line": 2274,
+          "source": "public String toggleMinimap() {"
+        },
+        {
+          "line": 2278,
+          "source": "public String toggleZenMode() {"
+        },
+        {
+          "line": 2282,
+          "source": "public String toggleGoyoMode() {"
+        },
+        {
+          "line": 2286,
+          "source": "public String toggleLimelight() {"
+        },
+        {
+          "line": 2290,
+          "source": "void updateZenModeLayout() {"
+        },
+        {
+          "line": 2294,
+          "source": "void refreshLimelight() {"
+        },
+        {
+          "line": 2298,
+          "source": "void paintLimelightOverlay(Graphics graphics, JTextArea area) {"
+        },
+        {
+          "line": 2302,
+          "source": "public String executeNormalKeys(String keys, int startLine, int endLine) {"
+        },
+        {
+          "line": 2323,
+          "source": "public int getCurrentLineNumber() {"
+        },
+        {
+          "line": 2327,
+          "source": "String getWordAtCaret() {"
+        },
+        {
+          "line": 2331,
+          "source": "public String showLspCompletionStatus() {"
+        },
+        {
+          "line": 2335,
+          "source": "public String handleLspCommand(String argument) {"
+        },
+        {
+          "line": 2339,
+          "source": "public String formatCurrentBuffer() {"
+        },
+        {
+          "line": 2343,
+          "source": "public String showFormatterPolicy() {"
+        },
+        {
+          "line": 2347,
+          "source": "public String handleDebugCommand(String argument) {"
+        },
+        {
+          "line": 2362,
+          "source": "public String lspStatus() {"
+        },
+        {
+          "line": 2366,
+          "source": "public String lspRestart(String ext) {"
+        },
+        {
+          "line": 2370,
+          "source": "void showLanguageServices() {"
+        },
+        {
+          "line": 2374,
+          "source": "public String lspStop(String ext) {"
+        },
+        {
+          "line": 2378,
+          "source": "public String lspServers() {"
+        },
+        {
+          "line": 2382,
+          "source": "public String lspLog() {"
+        },
+        {
+          "line": 2386,
+          "source": "String currentBufferExtension() {"
+        },
+        {
+          "line": 2390,
+          "source": "void cancelLspDefinition() {"
+        },
+        {
+          "line": 2394,
+          "source": "public String lspGoToDefinition() {"
+        },
+        {
+          "line": 2398,
+          "source": "public String lspGoToTypeDefinition() {"
+        },
+        {
+          "line": 2402,
+          "source": "public String lspGoToImplementation() {"
+        },
+        {
+          "line": 2406,
+          "source": "public String lspDocumentHighlights(String argument) {"
+        },
+        {
+          "line": 2410,
+          "source": "public String lspHover() {"
+        },
+        {
+          "line": 2414,
+          "source": "public String lspReferences() {"
+        },
+        {
+          "line": 2418,
+          "source": "public String lspRename(String newName) {"
+        },
+        {
+          "line": 2422,
+          "source": "public String lspRenameApply() {"
+        },
+        {
+          "line": 2426,
+          "source": "public String lspRenameCancel() {"
+        },
+        {
+          "line": 2430,
+          "source": "String buildLspRenamePreview(String targetName, List<LspClient.TextEdit> edits) {"
+        },
+        {
+          "line": 2434,
+          "source": "public String lspCodeActions(String selectionArgument) {"
+        },
+        {
+          "line": 2438,
+          "source": "List<LspClient.CodeAction> collectCursorCodeActions(LspClient client, String uri, int line, int column) {"
+        },
+        {
+          "line": 2442,
+          "source": "int parseOneBasedIndex(String value) {"
+        },
+        {
+          "line": 2446,
+          "source": "public String showDiagnostics() {"
+        },
+        {
+          "line": 2450,
+          "source": "public String diagnosticsNext() {"
+        },
+        {
+          "line": 2454,
+          "source": "public String diagnosticsPrev() {"
+        },
+        {
+          "line": 2458,
+          "source": "String jumpDiagnostic(boolean forward) {"
+        },
+        {
+          "line": 2462,
+          "source": "List<QuickfixService.Entry> diagnosticsToQuickfixEntries(String filePath, List<LspClient.Diagnostic> diagnostics) {"
+        },
+        {
+          "line": 2466,
+          "source": "String diagnosticSeverityLabel(int severity) {"
+        },
+        {
+          "line": 2470,
+          "source": "String openLspLocation(LspClient.Location location, String label) {"
+        },
+        {
+          "line": 2474,
+          "source": "WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {"
+        },
+        {
+          "line": 2478,
+          "source": "String applyResolvedTextEdits(String text, List<ResolvedTextEdit> resolvedEdits) {"
+        },
+        {
+          "line": 2482,
+          "source": "List<ResolvedTextEdit> resolveTextEdits(String text, List<LspClient.TextEdit> edits) {"
+        },
+        {
+          "line": 2486,
+          "source": "List<Integer> lineStartOffsets(String text) {"
+        },
+        {
+          "line": 2490,
+          "source": "int offsetForLineCharacter(String text, List<Integer> lineStarts, int line, int character) {"
+        },
+        {
+          "line": 2494,
+          "source": "String filePathFromUri(String uri) {"
+        },
+        {
+          "line": 2498,
+          "source": "String currentCompletionPrefix() {"
+        },
+        {
+          "line": 2502,
+          "source": "List<String> collectBufferCompletions(String prefix) {"
+        },
+        {
+          "line": 2506,
+          "source": "void addCompletionCandidate(String prefix, java.util.LinkedHashSet<String> unique, String candidate) {"
+        },
+        {
+          "line": 2510,
+          "source": "void applyCompletion(String prefix, String completion) {"
+        },
+        {
+          "line": 2514,
+          "source": "LspClient resolveLspClient(FileBuffer buffer) {"
+        },
+        {
+          "line": 2518,
+          "source": "void syncLspOpen(FileBuffer buffer) {"
+        },
+        {
+          "line": 2522,
+          "source": "void syncLspChange(FileBuffer buffer) {"
+        },
+        {
+          "line": 2526,
+          "source": "void syncLspChange(FileBuffer buffer, int offset, int removedLength, String insertedText) {"
+        },
+        {
+          "line": 2530,
+          "source": "void syncLspChange(FileBuffer buffer, FileBuffer.DocumentTextChange textChange) {"
+        },
+        {
+          "line": 2534,
+          "source": "void flushLspChange(FileBuffer buffer) {"
+        },
+        {
+          "line": 2538,
+          "source": "String lspCompletionUnavailableReason(FileBuffer buffer) {"
+        },
+        {
+          "line": 2542,
+          "source": "void shutdownLspScheduling() {"
+        },
+        {
+          "line": 2546,
+          "source": "void scheduleDiagnosticRefresh() {"
+        },
+        {
+          "line": 2550,
+          "source": "void refreshLspDecorations() {"
+        },
+        {
+          "line": 2554,
+          "source": "void clearLspDecorations() {"
+        },
+        {
+          "line": 2558,
+          "source": "public void notifyCurrentBufferSaved() {"
+        },
+        {
+          "line": 2562,
+          "source": "public void notifyBufferSaved(FileBuffer buffer) {"
+        },
+        {
+          "line": 2570,
+          "source": "void pollLspNotifications(FileBuffer buffer) {"
+        },
+        {
+          "line": 2574,
+          "source": "LspClient existingLspClient(FileBuffer buffer) {"
+        },
+        {
+          "line": 2578,
+          "source": "String bufferUri(FileBuffer buffer) {"
+        },
+        {
+          "line": 2582,
+          "source": "String languageId(FileBuffer buffer) {"
+        },
+        {
+          "line": 2586,
+          "source": "String bufferExtension(FileBuffer buffer) {"
+        },
+        {
+          "line": 2590,
+          "source": "String[] builtinLspCommand(String extension) {"
+        },
+        {
+          "line": 2595,
+          "source": "void repeatLastCommand() {"
+        },
+        {
+          "line": 2660,
+          "source": "void insertLastText() {"
+        },
+        {
+          "line": 2664,
+          "source": "int consumePendingCount() {"
+        },
+        {
+          "line": 2668,
+          "source": "void repeatAction(int count, Runnable action) {"
+        },
+        {
+          "line": 2672,
+          "source": "Character consumePendingRegister() {"
+        },
+        {
+          "line": 2676,
+          "source": "void storeYank(Character register, String text, boolean lineWise) {"
+        },
+        {
+          "line": 2680,
+          "source": "void storeDelete(Character register, String text, boolean lineWise) {"
+        },
+        {
+          "line": 2684,
+          "source": "void addToYankRing(RegisterContent content) {"
+        },
+        {
+          "line": 2688,
+          "source": "public String showYankRingPicker() {"
+        },
+        {
+          "line": 2692,
+          "source": "String pasteFromRegister(boolean before) {"
+        },
+        {
+          "line": 2696,
+          "source": "String playMacro(Character register) {"
+        },
+        {
+          "line": 2700,
+          "source": "String playMacro(Character register, int count) {"
+        },
+        {
+          "line": 2704,
+          "source": "String yankToEndOfLine() {"
+        },
+        {
+          "line": 2708,
+          "source": "String replaceCharacter(char replacement) {"
+        },
+        {
+          "line": 2712,
+          "source": "String applyMotionOperator(char operator, String motion) {"
+        },
+        {
+          "line": 2716,
+          "source": "String applyTextObjectOperator(char operator, char modifier, char objectKey) {"
+        },
+        {
+          "line": 2720,
+          "source": "String applyResolvedRange(char operator, MotionRange range, String label) {"
+        },
+        {
+          "line": 2724,
+          "source": "MotionRange resolveMotionRange(String motion) {"
+        },
+        {
+          "line": 2728,
+          "source": "MotionRange resolveTextObjectRange(char modifier, char objectKey) {"
+        },
+        {
+          "line": 2732,
+          "source": "String handleSurroundPending(char c) {"
+        },
+        {
+          "line": 2736,
+          "source": "boolean isTextObjectKey(char c) {"
+        },
+        {
+          "line": 2740,
+          "source": "String surroundChange(char oldChar, char newChar) {"
+        },
+        {
+          "line": 2744,
+          "source": "String surroundDelete(char target) {"
+        },
+        {
+          "line": 2748,
+          "source": "String surroundAdd(char targetObject, char surroundChar) {"
+        },
+        {
+          "line": 2752,
+          "source": "MotionRange resolveSurroundRange(char surround) {"
+        },
+        {
+          "line": 2756,
+          "source": "SurroundPair surroundPair(char surround) {"
+        },
+        {
+          "line": 2760,
+          "source": "MotionRange resolveWordObject(boolean around, boolean bigWord) {"
+        },
+        {
+          "line": 2764,
+          "source": "MotionRange resolveParagraphObject(boolean around) {"
+        },
+        {
+          "line": 2768,
+          "source": "MotionRange resolveSentenceObject(boolean around) {"
+        },
+        {
+          "line": 2772,
+          "source": "MotionRange resolveQuoteObject(boolean around, char quote) {"
+        },
+        {
+          "line": 2776,
+          "source": "MotionRange resolveBracketObject(boolean around, char open, char close) {"
+        },
+        {
+          "line": 2780,
+          "source": "int previewMotionTarget(String motion) {"
+        },
+        {
+          "line": 2785,
+          "source": "void setMode(EditorMode mode) {"
+        },
+        {
+          "line": 2790,
+          "source": "Color getModeBackground(EditorMode mode) {"
+        },
+        {
+          "line": 2795,
+          "source": "void updateStatusBar() {"
+        },
+        {
+          "line": 2799,
+          "source": "void requestStatusBarRefresh() {"
+        },
+        {
+          "line": 2803,
+          "source": "String inlinePeekMessage(FileBuffer buffer) {"
+        },
+        {
+          "line": 2807,
+          "source": "String quickfixInlinePeek() {"
+        },
+        {
+          "line": 2811,
+          "source": "String diagnosticInlinePeek(FileBuffer buffer) {"
+        },
+        {
+          "line": 2815,
+          "source": "String safePreviewText(String text, int maxLength) {"
+        },
+        {
+          "line": 2819,
+          "source": "void appendLspStatus(StringBuilder status, FileBuffer buffer) {"
+        },
+        {
+          "line": 2823,
+          "source": "void handleDocumentChange(DocumentEvent event) {"
+        },
+        {
+          "line": 2827,
+          "source": "void scheduleCompletionAfterDocumentChange(DocumentEvent event, FileBuffer.DocumentTextChange change) {"
+        },
+        {
+          "line": 2831,
+          "source": "void scheduleOpenBufferCompletionIndex() {"
+        },
+        {
+          "line": 2835,
+          "source": "void scheduleIdleBackup(FileBuffer buffer) {"
+        },
+        {
+          "line": 2839,
+          "source": "void backupBeforeSave(FileBuffer buffer) {"
+        },
+        {
+          "line": 2843,
+          "source": "void flushPendingBackups() {"
+        },
+        {
+          "line": 2847,
+          "source": "void withSuppressedDocumentEvents(Runnable action) {"
+        },
+        {
+          "line": 2851,
+          "source": "void detachActiveDocumentListener() {"
+        },
+        {
+          "line": 2855,
+          "source": "void attachActiveDocumentListener() {"
+        },
+        {
+          "line": 2859,
+          "source": "void loadBufferIntoEditor(FileBuffer buffer) {"
+        },
+        {
+          "line": 2864,
+          "source": "void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {"
+        },
+        {
+          "line": 2868,
+          "source": "void handleLargeFileScroll(EditorPane pane) {"
+        },
+        {
+          "line": 2872,
+          "source": "void handleLargeFileCaret(EditorPane pane) {"
+        },
+        {
+          "line": 2876,
+          "source": "void handleLargeFileResize(EditorPane pane) {"
+        },
+        {
+          "line": 2880,
+          "source": "void persistCurrentBufferState() {"
+        },
+        {
+          "line": 2885,
+          "source": "void markModified() {"
+        },
+        {
+          "line": 2889,
+          "source": "void updateDiffGutter(FileBuffer buffer) {"
+        },
+        {
+          "line": 2893,
+          "source": "void scheduleDiffGutter(FileBuffer buffer) {"
+        },
+        {
+          "line": 2897,
+          "source": "void scheduleDiffGutter(FileBuffer buffer, FileBuffer.DocumentTextChange change) {"
+        },
+        {
+          "line": 2902,
+          "source": "public void showMessage(String message) {"
+        },
+        {
+          "line": 2907,
+          "source": "void openFileChooser() {"
+        },
+        {
+          "line": 2911,
+          "source": "void openEmptyBuffer() {"
+        },
+        {
+          "line": 2915,
+          "source": "public void openFile(File file) throws IOException {"
+        },
+        {
+          "line": 2919,
+          "source": "public void openFileAsync(File file) {"
+        },
+        {
+          "line": 2923,
+          "source": "public void openFileAsync(File file, java.util.function.Consumer<IOException> completion) {"
+        },
+        {
+          "line": 2927,
+          "source": "void openMarkdownTarget(MarkdownLinkNavigation.Target target, java.util.function.BooleanSupplier current, Runnable accepted,"
+        },
+        {
+          "line": 2933,
+          "source": "String openFileAtAsync(File file, int line, int column, String successMessage) {"
+        },
+        {
+          "line": 2959,
+          "source": "public FileBuffer getCurrentBuffer() {"
+        },
+        {
+          "line": 2963,
+          "source": "String snippetLanguageId(FileBuffer buffer) {"
+        },
+        {
+          "line": 2968,
+          "source": "int effectiveTabSize(FileBuffer buffer) {"
+        },
+        {
+          "line": 2974,
+          "source": "boolean effectiveExpandTab(FileBuffer buffer) {"
+        },
+        {
+          "line": 2980,
+          "source": "private WorkspaceEditorSettings.Indentation workspaceEditorSettings(FileBuffer buffer) {"
+        },
+        {
+          "line": 2986,
+          "source": "private void refreshIndentationPreferences(FileBuffer buffer) {"
+        },
+        {
+          "line": 2992,
+          "source": "int effectiveTabSize() { return effectiveTabSize(getCurrentBuffer()); }"
+        },
+        {
+          "line": 2994,
+          "source": "boolean effectiveExpandTab() { return effectiveExpandTab(getCurrentBuffer()); }"
+        },
+        {
+          "line": 2996,
+          "source": "public JTextArea getTextArea() {"
+        },
+        {
+          "line": 3000,
+          "source": "public String nextBuffer() {"
+        },
+        {
+          "line": 3004,
+          "source": "public String prevBuffer() {"
+        },
+        {
+          "line": 3008,
+          "source": "public String deleteBuffer(boolean force) {"
+        },
+        {
+          "line": 3012,
+          "source": "void switchToBuffer(int index) {"
+        },
+        {
+          "line": 3016,
+          "source": "public String splitWindow(boolean vertical) {"
+        },
+        {
+          "line": 3020,
+          "source": "String openFileInSplit(File file, EditorPane targetPane, WindowLayoutNode.Orientation orientation, boolean newPaneFirst) {"
+        },
+        {
+          "line": 3024,
+          "source": "public String closeActiveWindow() {"
+        },
+        {
+          "line": 3028,
+          "source": "boolean canCloseActiveWindow() {"
+        },
+        {
+          "line": 3032,
+          "source": "String closeActiveBufferWithoutExiting(boolean force) {"
+        },
+        {
+          "line": 3036,
+          "source": "String closePane(EditorPane paneToClose) {"
+        },
+        {
+          "line": 3040,
+          "source": "public String cycleWindowFocus() {"
+        },
+        {
+          "line": 3044,
+          "source": "public String cycleWindowFocus(int direction) {"
+        },
+        {
+          "line": 3048,
+          "source": "public String resizeActiveWindow(double delta) {"
+        },
+        {
+          "line": 3052,
+          "source": "public String equalizeWindows() {"
+        },
+        {
+          "line": 3056,
+          "source": "public String focusWindowDirection(int dx, int dy) {"
+        },
+        {
+          "line": 3060,
+          "source": "WindowLayoutNode.Direction toLayoutDirection(int dx, int dy) {"
+        },
+        {
+          "line": 3064,
+          "source": "double directionalAlignmentScore(Rectangle activeBounds, Rectangle candidateBounds, WindowLayoutNode.Direction direction) {"
+        },
+        {
+          "line": 3068,
+          "source": "Rectangle paneBounds(EditorPane pane) {"
+        },
+        {
+          "line": 3072,
+          "source": "FileBuffer findBufferByPath(File file) {"
+        },
+        {
+          "line": 3076,
+          "source": "boolean shouldReplaceSingleUntitledBuffer() {"
+        },
+        {
+          "line": 3081,
+          "source": "public String search(String pattern) {"
+        },
+        {
+          "line": 3085,
+          "source": "public String searchBackward(String pattern) {"
+        },
+        {
+          "line": 3089,
+          "source": "public String substitute(String pattern, String replacement, boolean wholeBuffer, boolean replaceAll) {"
+        },
+        {
+          "line": 3093,
+          "source": "String substituteCurrentLine(String pattern, String replacement, boolean replaceAll) {"
+        },
+        {
+          "line": 3097,
+          "source": "ReplacementResult replaceLiteral(String text, String pattern, String replacement, boolean replaceAll) {"
+        },
+        {
+          "line": 3102,
+          "source": "public void toggleLineNumbers(boolean enabled) {"
+        },
+        {
+          "line": 3106,
+          "source": "public void setLineNumberMode(LineNumberMode mode) {"
+        },
+        {
+          "line": 3110,
+          "source": "public String setLineNumberMode(String value) {"
+        },
+        {
+          "line": 3114,
+          "source": "public void setHighlightSearch(boolean enabled) {"
+        },
+        {
+          "line": 3118,
+          "source": "public void setAutoIndent(boolean enabled) {"
+        },
+        {
+          "line": 3122,
+          "source": "public void setWrap(boolean enabled) {"
+        },
+        {
+          "line": 3126,
+          "source": "public void setExpandTab(boolean enabled) {"
+        },
+        {
+          "line": 3130,
+          "source": "public void setShowCurrentLine(boolean enabled) {"
+        },
+        {
+          "line": 3134,
+          "source": "public String getCurrentThemeName() {"
+        },
+        {
+          "line": 3138,
+          "source": "public Map<String, String> getActiveThemePaletteHex() {"
+        },
+        {
+          "line": 3142,
+          "source": "public String resolveCommandAlias(String command) {"
+        },
+        {
+          "line": 3146,
+          "source": "public String setThemeFromCommand(String value) {"
+        },
+        {
+          "line": 3150,
+          "source": "String mapPaletteAliasToConfigKey(String rawKey) {"
+        },
+        {
+          "line": 3154,
+          "source": "String colorToHex(Color color) {"
+        },
+        {
+          "line": 3158,
+          "source": "public String setConfigOption(String key, String value) {"
+        },
+        {
+          "line": 3162,
+          "source": "public String setConfigOptionPersistent(String key, String value) {"
+        },
+        {
+          "line": 3166,
+          "source": "public String resetConfigOptionPersistent(String key) {"
+        },
+        {
+          "line": 3170,
+          "source": "public String persistSuggestedConfigRepairs() {"
+        },
+        {
+          "line": 3174,
+          "source": "String setKeybindingPersistent(String scope, String lhs, String mapping) {"
+        },
+        {
+          "line": 3178,
+          "source": "String resetKeybindingPersistent(String scope, String lhs) {"
+        },
+        {
+          "line": 3182,
+          "source": "List<KeymapOverlay.Binding> getEffectiveKeybindings() {"
+        },
+        {
+          "line": 3186,
+          "source": "String showKeymapInspector() {"
+        },
+        {
+          "line": 3190,
+          "source": "String showEffectiveKeybindings(String query) {"
+        },
+        {
+          "line": 3194,
+          "source": "boolean isThemeRelatedConfigKey(String key) {"
+        },
+        {
+          "line": 3198,
+          "source": "public String saveConfigToDisk() {"
+        },
+        {
+          "line": 3202,
+          "source": "public String materializeDefaultConfig(boolean overwrite) {"
+        },
+        {
+          "line": 3206,
+          "source": "public String showSettingsInspector() {"
+        },
+        {
+          "line": 3210,
+          "source": "public String showTypedSettingsReference() {"
+        },
+        {
+          "line": 3214,
+          "source": "public String reloadConfigFromDisk() {"
+        },
+        {
+          "line": 3218,
+          "source": "String reloadConfigIfChanged() {"
+        },
+        {
+          "line": 3222,
+          "source": "public String reloadConfigIfSettingsBuffer(FileBuffer buffer) {"
+        },
+        {
+          "line": 3226,
+          "source": "public String reloadConfigIfSettingsBuffer(FileBuffer buffer, String previousContent, String updatedContent) {"
+        },
+        {
+          "line": 3230,
+          "source": "boolean isSettingsFile(File file) {"
+        },
+        {
+          "line": 3234,
+          "source": "boolean didConfigKeyChange(String previousContent, String updatedContent, String key) {"
+        },
+        {
+          "line": 3238,
+          "source": "String extractConfigValue(String content, String key) {"
+        },
+        {
+          "line": 3242,
+          "source": "void applyRuntimeConfigFromSettings() {"
+        },
+        {
+          "line": 3246,
+          "source": "String adjustUiZoom(int direction) {"
+        },
+        {
+          "line": 3250,
+          "source": "String adjustUiZoom(int direction, double percentage) {"
+        },
+        {
+          "line": 3254,
+          "source": "String resetUiZoom() {"
+        },
+        {
+          "line": 3258,
+          "source": "public String showThemes() {"
+        },
+        {
+          "line": 3262,
+          "source": "public String openSettingsBuffer() {"
+        },
+        {
+          "line": 3266,
+          "source": "public String openSnippetsBuffer() {"
+        },
+        {
+          "line": 3270,
+          "source": "public String openCommandLogBuffer() {"
+        },
+        {
+          "line": 3274,
+          "source": "public String cleanShedDataFiles() {"
+        },
+        {
+          "line": 3278,
+          "source": "public String handleSessionCommand(String argument) {"
+        },
+        {
+          "line": 3282,
+          "source": "public String handleWorkspaceProfileCommand(String argument) {"
+        },
+        {
+          "line": 3286,
+          "source": "String saveSession(String nameArgument) {"
+        },
+        {
+          "line": 3290,
+          "source": "String loadSession(String nameArgument, boolean force) {"
+        },
+        {
+          "line": 3294,
+          "source": "boolean restoreSessionV2(Map<String, Object> payload) {"
+        },
+        {
+          "line": 3298,
+          "source": "boolean restoreLegacySession(Map<String, Object> payload) {"
+        },
+        {
+          "line": 3302,
+          "source": "Map<String, Object> captureSessionUiSettings() {"
+        },
+        {
+          "line": 3306,
+          "source": "void applySessionUiSettings(Map<String, Object> settings) {"
+        },
+        {
+          "line": 3310,
+          "source": "List<Map<String, Object>> serializeSessionBuffers(Map<FileBuffer, String> bufferIds) {"
+        },
+        {
+          "line": 3314,
+          "source": "List<Map<String, Object>> serializeSessionPanes(Map<FileBuffer, String> bufferIds) {"
+        },
+        {
+          "line": 3318,
+          "source": "List<FileBuffer> deserializeSessionBuffers(Object bufferObject, Map<String, FileBuffer> idToBuffer) {"
+        },
+        {
+          "line": 3322,
+          "source": "Map<String, Object> serializeWindowLayout(WindowLayoutNode node) {"
+        },
+        {
+          "line": 3326,
+          "source": "WindowLayoutNode deserializeWindowLayout(Map<String, Object> layout, List<EditorPane> panes) {"
+        },
+        {
+          "line": 3330,
+          "source": "void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {"
+        },
+        {
+          "line": 3334,
+          "source": "WindowLayoutNode defaultLayoutForPanes(List<EditorPane> panes) {"
+        },
+        {
+          "line": 3338,
+          "source": "List<String> extractSessionFilePaths(Object filesObject) {"
+        },
+        {
+          "line": 3342,
+          "source": "String listSessions() {"
+        },
+        {
+          "line": 3346,
+          "source": "String listWorkspaceProfiles() {"
+        },
+        {
+          "line": 3350,
+          "source": "String defaultWorkspaceProfileName() {"
+        },
+        {
+          "line": 3354,
+          "source": "File resolveSessionFile(String nameArgument) {"
+        },
+        {
+          "line": 3358,
+          "source": "String sanitizeSessionName(String rawName) {"
+        },
+        {
+          "line": 3362,
+          "source": "boolean hasUnsavedChangesInAnyBuffer() {"
+        },
+        {
+          "line": 3366,
+          "source": "void ensureSettingsFileSeeded(File settingsFile) throws IOException {"
+        },
+        {
+          "line": 3370,
+          "source": "public String setTabSizeFromCommand(String value) {"
+        },
+        {
+          "line": 3375,
+          "source": "public String gotoLine(int lineNum) {"
+        },
+        {
+          "line": 3380,
+          "source": "public void showHelp(String topic) {"
+        },
+        {
+          "line": 3384,
+          "source": "String getHelpText(String topic) {"
+        },
+        {
+          "line": 3389,
+          "source": "void addToRecentFiles(String filepath) {"
+        },
+        {
+          "line": 3393,
+          "source": "public String showRecentFiles() {"
+        },
+        {
+          "line": 3398,
+          "source": "void handleQuit(boolean force) {"
+        },
+        {
+          "line": 3402,
+          "source": "int confirmDiscardChanges(String prompt) {"
+        },
+        {
+          "line": 3406,
+          "source": "public String requestQuit(boolean force) {"
+        },
+        {
+          "line": 3410,
+          "source": "public String requestCloseActiveWindow(boolean force) {"
+        },
+        {
+          "line": 3414,
+          "source": "public ConfigManager getConfigManager() {"
+        },
+        {
+          "line": 3418,
+          "source": "public String executeCommand(String cmd) {"
+        },
+        {
+          "line": 3422,
+          "source": "public String getModeName() {"
+        },
+        {
+          "line": 3426,
+          "source": "public String runUserCommand(String name, String shellCmd) {"
+        },
+        {
+          "line": 3430,
+          "source": "public String showUndoHistory() {"
+        },
+        {
+          "line": 3434,
+          "source": "public String clearSearchHighlights() {"
+        },
+        {
+          "line": 3438,
+          "source": "public String writeAll() {"
+        },
+        {
+          "line": 3442,
+          "source": "public String writeAllAndQuit(boolean force) {"
+        },
+        {
+          "line": 3446,
+          "source": "public String quitAll(boolean force) {"
+        },
+        {
+          "line": 3450,
+          "source": "public void showScratchBuffer(String title, String content) {"
+        },
+        {
+          "line": 3454,
+          "source": "public void showPlainScratchBuffer(String title, String content) {"
+        },
+        {
+          "line": 3458,
+          "source": "void openScratchBuffer(String title, String content, boolean returnable) {"
+        },
+        {
+          "line": 3462,
+          "source": "boolean closeReturnableScratchBuffer() {"
+        },
+        {
+          "line": 3466,
+          "source": "void loadRecentFiles() {"
+        },
+        {
+          "line": 3470,
+          "source": "void saveRecentFiles() {"
+        },
+        {
+          "line": 3474,
+          "source": "void loadTrustedProjectRoots() {"
+        },
+        {
+          "line": 3478,
+          "source": "void saveTrustedProjectRoots() {"
+        },
+        {
+          "line": 3482,
+          "source": "boolean ensureProjectTrustForFile(File file) {"
+        },
+        {
+          "line": 3486,
+          "source": "File detectProjectTrustRoot(File file) {"
+        },
+        {
+          "line": 3490,
+          "source": "boolean hasProjectLocalExecutionSurface(File projectRoot) {"
+        },
+        {
+          "line": 3494,
+          "source": "void appendCommandLog(String entry) {"
+        },
+        {
+          "line": 3498,
+          "source": "private void recordFailedAsyncJob(AsyncJobService.JobSnapshot snapshot) {"
+        },
+        {
+          "line": 3508,
+          "source": "private static String conciseLogText(String value, int maximumLength) {"
+        },
+        {
+          "line": 3513,
+          "source": "void ensureStoreDirectory(File store) throws IOException {"
+        },
+        {
+          "line": 3517,
+          "source": "static final Pattern HEX_COLOR_PATTERN = Pattern.compile(\"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\\\\b\");"
+        },
+        {
+          "line": 3518,
+          "source": "void paintColorPreviews(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3521,
+          "source": "void paintWrapIndicators(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3525,
+          "source": "void paintVisualBlockOverlay(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3529,
+          "source": "void paintDiagnosticOverlay(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3533,
+          "source": "void refreshDiagnosticRanges() {"
+        },
+        {
+          "line": 3537,
+          "source": "void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3541,
+          "source": "void paintLspSemanticOverlay(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3545,
+          "source": "void paintLspInlayHintOverlay(Graphics g, JTextArea area) {"
+        },
+        {
+          "line": 3549,
+          "source": "public void closeEditor() {"
+        },
+        {
+          "line": 3597,
+          "source": "public void rememberExCommand(String command) {"
+        },
+        {
+          "line": 3602,
+          "source": "public void keyTyped(KeyEvent e) {"
+        },
+        {
+          "line": 3607,
+          "source": "public void keyReleased(KeyEvent e) {"
+        },
+        {
+          "line": 3612,
+          "source": "public static void main(String[] args) {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceApiException.java",
+      "sha256": "e880f117905caaa178f0ba8e3671d775345e3ea0e823b8b1d002b4aaef97c001",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceApiException.java.gz",
+      "anchors": [
+        {
+          "line": 18,
+          "source": "public WorkspaceApiException(Code code, String message) { this(code, message, Map.of()); }"
+        },
+        {
+          "line": 20,
+          "source": "static WorkspaceApiException invalidRequest(String message) { return new WorkspaceApiException(Code.INVALID_REQUEST, message); }"
+        },
+        {
+          "line": 22,
+          "source": "public WorkspaceApiException(Code code, String message, Map<String, Object> details) {"
+        },
+        {
+          "line": 28,
+          "source": "public Code code() { return code; }"
+        },
+        {
+          "line": 29,
+          "source": "public Map<String, Object> details() { return details; }"
+        },
+        {
+          "line": 30,
+          "source": "public Map<String, Object> toMap() {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceBridgeClient.java",
+      "sha256": "f539b7aeeecffdc5fd6f37faae4881ba0cebfb9dfd3fb8dace60439475054293",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceBridgeClient.java.gz",
+      "anchors": [
+        {
+          "line": 22,
+          "source": "private final AtomicBoolean timedOut = new AtomicBoolean();"
+        },
+        {
+          "line": 42,
+          "source": "static WorkspaceBridgeClient status(Path descriptor, Path credential) throws IOException {"
+        },
+        {
+          "line": 50,
+          "source": "private WorkspaceBridgeClient(WorkspaceStatusAttachment.Descriptor endpoint, byte[] key) throws IOException {"
+        },
+        {
+          "line": 71,
+          "source": "synchronized String exchange(String request) throws IOException {"
+        },
+        {
+          "line": 80,
+          "source": "private String statusExchange(String request) throws IOException {"
+        },
+        {
+          "line": 115,
+          "source": "private ScheduledFuture<?> deadline() {"
+        },
+        {
+          "line": 122,
+          "source": "@Override public void close() throws IOException {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceBridgeServer.java",
+      "sha256": "8be5ff98cb92a2f40c02410f5ca964b6cfe05ac038c168333a619542a027a862",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceBridgeServer.java.gz",
+      "anchors": [
+        {
+          "line": 29,
+          "source": "private final ExecutorService clients = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name(\"shed-workspace-client-\", 0).factory());"
+        },
+        {
+          "line": 30,
+          "source": "private final Set<Socket> connections = ConcurrentHashMap.newKeySet();"
+        },
+        {
+          "line": 31,
+          "source": "private final Semaphore slots = new Semaphore(MAX_CLIENTS);"
+        },
+        {
+          "line": 32,
+          "source": "private final AtomicBoolean closed = new AtomicBoolean();"
+        },
+        {
+          "line": 33,
+          "source": "private final AtomicBoolean terminated = new AtomicBoolean();"
+        },
+        {
+          "line": 34,
+          "source": "private final AtomicBoolean observed = new AtomicBoolean();"
+        },
+        {
+          "line": 35,
+          "source": "private final AtomicReference<Runnable> closeObserver = new AtomicReference<>();"
+        },
+        {
+          "line": 36,
+          "source": "private final ScheduledThreadPoolExecutor deadlines = new ScheduledThreadPoolExecutor(1, task ->"
+        },
+        {
+          "line": 57,
+          "source": "private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {"
+        },
+        {
+          "line": 61,
+          "source": "static WorkspaceBridgeServer status(ApplicationStatus application, Path directory, List<Path> roots) throws IOException {"
+        },
+        {
+          "line": 65,
+          "source": "static WorkspaceBridgeServer status(ApplicationStatus application, Path directory, List<Path> roots, Duration lifetime, Clock clock) throws IOException {"
+        },
+        {
+          "line": 69,
+          "source": "private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory,"
+        },
+        {
+          "line": 104,
+          "source": "Path descriptor() { return descriptor; }"
+        },
+        {
+          "line": 105,
+          "source": "String workspaceId() { return endpoint == null ? null : endpoint.workspaceId; }"
+        },
+        {
+          "line": 106,
+          "source": "Path credential() { return statusAttachment == null ? null : statusAttachment.credentialFile(); }"
+        },
+        {
+          "line": 107,
+          "source": "boolean statusOnly() { return statusAttachment != null; }"
+        },
+        {
+          "line": 108,
+          "source": "ApplicationStatus statusApplication() { return applicationStatus; }"
+        },
+        {
+          "line": 109,
+          "source": "int connectionCount() { return connections.size(); }"
+        },
+        {
+          "line": 110,
+          "source": "void onClosed(Runnable observer) {"
+        },
+        {
+          "line": 116,
+          "source": "private void notifyClosed() {"
+        },
+        {
+          "line": 120,
+          "source": "boolean running() { return !closed.get() && !listener.isClosed(); }"
+        },
+        {
+          "line": 121,
+          "source": "int port() { return listener.getLocalPort(); }"
+        },
+        {
+          "line": 122,
+          "source": "static InetAddress loopback() throws IOException { return InetAddress.getByAddress(new byte[]{127, 0, 0, 1}); }"
+        },
+        {
+          "line": 124,
+          "source": "private void accept() {"
+        },
+        {
+          "line": 141,
+          "source": "private void serve(Socket connection) {"
+        },
+        {
+          "line": 154,
+          "source": "private void serveFrames(Socket connection) throws IOException {"
+        },
+        {
+          "line": 187,
+          "source": "private void serveStatus(Socket connection) throws IOException {"
+        },
+        {
+          "line": 216,
+          "source": "private static Object statusRequestId(String request) {"
+        },
+        {
+          "line": 223,
+          "source": "private ScheduledFuture<?> deadline(Socket connection, int milliseconds) {"
+        },
+        {
+          "line": 229,
+          "source": "@Override public void close() throws IOException {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceCli.java",
+      "sha256": "cda479293525ecc5867dae3a556797e86bf6cf2ed5da43b37d91a6376a32c764",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceCli.java.gz",
+      "anchors": [
+        {
+          "line": 16,
+          "source": "private WorkspaceCli() { }"
+        },
+        {
+          "line": 18,
+          "source": "public static boolean handles(String[] args) { return args != null && args.length > 0 && \"--workspace-api\".equals(args[0]); }"
+        },
+        {
+          "line": 20,
+          "source": "public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {"
+        },
+        {
+          "line": 70,
+          "source": "private static int status(Path descriptor, Path credential, PrintWriter output) {"
+        },
+        {
+          "line": 91,
+          "source": "private static int statusFailure(PrintWriter output, String code) {"
+        },
+        {
+          "line": 95,
+          "source": "private static int statusExit(String code) {"
+        },
+        {
+          "line": 107,
+          "source": "private static int serve(RequestHandler handler, String request, InputStream input, PrintWriter writer) throws IOException {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceFrames.java",
+      "sha256": "d2e0859ca84ff8890531188205b028af869b270b757a75a8b211182bf9907a17",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceFrames.java.gz",
+      "anchors": [
+        {
+          "line": 15,
+          "source": "private WorkspaceFrames() { }"
+        },
+        {
+          "line": 17,
+          "source": "static byte[] read(InputStream input, int maximum) throws IOException {"
+        },
+        {
+          "line": 21,
+          "source": "static byte[] readComplete(InputStream input, int maximum) throws IOException {"
+        },
+        {
+          "line": 25,
+          "source": "private static byte[] read(InputStream input, int maximum, boolean complete) throws IOException {"
+        },
+        {
+          "line": 39,
+          "source": "static String decode(byte[] bytes) throws java.nio.charset.CharacterCodingException {"
+        },
+        {
+          "line": 44,
+          "source": "static void write(OutputStream output, String frame, int maximum) throws IOException {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceRpc.java",
+      "sha256": "b10b975c79108a53168986588ed91901d96a98511913aeba77ef7ed445994147",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceRpc.java.gz",
+      "anchors": [
+        {
+          "line": 15,
+          "source": "public WorkspaceRpc(WorkspaceQueryService workspace) { this(workspace, null); }"
+        },
+        {
+          "line": 26,
+          "source": "public String handle(String json) {"
+        },
+        {
+          "line": 54,
+          "source": "private String status(Map<String, Object> request, Object id, boolean notification, String method) {"
+        },
+        {
+          "line": 66,
+          "source": "static boolean expectsResponse(String json) {"
+        },
+        {
+          "line": 73,
+          "source": "private static boolean validEnvelope(Map<String, Object> request) {"
+        },
+        {
+          "line": 79,
+          "source": "private Object dispatch(String method, Map<String, Object> params) {"
+        },
+        {
+          "line": 113,
+          "source": "private Object search(String method, Map<String, Object> params) {"
+        },
+        {
+          "line": 134,
+          "source": "private static String filter(Map<String, Object> params, String key) {"
+        },
+        {
+          "line": 139,
+          "source": "private static boolean bool(Map<String, Object> params, String key, boolean fallback) {"
+        },
+        {
+          "line": 145,
+          "source": "static String error(Object id, int code, String message, Map<String, Object> data) {"
+        },
+        {
+          "line": 148,
+          "source": "private static Map<String, Object> response(Object id, String key, Object value) {"
+        },
+        {
+          "line": 151,
+          "source": "private static boolean validId(Object id) { return id == null || id instanceof Long || id instanceof String value && value.length() <= 256; }"
+        },
+        {
+          "line": 152,
+          "source": "static void fields(Map<String, Object> params, Set<String> allowed) {"
+        },
+        {
+          "line": 155,
+          "source": "static String string(Map<String, Object> params, String key, boolean required, int max) {"
+        },
+        {
+          "line": 161,
+          "source": "static int integer(Map<String, Object> params, String key, int fallback, int minimum, int maximum) {"
+        },
+        {
+          "line": 173,
+          "source": "static WorkspaceApiException invalid(String message) { return WorkspaceApiException.invalidRequest(message); }"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceStatusAttachment.java",
+      "sha256": "710c55b81d401e4a337d64fd4981af003b3aca7eaba4e5aa90ce003841d39983",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceStatusAttachment.java.gz",
+      "anchors": [
+        {
+          "line": 19,
+          "source": "static final Duration LIFETIME = Duration.ofMinutes(10);"
+        },
+        {
+          "line": 20,
+          "source": "record Descriptor(String instanceId, String windowId, String attachmentId, int port, long expiresAt) {"
+        },
+        {
+          "line": 40,
+          "source": "private final byte[] key = random();"
+        },
+        {
+          "line": 72,
+          "source": "Path discoveryFile() { return discoveryFile; }"
+        },
+        {
+          "line": 73,
+          "source": "Path credentialFile() { return credentialFile; }"
+        },
+        {
+          "line": 74,
+          "source": "synchronized boolean expired() { return closed || clock.millis() >= descriptor.expiresAt() || System.nanoTime() - deadlineNanos >= 0; }"
+        },
+        {
+          "line": 75,
+          "source": "synchronized byte[] key() {"
+        },
+        {
+          "line": 80,
+          "source": "static byte[] readKey(Path file, Descriptor descriptor) throws IOException {"
+        },
+        {
+          "line": 93,
+          "source": "@Override public synchronized void close() throws IOException {"
+        },
+        {
+          "line": 104,
+          "source": "static byte[] random() { byte[] value = new byte[32]; new SecureRandom().nextBytes(value); return value; }"
+        },
+        {
+          "line": 105,
+          "source": "static Path privateDirectory(Path path) throws IOException {"
+        },
+        {
+          "line": 111,
+          "source": "private static void checkAncestors(Path requested) throws IOException {"
+        },
+        {
+          "line": 117,
+          "source": "private static byte[] privateBytes(Path file) throws IOException {"
+        },
+        {
+          "line": 122,
+          "source": "static Map<String, Object> object(byte[] bytes) throws IOException {"
+        },
+        {
+          "line": 129,
+          "source": "private static String uuid(Object value) {"
+        },
+        {
+          "line": 135,
+          "source": "static WorkspaceApiException failure(WorkspaceApiException.Code code) {"
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceStatusProtocol.java",
+      "sha256": "b3c7ac8265f1ee269cc5c20920393bbb87052a1144e6f3822606bf767ea82f19",
+      "source_snapshot": "source-versions/src__main__java__shed__WorkspaceStatusProtocol.java.gz",
+      "anchors": [
+        {
+          "line": 27,
+          "source": "private WorkspaceStatusProtocol() { }"
+        },
+        {
+          "line": 62,
+          "source": "static Session accept(WorkspaceStatusAttachment attachment, InputStream input, OutputStream output) throws IOException {"
+        },
+        {
+          "line": 84,
+          "source": "static Session connect(WorkspaceStatusAttachment.Descriptor target, byte[] key, InputStream input, OutputStream output) throws IOException {"
+        },
+        {
+          "line": 107,
+          "source": "static String signature(byte[] key, WorkspaceStatusAttachment.Descriptor d, String role, String clientNonce,"
+        },
+        {
+          "line": 124,
+          "source": "static String read(InputStream input) throws IOException {"
+        },
+        {
+          "line": 129,
+          "source": "static void write(OutputStream output, String frame) throws IOException { WorkspaceFrames.write(output, frame, FRAME_BYTES); }"
+        },
+        {
+          "line": 130,
+          "source": "static void size(String payload) {"
+        },
+        {
+          "line": 134,
+          "source": "static String request(String method, Map<String, Object> params) {"
+        },
+        {
+          "line": 137,
+          "source": "private static String response(Map<String, Object> result) {"
+        },
+        {
+          "line": 140,
+          "source": "private static Map<String, Object> params(String frame, String method) throws IOException {"
+        },
+        {
+          "line": 148,
+          "source": "private static Map<String, Object> result(String frame) throws IOException {"
+        },
+        {
+          "line": 163,
+          "source": "private static boolean matches(String expected, Object supplied) {"
+        },
+        {
+          "line": 167,
+          "source": "private static String nonce(Object value) {"
+        },
+        {
+          "line": 171,
+          "source": "private static boolean validUuid(String value) {"
+        },
+        {
+          "line": 174,
+          "source": "private static String randomNonce() { return HexFormat.of().formatHex(WorkspaceStatusAttachment.random()); }"
+        },
+        {
+          "line": 175,
+          "source": "private static WorkspaceApiException denied() { return WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED); }"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/NativeFixtureGate.java",
+      "sha256": "edc0a8afddde98c514171d1383ec776550016361b8b495798094d95f6dbc9b25",
+      "source_snapshot": "source-versions/src__test__java__shed__NativeFixtureGate.java.gz",
+      "anchors": [
+        {
+          "line": 14,
+          "source": "static void requireReviewed(String name) throws Exception {"
+        },
+        {
+          "line": 37,
+          "source": "static void requireContext() throws Exception {"
+        },
+        {
+          "line": 57,
+          "source": "@Override public void beforeAll(ExtensionContext context) throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceBridgeTest.java",
+      "sha256": "3bc58e4548ad396e14be5eabcb13b852cb13a92187b8eda4a4946818e5046035",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceBridgeTest.java.gz",
+      "anchors": [
+        {
+          "line": 24,
+          "source": "@Test void liveHeadlessCliReadsUnsavedBuffersAndRejectsStaleVersionsWithoutSavingOrOpeningWindows() throws Exception {"
+        },
+        {
+          "line": 69,
+          "source": "@Test void authenticationAndWorkspaceIdentityFailBeforeReadingEditorState() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void notificationsMalformedMessagesAndLimitsDoNotDesynchronizeAuthenticatedStreams() throws Exception {"
+        },
+        {
+          "line": 117,
+          "source": "@Test void closingRevokesExistingClientsAndRemovesOnlyItsOwnDescriptor() throws Exception {"
+        },
+        {
+          "line": 130,
+          "source": "@Test void connectionStorageCannotBeExposedAsWorkspaceContent() throws Exception {"
+        },
+        {
+          "line": 137,
+          "source": "@Test void authenticationHasAnAbsoluteDeadlineEvenWhenAnUnauthenticatedClientKeepsSendingBytes() throws Exception {"
+        },
+        {
+          "line": 161,
+          "source": "private WorkspaceBridgeServer diskServer(Path root) throws IOException {"
+        },
+        {
+          "line": 164,
+          "source": "private static String[] args(Path root, Path descriptor, String request) {"
+        },
+        {
+          "line": 167,
+          "source": "private static Map<String, Object> result(String json) { return MiniJson.asObject(MiniJson.asObject(MiniJson.parseStrict(json)).get(\"result\")); }"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceCliProcessGuardTest.java",
+      "sha256": "479ee01e4c4c0d8d58465f7bade7b3db076b71587a376fb7b63899f98af73607",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceCliProcessGuardTest.java.gz",
+      "anchors": [
+        {
+          "line": 11,
+          "source": "static ProcessBuilder builder(String... args) {"
+        },
+        {
+          "line": 17,
+          "source": "@Test void onlyTheHeadlessCliAndDisposablePathsAreAdmitted() throws Exception {"
+        },
+        {
+          "line": 28,
+          "source": "@Test void guiArbitraryMainsInjectedJvmOptionsAndOutsidePathsFailBeforeLaunch() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceCliTest.java",
+      "sha256": "9ba620eb5c8c0b5f3a0dd59f3d335ffafd1d2aa5f588a3c98ca4dc01b94919ec",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceCliTest.java.gz",
+      "anchors": [
+        {
+          "line": 17,
+          "source": "@Test void stdioAcceptsCrLfAndFinalFramesWithoutNewlineAndKeepsDiagnosticsSeparate() {"
+        },
+        {
+          "line": 27,
+          "source": "@Test void malformedFramesAreReportedAndOversizedFramesTerminateTheStream() {"
+        },
+        {
+          "line": 39,
+          "source": "@Test void oneShotErrorsHaveNonzeroExitAndNeverCreateTargets() {"
+        },
+        {
+          "line": 50,
+          "source": "@Test void realApplicationEntryPointAnswersAndExitsWithHeadlessAwt() throws Exception {"
+        },
+        {
+          "line": 67,
+          "source": "@Test void headlessSearchWorksWithoutGitOnPathAndDoesNotCreateWorkspaceOrHomeState() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void filePaginationCanContinueFromAFreshHeadlessProcess() throws Exception {"
+        },
+        {
+          "line": 107,
+          "source": "private static Map<String, Object> filePage(Path root, Map<String, Object> params) throws Exception {"
+        },
+        {
+          "line": 120,
+          "source": "private static Process startIsolated(ProcessBuilder builder) throws java.io.IOException {"
+        },
+        {
+          "line": 124,
+          "source": "private static void sendRequest(Process process, String request) throws java.io.IOException {"
+        },
+        {
+          "line": 130,
+          "source": "private String[] args() { return new String[]{\"--workspace-api\", \"--root\", root.toString(), \"--stdio\"}; }"
+        },
+        {
+          "line": 131,
+          "source": "private static ByteArrayInputStream bytes(String value) { return new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)); }"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceCliTestProcess.java",
+      "sha256": "d0259b4e4b7a408010207411fdf358edfc8003e05915c028449149e12d87a4ad",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceCliTestProcess.java.gz",
+      "anchors": [
+        {
+          "line": 15,
+          "source": "private WorkspaceCliTestProcess() { }"
+        },
+        {
+          "line": 17,
+          "source": "static ProcessBuilder prepare(ProcessBuilder requested) throws IOException {"
+        },
+        {
+          "line": 67,
+          "source": "static Process start(ProcessBuilder requested) throws IOException { return prepare(requested).start(); }"
+        },
+        {
+          "line": 69,
+          "source": "static void stop(Process process) throws Exception {"
+        },
+        {
+          "line": 79,
+          "source": "private static Path confined(Path requested, Path root) throws IOException {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceStatusContractTest.java",
+      "sha256": "4d6c96c175c0adf16dbfebbba9fe7008bb6b3bba69a1a1088380c5b3d1aa252f",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceStatusContractTest.java.gz",
+      "anchors": [
+        {
+          "line": 22,
+          "source": "static final WorkspaceStatusAttachment.Descriptor TARGET = new WorkspaceStatusAttachment.Descriptor("
+        },
+        {
+          "line": 25,
+          "source": "static String request(String method) { return WorkspaceRpcTest.request(\"query\", method, Map.of(\"schemaVersion\", 1)); }"
+        },
+        {
+          "line": 26,
+          "source": "static Map<String, Object> object(String json) { return MiniJson.asObject(MiniJson.parseStrict(json)); }"
+        },
+        {
+          "line": 27,
+          "source": "static String code(String json) { return (String) MiniJson.asObject(MiniJson.asObject(object(json).get(\"error\")).get(\"data\")).get(\"code\"); }"
+        },
+        {
+          "line": 28,
+          "source": "static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }"
+        },
+        {
+          "line": 30,
+          "source": "@Test void statusContainsOnlyVersionedOpaqueLifecycleData() {"
+        },
+        {
+          "line": 39,
+          "source": "@Test void readinessAndShutdownDoNotReenterReadyState() {"
+        },
+        {
+          "line": 46,
+          "source": "@Test void statusGrantHasNoLegacyOrFutureOperationFallback() {"
+        },
+        {
+          "line": 54,
+          "source": "@Test void malformedNotificationsUnknownFieldsAndVersionsFailExplicitly() {"
+        },
+        {
+          "line": 65,
+          "source": "@Test void discoveryHasNoSecretAndCredentialIsSeparatelyRequired() throws Exception {"
+        },
+        {
+          "line": 79,
+          "source": "@Test void privatePermissionsSymlinkAncestorsAndExposedRootsAreRejected() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void cleanupRetainsReplacedFilesAndNeverDeletesTheirNeighbours() throws Exception {"
+        },
+        {
+          "line": 105,
+          "source": "@Test void newStatusFramesRequireATerminatingNewlineWithoutChangingLegacyFrames() throws Exception {"
+        },
+        {
+          "line": 111,
+          "source": "@Test void hmacTranscriptMatchesAnIndependentPythonReference() {"
+        },
+        {
+          "line": 118,
+          "source": "@Test void framesBindRolesSequencesSessionContextAndExactPayloadBytes() throws Exception {"
+        },
+        {
+          "line": 134,
+          "source": "@Test void anUnprovenServerReceivesNoClientProofOrSecret() throws Exception {"
+        },
+        {
+          "line": 145,
+          "source": "@Test void statusArgumentsCannotSelectLegacyRequestsOrPrintClientPathsOnFailure() {"
+        },
+        {
+          "line": 159,
+          "source": "@Test void everyIdentityNonceRoleAndExpiryFieldIsBoundToTheProof() {"
+        },
+        {
+          "line": 173,
+          "source": "@Test void receivedStatusMustMatchTheAuthenticatedIdentityAndExactPrivacySchema() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceStatusMeasurementTest.java",
+      "sha256": "4b1779ec43b80152e8d13176b6c06185c24d6a84437add7b59a1e2b48f6788d1",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceStatusMeasurementTest.java.gz",
+      "anchors": [
+        {
+          "line": 27,
+          "source": "static <T> T edt(Callable<T> call) throws Exception {"
+        },
+        {
+          "line": 30,
+          "source": "static long ownedThreads() {"
+        },
+        {
+          "line": 34,
+          "source": "static Map<String, Object> memory() {"
+        },
+        {
+          "line": 42,
+          "source": "static Map<String, Object> samples(List<Double> values) {"
+        },
+        {
+          "line": 49,
+          "source": "static Map<String, Object> idleCpu() throws Exception {"
+        },
+        {
+          "line": 65,
+          "source": "static List<WeakReference<Object>> cycle(Path directory, List<Double> create, List<Double> attach, List<Double> close) throws Exception {"
+        },
+        {
+          "line": 77,
+          "source": "@Test void boundedLatencyTypingAndRetention() throws Exception {"
+        },
+        {
+          "line": 139,
+          "source": "private static List<Double> type(JTextArea area, BufferedImage image, WorkspaceBridgeClient client) throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceStatusProcessTest.java",
+      "sha256": "82351cc30d696781314758e2d9c11b29ec83e23bb21e2f855a758df8a1ef0933",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceStatusProcessTest.java.gz",
+      "anchors": [
+        {
+          "line": 17,
+          "source": "@Test void separateCliAttachesAndDisconnectsWithoutChangingSyntheticExternalFiles() throws Exception {"
+        },
+        {
+          "line": 46,
+          "source": "@Test void unauthorizedExternalCliExitsNonzeroWithoutAnIdentityOrPrivatePath() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceStatusTransportTest.java",
+      "sha256": "65d5094bdf807644738ab8fecda5ede38f859ce5e074f25731c542c05634890b",
+      "source_snapshot": "source-versions/src__test__java__shed__WorkspaceStatusTransportTest.java.gz",
+      "anchors": [
+        {
+          "line": 38,
+          "source": "static void await(BooleanSupplier condition) {"
+        },
+        {
+          "line": 43,
+          "source": "WorkspaceBridgeServer server() throws IOException {"
+        },
+        {
+          "line": 46,
+          "source": "static Socket socket(WorkspaceBridgeServer server) throws IOException {"
+        },
+        {
+          "line": 49,
+          "source": "static String exchange(WorkspaceBridgeClient client) throws IOException {"
+        },
+        {
+          "line": 52,
+          "source": "static String code(String response) { return WorkspaceStatusContractTest.code(response); }"
+        },
+        {
+          "line": 53,
+          "source": "static Map<String, Object> object(String json) { return WorkspaceStatusContractTest.object(json); }"
+        },
+        {
+          "line": 54,
+          "source": "static String hello(WorkspaceStatusAttachment.Descriptor d, String nonce) {"
+        },
+        {
+          "line": 58,
+          "source": "static int cli(Path descriptor, Path credential, ByteArrayOutputStream output) {"
+        },
+        {
+          "line": 65,
+          "source": "@Test void realTransportAuthenticatesSequentialClientsAndCorrelatesRepeatedStatus() throws Exception {"
+        },
+        {
+          "line": 84,
+          "source": "@Test void wrongCredentialsNeverReturnApplicationState() throws Exception {"
+        },
+        {
+          "line": 100,
+          "source": "@Test void explicitInstanceAndCredentialTargetsCannotBeMixed() throws Exception {"
+        },
+        {
+          "line": 113,
+          "source": "@Test void descriptorVersionMissingCredentialAndPermissionFailuresAreDistinct() throws Exception {"
+        },
+        {
+          "line": 129,
+          "source": "@Test void unreadyStatusIsNotSuccessAndStillDoesNotLeakPaths() throws Exception {"
+        },
+        {
+          "line": 138,
+          "source": "@Test void authenticatedStatusClientCannotReachLegacyOrFutureFeatures() throws Exception {"
+        },
+        {
+          "line": 148,
+          "source": "@Test void replayedClientProofFailsWithAFreshServerChallenge() throws Exception {"
+        },
+        {
+          "line": 166,
+          "source": "@Test void duplicatedOrTamperedSignedRequestsCloseTheSession() throws Exception {"
+        },
+        {
+          "line": 183,
+          "source": "@Test void malformedOversizedTruncatedAndLegacyAuthenticationCannotReadStatus() throws Exception {"
+        },
+        {
+          "line": 200,
+          "source": "@Test void shutdownRevokesConnectionsAndAStaleRecordCannotRetargetToAnotherAttachment() throws Exception {"
+        },
+        {
+          "line": 220,
+          "source": "@Test void logicalExpirationIsRejectedAndTimedExpirationRemovesOwnedFiles() throws Exception {"
+        },
+        {
+          "line": 232,
+          "source": "@Test void incompleteAuthenticationHasAnAbsoluteDeadlineAndReleasesItsSlot() throws Exception {"
+        },
+        {
+          "line": 241,
+          "source": "@Test void connectionSlotsAndRepeatedAttachmentCleanupAreBounded() throws Exception {"
+        },
+        {
+          "line": 255,
+          "source": "@Test void failedInitializationLeavesNoCredentialAndPreservesExternalSentinel() throws Exception {"
+        },
+        {
+          "line": 264,
+          "source": "@Test void aSilentPeerTimesOutWithoutReceivingAClientProof() throws Exception {"
+        },
+        {
+          "line": 284,
+          "source": "@Test void evenAnAuthenticatedServerCannotChangeResponseCorrelation() throws Exception {"
+        },
+        {
+          "line": 309,
+          "source": "@Test void statusRoundTripDoesNotNeedTheEdtOrMutateAnUnrelatedSharedDocument() throws Exception {"
+        },
+        {
+          "line": 327,
+          "source": "@Test void expirationReleasesTheOwningRegistryAndItsCloseObserverExactlyOnce() throws Exception {"
+        },
+        {
+          "line": 337,
+          "source": "@Test void expirationAfterAuthenticationIsCorrelatedAndCannotReturnStatus() throws Exception {"
+        },
+        {
+          "line": 346,
+          "source": "@Test void queryLimitIsBoundedAndClosingTheClientInvalidatesItsSession() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/resources/shed/portable-fixture-helpers.properties",
+      "sha256": "f1ca31c777d801c6370257e95ba03b856dc3afc83d0c3b7ccd1842746e3cba2b",
+      "source_snapshot": "source-versions/src__test__resources__shed__portable-fixture-helpers.properties.gz",
+      "anchors": []
+    },
+    {
+      "path": "src/test/resources/shed/portable-fixture-tests.properties",
+      "sha256": "7530b6b116c566ec520da91ac567ea85199e1d32c567771f7be601036ccb795c",
+      "source_snapshot": "source-versions/src__test__resources__shed__portable-fixture-tests.properties.gz",
+      "anchors": []
+    },
+    {
+      "path": "src/main/java/shed/PrivateWorkspaceFiles.java",
+      "sha256": "90980836a72df1fe404b86fbeb9c72ffaf8deabe327d3457dd19447418142f9a",
+      "change": "unchanged supporting boundary"
+    },
+    {
+      "path": "src/main/java/shed/MiniJson.java",
+      "sha256": "a20fd6a1c05e0e7eabc2c71643c9a6d7ae2264e5fcbd5e64e75600567be0ba75",
+      "change": "unchanged supporting boundary"
+    },
+    {
+      "path": "src/main/java/shed/AsyncJobService.java",
+      "sha256": "7f896528e2d9520056d2367d7cf53b2d06de7048fcc3960e75d460289aca8145",
+      "change": "unchanged supporting boundary"
+    },
+    {
+      "path": "scripts/native_fixture.py",
+      "sha256": "c40f621abdfdd0ce61df030a30262d439dd9f73b013f60bf753c8c456b72db7a",
+      "change": "unchanged supporting boundary"
+    },
+    {
+      "path": "scripts/test-packaged-markdown.py",
+      "sha256": "ce9718c4f26e23ab09d965128ce406c872e12c037f6af76966bac4ddc77a48a8",
+      "change": "unchanged supporting boundary"
+    },
+    {
+      "path": "scripts/shed",
+      "sha256": "63b0f0f2b50721167876c6e3316c51fc50d67fddd22138bca5f56de5d347a7bb",
+      "change": "unchanged supporting boundary"
+    },
+    {
+      "path": "pom.xml",
+      "sha256": "c9d65dc851633a5cff118af5773e257cd1fef922a2aa9c42b5194627510c4352",
+      "change": "unchanged supporting boundary"
+    }
+  ],
+  "note": "method anchors are source evidence; native Texteditor lifecycle remains unaccepted"
+}

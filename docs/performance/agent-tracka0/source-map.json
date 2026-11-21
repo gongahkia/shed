@@ -1,0 +1,3653 @@
+{
+  "basis": "static repository inspection; line anchors are not runtime acceptance",
+  "production": [
+    {
+      "path": "src/main/java/shed/Texteditor.java",
+      "sha256": "925b0497532552ddfc210c055fce7b9d99feefafc591f02ab1699d1166a38f57",
+      "anchors": [
+        {
+          "search": "public static void main",
+          "locations": [
+            {
+              "line": 3610,
+              "source": "public static void main(String[] args) {"
+            }
+          ]
+        },
+        {
+          "search": "openStartupTargets(",
+          "locations": [
+            {
+              "line": 514,
+              "source": "if (!openStartupTargets(args, startupStartedAt)) {"
+            },
+            {
+              "line": 571,
+              "source": "private boolean openStartupTargets(String[] arguments, long startupStartedAt) {"
+            }
+          ]
+        },
+        {
+          "search": "void closeEditor(",
+          "locations": [
+            {
+              "line": 3547,
+              "source": "public void closeEditor() {"
+            }
+          ]
+        },
+        {
+          "search": "workspaceQueries(",
+          "locations": [
+            {
+              "line": 262,
+              "source": "WorkspaceQueryService workspaceQueries(Path root, AgentPolicy policy) {"
+            }
+          ]
+        },
+        {
+          "search": "workspaceDocuments(",
+          "locations": [
+            {
+              "line": 266,
+              "source": "WorkspaceDocumentEditor workspaceDocuments() { return workspaceDocumentSource; }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceCli.java",
+      "sha256": "38194887a0854ccd6d907d92dfdb6a854ff59ddc518fe742f9224f1f3b6b9ea2",
+      "anchors": [
+        {
+          "search": "static boolean handles",
+          "locations": [
+            {
+              "line": 18,
+              "source": "public static boolean handles(String[] args) { return args != null && args.length > 0 && \"--workspace-api\".equals(args[0]); }"
+            }
+          ]
+        },
+        {
+          "search": "static int run",
+          "locations": [
+            {
+              "line": 20,
+              "source": "public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {"
+            }
+          ]
+        },
+        {
+          "search": "private static int serve",
+          "locations": [
+            {
+              "line": 57,
+              "source": "private static int serve(RequestHandler handler, String request, InputStream input, PrintWriter writer) throws IOException {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceBridgeServer.java",
+      "sha256": "e124237d8f02fbd74a1b6a28ce6486a728ec028583acdadbf8cd37fbaf1fd8c8",
+      "anchors": [
+        {
+          "search": "static final int MAX_CLIENTS",
+          "locations": [
+            {
+              "line": 22,
+              "source": "static final int MAX_CLIENTS = 8;"
+            }
+          ]
+        },
+        {
+          "search": "WorkspaceBridgeServer(",
+          "locations": [
+            {
+              "line": 36,
+              "source": "WorkspaceBridgeServer(WorkspaceQueryService workspace, Path privateDirectory) throws IOException {"
+            },
+            {
+              "line": 40,
+              "source": "WorkspaceBridgeServer(WorkspaceQueryService workspace, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {"
+            },
+            {
+              "line": 44,
+              "source": "WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory) throws IOException {"
+            },
+            {
+              "line": 48,
+              "source": "private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "loopback()",
+          "locations": [
+            {
+              "line": 53,
+              "source": "this.listener = new ServerSocket(0, MAX_CLIENTS, loopback());"
+            },
+            {
+              "line": 72,
+              "source": "static InetAddress loopback() throws IOException { return InetAddress.getByAddress(new byte[]{127, 0, 0, 1}); }"
+            }
+          ]
+        },
+        {
+          "search": "serveFrames(",
+          "locations": [
+            {
+              "line": 94,
+              "source": "serveFrames(connection);"
+            },
+            {
+              "line": 104,
+              "source": "private void serveFrames(Socket connection) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "public void close",
+          "locations": [
+            {
+              "line": 142,
+              "source": "@Override public void close() throws IOException {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceBridgeClient.java",
+      "sha256": "480e02674122655ca8064b62d21960b357727a16813bdb7257c0aa925f03ce51",
+      "anchors": [
+        {
+          "search": "WorkspaceBridgeClient(",
+          "locations": [
+            {
+              "line": 14,
+              "source": "WorkspaceBridgeClient(Path descriptor, Path requestedRoot) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "String exchange(",
+          "locations": [
+            {
+              "line": 30,
+              "source": "String exchange(String request) throws IOException {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceBridgeEndpoint.java",
+      "sha256": "e4be1e912afb51aa37d38484950666b385394fa9faef107f43d416afede9a33a",
+      "anchors": [
+        {
+          "search": "static final Set<String> FIELDS",
+          "locations": [
+            {
+              "line": 16,
+              "source": "private static final Set<String> FIELDS = Set.of(\"schemaVersion\", \"workspaceId\", \"root\", \"instanceId\", \"port\", \"token\");"
+            }
+          ]
+        },
+        {
+          "search": "WorkspaceBridgeEndpoint(",
+          "locations": [
+            {
+              "line": 23,
+              "source": "WorkspaceBridgeEndpoint(WorkspaceQueryService workspace, int port) {"
+            },
+            {
+              "line": 29,
+              "source": "private WorkspaceBridgeEndpoint(Path root, String workspaceId, String instanceId, int port, String token) {"
+            },
+            {
+              "line": 50,
+              "source": "return new WorkspaceBridgeEndpoint(root, workspaceId, instance, port.intValue(), token);"
+            }
+          ]
+        },
+        {
+          "search": "static WorkspaceBridgeEndpoint read",
+          "locations": [
+            {
+              "line": 38,
+              "source": "static WorkspaceBridgeEndpoint read(Path file) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "authenticationRequest(",
+          "locations": [
+            {
+              "line": 56,
+              "source": "String authenticationRequest() {"
+            }
+          ]
+        },
+        {
+          "search": "authenticates(",
+          "locations": [
+            {
+              "line": 61,
+              "source": "boolean authenticates(String json) {"
+            }
+          ]
+        },
+        {
+          "search": "confirms(",
+          "locations": [
+            {
+              "line": 80,
+              "source": "boolean confirms(String json) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/PrivateWorkspaceFiles.java",
+      "sha256": "90980836a72df1fe404b86fbeb9c72ffaf8deabe327d3457dd19447418142f9a",
+      "anchors": [
+        {
+          "search": "static Path directory",
+          "locations": [
+            {
+              "line": 29,
+              "source": "static Path directory(Path requested) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "static Path existingDirectory",
+          "locations": [
+            {
+              "line": 36,
+              "source": "static Path existingDirectory(Path requested) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "static byte[] read",
+          "locations": [
+            {
+              "line": 57,
+              "source": "static byte[] read(Path requested, int limit) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "static void deleteIfMatching",
+          "locations": [
+            {
+              "line": 84,
+              "source": "static void deleteIfMatching(Path path, byte[] expected) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "private static void check(",
+          "locations": [
+            {
+              "line": 91,
+              "source": "private static void check(Path path, boolean directory) throws IOException {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/AgentWorkspaceController.java",
+      "sha256": "2bacf67c3be7887868f294bebce8cecba38c2406d2dc1f2f09892c6055a3ffe9",
+      "anchors": [
+        {
+          "search": "String handle(",
+          "locations": [
+            {
+              "line": 29,
+              "source": "String handle(String argument) {"
+            }
+          ]
+        },
+        {
+          "search": "String start(",
+          "locations": [
+            {
+              "line": 49,
+              "source": "private String start(boolean allowProposals) {"
+            }
+          ]
+        },
+        {
+          "search": "String stop(",
+          "locations": [
+            {
+              "line": 89,
+              "source": "private String stop() {"
+            }
+          ]
+        },
+        {
+          "search": "void release(",
+          "locations": [
+            {
+              "line": 100,
+              "source": "private void release(WorkspaceBridgeServer server) {"
+            }
+          ]
+        },
+        {
+          "search": "void close(",
+          "locations": [
+            {
+              "line": 117,
+              "source": "@Override public void close() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceController.java",
+      "sha256": "9380d0d1b40d15f14d8ea0b4055225a3f22a22f040d29e019f168caf0096f49c",
+      "anchors": [
+        {
+          "search": "List<Path> roots(",
+          "locations": [
+            {
+              "line": 24,
+              "source": "public List<Path> roots() {"
+            }
+          ]
+        },
+        {
+          "search": "Path activeRoot(",
+          "locations": [
+            {
+              "line": 28,
+              "source": "public Path activeRoot() {"
+            }
+          ]
+        },
+        {
+          "search": "String addFolder(",
+          "locations": [
+            {
+              "line": 106,
+              "source": "public String addFolder(Path path, boolean activate) { return addDirectory(path == null ? null : path.toFile(), activate); }"
+            }
+          ]
+        },
+        {
+          "search": "String removeFolder(",
+          "locations": [
+            {
+              "line": 107,
+              "source": "public String removeFolder(Path path) { return remove(path == null ? \"\" : path.toString()); }"
+            }
+          ]
+        },
+        {
+          "search": "String activateFolder(",
+          "locations": [
+            {
+              "line": 108,
+              "source": "public String activateFolder(Path path, boolean showTree) { return activate(path == null ? \"\" : path.toString(), showTree); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceRoots.java",
+      "sha256": "2f4139e50c6b2c586bbc9f5b2af86ed65465f6d0c3e4510dd3ec2abc08097016",
+      "anchors": [
+        {
+          "search": "List<Path> all(",
+          "locations": [
+            {
+              "line": 14,
+              "source": "List<Path> all() {"
+            }
+          ]
+        },
+        {
+          "search": "Path active(",
+          "locations": [
+            {
+              "line": 18,
+              "source": "Path active() {"
+            }
+          ]
+        },
+        {
+          "search": "boolean add(",
+          "locations": [
+            {
+              "line": 22,
+              "source": "boolean add(Path path) {"
+            }
+          ]
+        },
+        {
+          "search": "boolean remove(",
+          "locations": [
+            {
+              "line": 30,
+              "source": "boolean remove(Path path) {"
+            }
+          ]
+        },
+        {
+          "search": "boolean activate(",
+          "locations": [
+            {
+              "line": 39,
+              "source": "boolean activate(Path path) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceRootResolver.java",
+      "sha256": "1e906c8390a230cb69e884ff63a7dfd6f9253dd41877a1b5e0e01045ab65eb5e",
+      "anchors": [
+        {
+          "search": "configuredRoot(",
+          "locations": [
+            {
+              "line": 14,
+              "source": "static Path configuredRoot(Path candidate, List<Path> roots) {"
+            },
+            {
+              "line": 60,
+              "source": "Path configured = configuredRoot(candidate, roots);"
+            }
+          ]
+        },
+        {
+          "search": "normalizedIdentity(",
+          "locations": [
+            {
+              "line": 26,
+              "source": "Path resolved = normalizedIdentity(normalized);"
+            },
+            {
+              "line": 27,
+              "source": "return normalizedRoots.stream().filter(root -> resolved.startsWith(normalizedIdentity(root)))"
+            },
+            {
+              "line": 32,
+              "source": "static Path normalizedIdentity(Path path) {"
+            },
+            {
+              "line": 48,
+              "source": "Path rootIdentity = normalizedIdentity(normalizedRoot);"
+            },
+            {
+              "line": 49,
+              "source": "Path candidateIdentity = normalizedIdentity(candidate);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspacePaths.java",
+      "sha256": "22209f32ac65ad26309e7969e459a0e7d9d34792ee0821f9316705282b2b9493",
+      "anchors": [
+        {
+          "search": "static Path root(",
+          "locations": [
+            {
+              "line": 15,
+              "source": "static Path root(Path requested) {"
+            }
+          ]
+        },
+        {
+          "search": "static Path resolve(",
+          "locations": [
+            {
+              "line": 25,
+              "source": "static Path resolve(Path root, String requested) {"
+            }
+          ]
+        },
+        {
+          "search": "static String id(",
+          "locations": [
+            {
+              "line": 53,
+              "source": "static String id(Path root) { return \"workspace-\" + hash(root.toUri().toString()).substring(0, 24); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/DocumentWorkspace.java",
+      "sha256": "cc149ea240db745a5371f6cc446f84be767a67f208102c154979c5fa44c117d0",
+      "anchors": [
+        {
+          "search": "record Id(",
+          "locations": [
+            {
+              "line": 9,
+              "source": "record Id(long value) { }"
+            }
+          ]
+        },
+        {
+          "search": "record Document(",
+          "locations": [
+            {
+              "line": 10,
+              "source": "record Document(Id id, String name, String path, boolean modified, boolean readOnly, long revision) { }"
+            }
+          ]
+        },
+        {
+          "search": "List<Document> documents(",
+          "locations": [
+            {
+              "line": 11,
+              "source": "List<Document> documents();"
+            }
+          ]
+        },
+        {
+          "search": "String open(",
+          "locations": [
+            {
+              "line": 16,
+              "source": "String open(Path path, int line, int column, String label);"
+            }
+          ]
+        },
+        {
+          "search": "EditorSurface activeSurface(",
+          "locations": [
+            {
+              "line": 22,
+              "source": "EditorSurface activeSurface();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/DocumentWorkbench.java",
+      "sha256": "0b081b200971c150e15859e5b414404170a78f76ba4a0bc459ceef038f91ce91",
+      "anchors": [
+        {
+          "search": "class DocumentWorkbench",
+          "locations": [
+            {
+              "line": 8,
+              "source": "final class DocumentWorkbench implements DocumentWorkspace {"
+            }
+          ]
+        },
+        {
+          "search": "String open(",
+          "locations": [
+            {
+              "line": 12,
+              "source": "String open(Path path, int line, int column, String label);"
+            },
+            {
+              "line": 47,
+              "source": "public String open(Path path, int line, int column, String label) {"
+            }
+          ]
+        },
+        {
+          "search": "EditorSurface activeSurface(",
+          "locations": [
+            {
+              "line": 65,
+              "source": "public EditorSurface activeSurface() { return host.surface(); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/SwingWorkbenchHost.java",
+      "sha256": "612abb0310f26e5924528046d230e7c5f80c170ae9dfb065b9d710d1e1e66039",
+      "anchors": [
+        {
+          "search": "class SwingWorkbenchHost",
+          "locations": [
+            {
+              "line": 6,
+              "source": "final class SwingWorkbenchHost implements DocumentWorkbench.Host {"
+            }
+          ]
+        },
+        {
+          "search": "String open(",
+          "locations": [
+            {
+              "line": 15,
+              "source": "public String open(Path path, int line, int column, String label) {"
+            }
+          ]
+        },
+        {
+          "search": "EditorSurface surface(",
+          "locations": [
+            {
+              "line": 27,
+              "source": "public EditorSurface surface() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/LegacyDocumentStore.java",
+      "sha256": "2973148b31f5dd13892b0f2ebf2a4b48201bf664b1d598e8f7d2ffb3468a6d1e",
+      "anchors": [
+        {
+          "search": "List<FileBuffer> buffers",
+          "locations": [
+            {
+              "line": 10,
+              "source": "private final List<FileBuffer> buffers = new ArrayList<>();"
+            }
+          ]
+        },
+        {
+          "search": "DocumentWorkspace.Id id(",
+          "locations": [
+            {
+              "line": 17,
+              "source": "DocumentWorkspace.Id id(FileBuffer buffer) {"
+            }
+          ]
+        },
+        {
+          "search": "DocumentWorkspace.Document describe(",
+          "locations": [
+            {
+              "line": 20,
+              "source": "DocumentWorkspace.Document describe(FileBuffer buffer) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/FileBuffer.java",
+      "sha256": "44210cdcda2780ebd3644de321938cbf356ae72dc66a33bdbce47f78af4775a0",
+      "anchors": [
+        {
+          "search": "long documentRevision()",
+          "locations": [
+            {
+              "line": 525,
+              "source": "long documentRevision() { return documentRevision; }"
+            }
+          ]
+        },
+        {
+          "search": "TextTransaction beginTextTransaction",
+          "locations": [
+            {
+              "line": 523,
+              "source": "TextTransaction beginTextTransaction() { return new TextTransaction(); }"
+            }
+          ]
+        },
+        {
+          "search": "class TextTransaction",
+          "locations": [
+            {
+              "line": 544,
+              "source": "final class TextTransaction implements AutoCloseable {"
+            }
+          ]
+        },
+        {
+          "search": "PlainDocument getDocument(",
+          "locations": [
+            {
+              "line": 673,
+              "source": "public PlainDocument getDocument() {"
+            }
+          ]
+        },
+        {
+          "search": "UndoManager getUndoManager(",
+          "locations": [
+            {
+              "line": 781,
+              "source": "public UndoManager getUndoManager() {"
+            }
+          ]
+        },
+        {
+          "search": "VersionedTextSnapshot textSnapshot(",
+          "locations": [
+            {
+              "line": 677,
+              "source": "VersionedTextSnapshot textSnapshot() {"
+            }
+          ]
+        },
+        {
+          "search": "DocumentTextChange reconcileDocumentText(",
+          "locations": [
+            {
+              "line": 707,
+              "source": "DocumentTextChange reconcileDocumentText() {"
+            }
+          ]
+        },
+        {
+          "search": "String getSavedContent(",
+          "locations": [
+            {
+              "line": 635,
+              "source": "public String getSavedContent() {"
+            }
+          ]
+        },
+        {
+          "search": "ExternalFileState getExternalFileState(",
+          "locations": [
+            {
+              "line": 866,
+              "source": "public ExternalFileState getExternalFileState() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/EditorWorkspaceDocuments.java",
+      "sha256": "628737d2a98d503ff280787985afe4f9218d30dd6be02c96ce345dbb3390beb0",
+      "anchors": [
+        {
+          "search": "List<WorkspaceDocument> snapshots(",
+          "locations": [
+            {
+              "line": 43,
+              "source": "@Override public List<WorkspaceDocument> snapshots() {"
+            }
+          ]
+        },
+        {
+          "search": "private List<Captured> capture(",
+          "locations": [
+            {
+              "line": 73,
+              "source": "private List<Captured> capture() {"
+            }
+          ]
+        },
+        {
+          "search": "WorkspaceDocument materialize(",
+          "locations": [
+            {
+              "line": 65,
+              "source": "private static WorkspaceDocument materialize(Captured item) {"
+            }
+          ]
+        },
+        {
+          "search": "List<WorkspaceDocument> applyTexts(",
+          "locations": [
+            {
+              "line": 97,
+              "source": "@Override public List<WorkspaceDocument> applyTexts(List<TextChange> changes) {"
+            },
+            {
+              "line": 116,
+              "source": "@Override public List<WorkspaceDocument> applyTexts(List<TextChange> changes, List<Path> unboundPaths) {"
+            }
+          ]
+        },
+        {
+          "search": "boolean matchesSavedDisk(",
+          "locations": [
+            {
+              "line": 101,
+              "source": "@Override public boolean matchesSavedDisk(WorkspaceDocument expected, WorkspaceDiskBinding binding) {"
+            }
+          ]
+        },
+        {
+          "search": "class Identity",
+          "locations": [
+            {
+              "line": 294,
+              "source": "private static final class Identity {"
+            }
+          ]
+        },
+        {
+          "search": "onEdtMutation(",
+          "locations": [
+            {
+              "line": 146,
+              "source": "return onEdtMutation(() -> {"
+            },
+            {
+              "line": 260,
+              "source": "private static <T> T onEdtMutation(Callable<T> mutation) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceDocument.java",
+      "sha256": "cccd74189737d9256f3f58e9eb5b77084f7c827a1c9732bf350aeae939fa285a",
+      "anchors": [
+        {
+          "search": "record WorkspaceDocument",
+          "locations": [
+            {
+              "line": 8,
+              "source": "public record WorkspaceDocument(String workspaceId, String documentId, String uri, String version,"
+            }
+          ]
+        },
+        {
+          "search": "enum Source",
+          "locations": [
+            {
+              "line": 11,
+              "source": "public enum Source { EDITOR, DISK }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceDocumentEditor.java",
+      "sha256": "6573d5dd8ea2dd669264e1b10cc114bf824874bc18b09e4c15b6937110dd7b89",
+      "anchors": [
+        {
+          "search": "interface WorkspaceDocumentEditor",
+          "locations": [
+            {
+              "line": 6,
+              "source": "interface WorkspaceDocumentEditor extends WorkspaceDocumentSource {"
+            }
+          ]
+        },
+        {
+          "search": "record TextChange",
+          "locations": [
+            {
+              "line": 10,
+              "source": "record TextChange(WorkspaceDocument expected, String text, WorkspaceDiskBinding diskBinding, boolean detach) {"
+            }
+          ]
+        },
+        {
+          "search": "applyTexts(",
+          "locations": [
+            {
+              "line": 20,
+              "source": "default List<WorkspaceDocument> applyTexts(List<TextChange> changes) {"
+            },
+            {
+              "line": 26,
+              "source": "default List<WorkspaceDocument> applyTexts(List<TextChange> changes, List<java.nio.file.Path> unboundPaths) {"
+            },
+            {
+              "line": 27,
+              "source": "if (unboundPaths.isEmpty()) return applyTexts(changes);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceQueryService.java",
+      "sha256": "937d3be6eee45341cf03939ee9cb464cf74952ee55bc1b9c281e5248f0976a6d",
+      "anchors": [
+        {
+          "search": "read(",
+          "locations": [
+            {
+              "line": 56,
+              "source": "return WorkspaceTextFile.read(workspaceId, path);"
+            },
+            {
+              "line": 59,
+              "source": "public Map<String, Object> read(String requestedWorkspace, String document, String expectedVersion, int offset, int limit) {"
+            }
+          ]
+        },
+        {
+          "search": "MAX_READ_CHARACTERS",
+          "locations": [
+            {
+              "line": 12,
+              "source": "public static final int MAX_READ_CHARACTERS = 1024 * 1024;"
+            },
+            {
+              "line": 60,
+              "source": "bounds(offset, limit, MAX_READ_CHARACTERS);"
+            }
+          ]
+        },
+        {
+          "search": "Map<String, Object> info(",
+          "locations": [
+            {
+              "line": 30,
+              "source": "public Map<String, Object> info() {"
+            }
+          ]
+        },
+        {
+          "search": "Map<String, Object> listDocuments(",
+          "locations": [
+            {
+              "line": 37,
+              "source": "public Map<String, Object> listDocuments(String requestedWorkspace, int offset, int limit) {"
+            }
+          ]
+        },
+        {
+          "search": "WorkspaceDocument snapshot(",
+          "locations": [
+            {
+              "line": 46,
+              "source": "public WorkspaceDocument snapshot(String requestedWorkspace, String document) {"
+            }
+          ]
+        },
+        {
+          "search": "List<WorkspaceDocument> visibleDocuments(",
+          "locations": [
+            {
+              "line": 78,
+              "source": "List<WorkspaceDocument> visibleDocuments() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceRpc.java",
+      "sha256": "fe596f9e41e4578d02cf81d7d61eabe9cea38f200bffd6b85ff52c077f3ea45d",
+      "anchors": [
+        {
+          "search": "String handle(",
+          "locations": [
+            {
+              "line": 22,
+              "source": "public String handle(String json) {"
+            }
+          ]
+        },
+        {
+          "search": "validEnvelope(",
+          "locations": [
+            {
+              "line": 31,
+              "source": "if (!validEnvelope(request))"
+            },
+            {
+              "line": 52,
+              "source": "return request == null || request.containsKey(\"id\") || !validEnvelope(request);"
+            },
+            {
+              "line": 56,
+              "source": "private static boolean validEnvelope(Map<String, Object> request) {"
+            }
+          ]
+        },
+        {
+          "search": "documents/read",
+          "locations": [
+            {
+              "line": 86,
+              "source": "case \"documents/read\" -> {"
+            }
+          ]
+        },
+        {
+          "search": "workspace/info",
+          "locations": [
+            {
+              "line": 66,
+              "source": "case \"workspace/info\" -> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceFrames.java",
+      "sha256": "8d8ef0d96c6f71f24a7c31f523cfdef7fb5c87a1e8c882d9218e4130d9fe5661",
+      "anchors": [
+        {
+          "search": "MAX_REQUEST_BYTES",
+          "locations": [
+            {
+              "line": 13,
+              "source": "static final int MAX_REQUEST_BYTES = 1024 * 1024;"
+            }
+          ]
+        },
+        {
+          "search": "MAX_RESPONSE_BYTES",
+          "locations": [
+            {
+              "line": 14,
+              "source": "static final int MAX_RESPONSE_BYTES = 16 * 1024 * 1024;"
+            }
+          ]
+        },
+        {
+          "search": "static byte[] read",
+          "locations": [
+            {
+              "line": 17,
+              "source": "static byte[] read(InputStream input, int maximum) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "static String decode",
+          "locations": [
+            {
+              "line": 30,
+              "source": "static String decode(byte[] bytes) throws java.nio.charset.CharacterCodingException {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceQueryBudget.java",
+      "sha256": "df05481d21d4baa59c13c18dc14992ba72285725487cece1171d522c16280a6e",
+      "anchors": [
+        {
+          "search": "MAX_ENTRIES",
+          "locations": [
+            {
+              "line": 11,
+              "source": "static final int MAX_ENTRIES = 100_000;"
+            },
+            {
+              "line": 36,
+              "source": "if (++entries > MAX_ENTRIES) stop(\"ENTRY_LIMIT\");"
+            },
+            {
+              "line": 49,
+              "source": "\"counts\", Map.copyOf(counts), \"visitedEntries\", Math.min(entries, MAX_ENTRIES), \"snapshotCharacters\", text);"
+            }
+          ]
+        },
+        {
+          "search": "MAX_TEXT_CHARACTERS",
+          "locations": [
+            {
+              "line": 13,
+              "source": "static final int MAX_TEXT_CHARACTERS = 32 * 1024 * 1024;"
+            },
+            {
+              "line": 41,
+              "source": "if ((text += characters) > MAX_TEXT_CHARACTERS) stop(\"TEXT_LIMIT\");"
+            }
+          ]
+        },
+        {
+          "search": "void check(",
+          "locations": [
+            {
+              "line": 28,
+              "source": "void check() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/AgentPolicy.java",
+      "sha256": "cf4b00563f87edc90ac48482ae1ffe739a3cf00742f417e729bcebf0f99d4d69",
+      "anchors": [
+        {
+          "search": "enum Capability",
+          "locations": [
+            {
+              "line": 14,
+              "source": "public enum Capability { READ, PROPOSE, APPLY, RUN_HEADLESS, RUN_INTERACTIVE, OPEN_UI, NOTIFY, START_AGENT, WORKTREE, NETWORK }"
+            }
+          ]
+        },
+        {
+          "search": "readOnly(",
+          "locations": [
+            {
+              "line": 22,
+              "source": "public static AgentPolicy readOnly() {"
+            }
+          ]
+        },
+        {
+          "search": "void require(",
+          "locations": [
+            {
+              "line": 26,
+              "source": "public void require(Capability capability) {"
+            }
+          ]
+        },
+        {
+          "search": "void checkPath(",
+          "locations": [
+            {
+              "line": 35,
+              "source": "public void checkPath(Path relative, Capability capability) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/EditorPane.java",
+      "sha256": "bdd812d7733bd2b69fc6e7b4407550af85f0431ed398e54aa0eeacd62926482a",
+      "anchors": [
+        {
+          "search": "class EditorPane",
+          "locations": [
+            {
+              "line": 7,
+              "source": "public class EditorPane {"
+            }
+          ]
+        },
+        {
+          "search": "SourceView",
+          "locations": [
+            {
+              "line": 66,
+              "source": "void disposeSourceView() {"
+            }
+          ]
+        },
+        {
+          "search": "isDisposed(",
+          "locations": [
+            {
+              "line": 64,
+              "source": "boolean isDisposed() { return disposed; }"
+            }
+          ]
+        },
+        {
+          "search": "void disposeSourceView(",
+          "locations": [
+            {
+              "line": 66,
+              "source": "void disposeSourceView() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/EditorSurface.java",
+      "sha256": "1692b54731af870b94d90a065a98cebd67201f01558999173e8b04f7a520c4e3",
+      "anchors": [
+        {
+          "search": "interface EditorSurface",
+          "locations": [
+            {
+              "line": 5,
+              "source": "public interface EditorSurface {"
+            }
+          ]
+        },
+        {
+          "search": "record Selection",
+          "locations": [
+            {
+              "line": 6,
+              "source": "record Selection(int dot, int mark) { }"
+            }
+          ]
+        },
+        {
+          "search": "record Viewport",
+          "locations": [
+            {
+              "line": 7,
+              "source": "record Viewport(int x, int y) { }"
+            }
+          ]
+        },
+        {
+          "search": "void select(",
+          "locations": [
+            {
+              "line": 14,
+              "source": "void select(int dot, int mark);"
+            }
+          ]
+        },
+        {
+          "search": "void scrollTo(",
+          "locations": [
+            {
+              "line": 16,
+              "source": "void scrollTo(Viewport viewport);"
+            }
+          ]
+        },
+        {
+          "search": "void focus(",
+          "locations": [
+            {
+              "line": 17,
+              "source": "void focus();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/SwingEditorSurface.java",
+      "sha256": "4f1c7428a006b60be5073e73a9ee66eaea795af77a7e22277826560f3233eb5a",
+      "anchors": [
+        {
+          "search": "void select(",
+          "locations": [
+            {
+              "line": 25,
+              "source": "public void select(int dot, int mark) {"
+            }
+          ]
+        },
+        {
+          "search": "void scrollTo(",
+          "locations": [
+            {
+              "line": 34,
+              "source": "public void scrollTo(Viewport point) {"
+            }
+          ]
+        },
+        {
+          "search": "void focus(",
+          "locations": [
+            {
+              "line": 41,
+              "source": "public void focus() { area.requestFocusInWindow(); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/EditorUiController.java",
+      "sha256": "b2ae0cc27bddade855ce55ea7367dea5379d597abf0b8f2e93b5e4c5117b3860",
+      "anchors": [
+        {
+          "search": "void activateEditorPane(",
+          "locations": [
+            {
+              "line": 803,
+              "source": "void activateEditorPane(EditorPane pane) {"
+            }
+          ]
+        },
+        {
+          "search": "void requestActivePaneFocus(",
+          "locations": [
+            {
+              "line": 845,
+              "source": "void requestActivePaneFocus() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/PaneBufferController.java",
+      "sha256": "8da0e88eece2679b34f9627a6f992442578ff7c9be1b533c6d134c86df0eae70",
+      "anchors": [
+        {
+          "search": "void openFileCheckedAsync(",
+          "locations": [
+            {
+              "line": 479,
+              "source": "void openFileCheckedAsync(File file, java.util.function.BooleanSupplier current,"
+            }
+          ]
+        },
+        {
+          "search": "DocumentRequests",
+          "locations": [
+            {
+              "line": 25,
+              "source": "private final DocumentRequests<EditorPane> openRequests = new DocumentRequests<>();"
+            }
+          ]
+        },
+        {
+          "search": "void disposePaneView(",
+          "locations": [
+            {
+              "line": 915,
+              "source": "void disposePaneView(EditorPane pane) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/DocumentRequests.java",
+      "sha256": "7ee08753c81c1f5763fd6e8ace22c1b1c950389da98c736b93e44f1fe89eb73d",
+      "anchors": [
+        {
+          "search": "class DocumentRequests",
+          "locations": [
+            {
+              "line": 7,
+              "source": "final class DocumentRequests<T> {"
+            }
+          ]
+        },
+        {
+          "search": "invalidate(",
+          "locations": [
+            {
+              "line": 16,
+              "source": "void invalidate(T target) { requests.remove(target); }"
+            }
+          ]
+        },
+        {
+          "search": "long issue(",
+          "locations": [
+            {
+              "line": 10,
+              "source": "long issue(T target) {"
+            }
+          ]
+        },
+        {
+          "search": "boolean current(",
+          "locations": [
+            {
+              "line": 15,
+              "source": "boolean current(T target, long ticket) { return target == null || Long.valueOf(ticket).equals(requests.get(target)); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/DocumentNavigation.java",
+      "sha256": "905628ad1853181f13a9e324fb95c6b37351e4dcb700a87119d35aa9c268cd09",
+      "anchors": [
+        {
+          "search": "record Location",
+          "locations": [
+            {
+              "line": 8,
+              "source": "record Location(DocumentWorkspace.Id document, int offset) { }"
+            }
+          ]
+        },
+        {
+          "search": "NavigationHistory",
+          "locations": [
+            {
+              "line": 9,
+              "source": "private final NavigationHistory<Location> history = new NavigationHistory<>(100);"
+            }
+          ]
+        },
+        {
+          "search": "void record(",
+          "locations": [
+            {
+              "line": 10,
+              "source": "void record(Location location) { history.record(location); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/NavigationHistory.java",
+      "sha256": "2e646ba00868b0632c9365cd2b58cd584f085a581fac63718a53f33547c0b4cc",
+      "anchors": [
+        {
+          "search": "class NavigationHistory",
+          "locations": [
+            {
+              "line": 9,
+              "source": "final class NavigationHistory<T> {"
+            }
+          ]
+        },
+        {
+          "search": "void record(",
+          "locations": [
+            {
+              "line": 19,
+              "source": "void record(T origin) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/EditorLocation.java",
+      "sha256": "b73af7a608b210879e5591c617aa7189a49f7ee7f61af9f090b07a8f359a5b4a",
+      "anchors": [
+        {
+          "search": "static int offset(",
+          "locations": [
+            {
+              "line": 10,
+              "source": "static int offset(JTextArea area, int line, int column) throws BadLocationException {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/VersionedTextSnapshot.java",
+      "sha256": "fac8130861714946528edfb44152d110da041e7bb8bd29e1612e186750605755",
+      "anchors": [
+        {
+          "search": "int offsetAt(",
+          "locations": [
+            {
+              "line": 61,
+              "source": "int offsetAt(int line, int character) {"
+            }
+          ]
+        },
+        {
+          "search": "Position positionAt(",
+          "locations": [
+            {
+              "line": 56,
+              "source": "Position positionAt(int offset) {"
+            }
+          ]
+        },
+        {
+          "search": "int lineStartOffset(",
+          "locations": [
+            {
+              "line": 69,
+              "source": "int lineStartOffset(int line) {"
+            }
+          ]
+        },
+        {
+          "search": "int lineEndOffset(",
+          "locations": [
+            {
+              "line": 76,
+              "source": "int lineEndOffset(int line) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/GraphemeBoundary.java",
+      "sha256": "56180189486b26a24639f8f5eba86e26742b83fa0e740acb669c641799149149",
+      "anchors": [
+        {
+          "search": "boolean isBoundary(",
+          "locations": [
+            {
+              "line": 82,
+              "source": "static boolean isBoundary(String text, int offset) {"
+            }
+          ]
+        },
+        {
+          "search": "boolean continues(",
+          "locations": [
+            {
+              "line": 137,
+              "source": "private static boolean continues(int previous, int current, int regionalIndicators, boolean emojiBeforeZwj) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/InputController.java",
+      "sha256": "d9d8f03269237343135dcbde62ad906c2bba197708781e6b2c926990f1689522",
+      "anchors": [
+        {
+          "search": "composingText",
+          "locations": [
+            {
+              "line": 45,
+              "source": "private boolean composingText;"
+            },
+            {
+              "line": 92,
+              "source": "composingText = text != null && text.getEndIndex() - text.getBeginIndex() > event.getCommittedCharacterCount();"
+            },
+            {
+              "line": 97,
+              "source": "@Override public void focusLost(java.awt.event.FocusEvent event) { composingText = false; }"
+            },
+            {
+              "line": 102,
+              "source": "if (event == null || event.isConsumed() || event.getComponent() != editor.writingArea || composingText"
+            },
+            {
+              "line": 660,
+              "source": "|| event.isMetaDown() || composingText || !editor.extraSelections.isEmpty()"
+            },
+            {
+              "line": 1943,
+              "source": "if (composingText && code == KeyEvent.VK_ENTER) return;"
+            },
+            {
+              "line": 2976,
+              "source": "boolean allowsAiCompletion() { return !composingText && !isCompletionPopupVisible() && !snippetSession.active(editor.writingArea); }"
+            }
+          ]
+        },
+        {
+          "search": "inputMethodTextChanged(",
+          "locations": [
+            {
+              "line": 90,
+              "source": "@Override public void inputMethodTextChanged(java.awt.event.InputMethodEvent event) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/EditorState.java",
+      "sha256": "8f9fdc07a1660625b5555b3c33a502bc2c7df9038071d7afdea6e964b4335ee6",
+      "anchors": [
+        {
+          "search": "pendingKey",
+          "locations": [
+            {
+              "line": 6,
+              "source": "public char pendingKey;"
+            },
+            {
+              "line": 21,
+              "source": "pendingKey = '\\0';"
+            }
+          ]
+        },
+        {
+          "search": "pendingCount",
+          "locations": [
+            {
+              "line": 7,
+              "source": "public String pendingCount;"
+            },
+            {
+              "line": 22,
+              "source": "pendingCount = \"\";"
+            }
+          ]
+        },
+        {
+          "search": "visualStartPos",
+          "locations": [
+            {
+              "line": 9,
+              "source": "public int visualStartPos;"
+            },
+            {
+              "line": 24,
+              "source": "visualStartPos = -1;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/LspClient.java",
+      "sha256": "519a191ff0cc2c0a172aaec94463b37df0e4943f6c796323e432acbc65572677",
+      "anchors": [
+        {
+          "search": "class Diagnostic",
+          "locations": [
+            {
+              "line": 321,
+              "source": "public static class Diagnostic {"
+            }
+          ]
+        },
+        {
+          "search": "void drainNotifications(",
+          "locations": [
+            {
+              "line": 1635,
+              "source": "public void drainNotifications() {"
+            }
+          ]
+        },
+        {
+          "search": "List<Diagnostic> getDiagnostics(",
+          "locations": [
+            {
+              "line": 1608,
+              "source": "public List<Diagnostic> getDiagnostics(String uri) {"
+            }
+          ]
+        },
+        {
+          "search": "Map<String, List<Diagnostic>> diagnosticsSnapshot(",
+          "locations": [
+            {
+              "line": 1614,
+              "source": "public Map<String, List<Diagnostic>> diagnosticsSnapshot() {"
+            }
+          ]
+        },
+        {
+          "search": "publishDiagnostics",
+          "locations": [
+            {
+              "line": 1730,
+              "source": "textDocument.put(\"publishDiagnostics\", diagnosticsCapability);"
+            },
+            {
+              "line": 2011,
+              "source": "if (!\"textDocument/publishDiagnostics\".equals(method)) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/ProblemsController.java",
+      "sha256": "b9372590e5abe848b2e230b7b4ce17e023f0ed646fc6931b2ac8af53fdc72f0c",
+      "anchors": [
+        {
+          "search": "List<ProblemsService.Problem> snapshot(",
+          "locations": [
+            {
+              "line": 35,
+              "source": "List<ProblemsService.Problem> snapshot() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/ProblemsService.java",
+      "sha256": "e8cafb5697e152c94e5d6fc50fe21f3644b44698c297afca7a1f4c0119e40569",
+      "anchors": [
+        {
+          "search": "class ProblemsService",
+          "locations": [
+            {
+              "line": 11,
+              "source": "final class ProblemsService {"
+            }
+          ]
+        },
+        {
+          "search": "MAX",
+          "locations": [
+            {
+              "line": 12,
+              "source": "static final int MAX_RETAINED_ENTRIES = 2_000;"
+            },
+            {
+              "line": 76,
+              "source": "retainedBySource.put(entry.getKey(), List.copyOf(values.size() <= MAX_RETAINED_ENTRIES"
+            },
+            {
+              "line": 77,
+              "source": "? values : values.subList(0, MAX_RETAINED_ENTRIES)));"
+            },
+            {
+              "line": 113,
+              "source": "while (retained > MAX_RETAINED_ENTRIES && !retainedBySource.isEmpty()) {"
+            }
+          ]
+        },
+        {
+          "search": "class Problem",
+          "locations": [
+            {
+              "line": 11,
+              "source": "final class ProblemsService {"
+            },
+            {
+              "line": 32,
+              "source": "static final class Problem {"
+            }
+          ]
+        },
+        {
+          "search": "int retainedEntryCount(",
+          "locations": [
+            {
+              "line": 105,
+              "source": "synchronized int retainedEntryCount() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/LspDefinitionRequests.java",
+      "sha256": "3a8632fb1397bac37e201676e000d7a561a55abf59763d385cee7d0eb30e6809",
+      "anchors": [
+        {
+          "search": "class LspDefinitionRequests",
+          "locations": [
+            {
+              "line": 10,
+              "source": "final class LspDefinitionRequests implements AutoCloseable {"
+            }
+          ]
+        },
+        {
+          "search": "record Context",
+          "locations": [
+            {
+              "line": 11,
+              "source": "record Context(FileBuffer buffer, EditorPane pane, LspClient client, String path, String uri,"
+            }
+          ]
+        },
+        {
+          "search": "cancel(",
+          "locations": [
+            {
+              "line": 58,
+              "source": "if (jobId >= 0) jobs.cancel(jobId);"
+            },
+            {
+              "line": 97,
+              "source": "if ((active != null && active.context().buffer() == buffer) || (pending != null && pending.context().buffer() == buffer)) cancel();"
+            },
+            {
+              "line": 100,
+              "source": "void cancel() {"
+            },
+            {
+              "line": 105,
+              "source": "if (jobId >= 0 && jobs != null) jobs.cancel(jobId);"
+            },
+            {
+              "line": 111,
+              "source": "cancel();"
+            }
+          ]
+        },
+        {
+          "search": "class LspDefinitionRequests",
+          "locations": [
+            {
+              "line": 10,
+              "source": "final class LspDefinitionRequests implements AutoCloseable {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/AsyncJobService.java",
+      "sha256": "7f896528e2d9520056d2367d7cf53b2d06de7048fcc3960e75d460289aca8145",
+      "anchors": [
+        {
+          "search": "int submit(",
+          "locations": [
+            {
+              "line": 197,
+              "source": "public <T> int submit(String description, JobTask<T> task, JobCompletion<T> completion) {"
+            },
+            {
+              "line": 206,
+              "source": "private <T> int submit(ExecutorService targetExecutor, String description, JobTask<T> task, JobCompletion<T> completion) {"
+            }
+          ]
+        },
+        {
+          "search": "boolean cancel(",
+          "locations": [
+            {
+              "line": 292,
+              "source": "public boolean cancel(int id) {"
+            }
+          ]
+        },
+        {
+          "search": "void shutdownNow(",
+          "locations": [
+            {
+              "line": 331,
+              "source": "public void shutdownNow() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceProposalService.java",
+      "sha256": "1cbc5450479789cc5acd3b0e93205de9230b6a32923219f29b1f74a5b687f2ce",
+      "anchors": [
+        {
+          "search": "class WorkspaceProposalService",
+          "locations": [
+            {
+              "line": 14,
+              "source": "final class WorkspaceProposalService {"
+            }
+          ]
+        },
+        {
+          "search": "apply(",
+          "locations": [
+            {
+              "line": 279,
+              "source": "Map<String, Object> apply(String id, int revision) { return applyOrUndo(id, revision, false); }"
+            }
+          ]
+        },
+        {
+          "search": "propose(",
+          "locations": [
+            {
+              "line": 65,
+              "source": "Map<String, Object> propose(String requestId, String taskId, String turnId, List<Input> inputs) {"
+            }
+          ]
+        },
+        {
+          "search": "undo(",
+          "locations": [
+            {
+              "line": 280,
+              "source": "Map<String, Object> undo(String id, int revision) { return applyOrUndo(id, revision, true); }"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceEditTransaction.java",
+      "sha256": "3cf225bcd02b765eac8bd5ac8e2c1c9fad28d5f93811b13d4cc73914f33f1f31",
+      "anchors": [
+        {
+          "search": "class WorkspaceEditTransaction",
+          "locations": [
+            {
+              "line": 28,
+              "source": "final class WorkspaceEditTransaction implements AutoCloseable {"
+            }
+          ]
+        },
+        {
+          "search": "enum State",
+          "locations": [
+            {
+              "line": 29,
+              "source": "enum State { OPEN, PREPARED, COMMITTED, ROLLED_BACK, RECOVERY_REQUIRED }"
+            }
+          ]
+        },
+        {
+          "search": "void replace(",
+          "locations": [
+            {
+              "line": 102,
+              "source": "void replace(Path target, Path staged) throws IOException {"
+            },
+            {
+              "line": 107,
+              "source": "void replace(Path target, Path staged, Map<String, Object> expectedTarget) throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "void commit(",
+          "locations": [
+            {
+              "line": 273,
+              "source": "void commit() throws IOException {"
+            }
+          ]
+        },
+        {
+          "search": "Report rollback(",
+          "locations": [
+            {
+              "line": 279,
+              "source": "Report rollback() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/MarkdownController.java",
+      "sha256": "1233504d990a4f72edb47ed2d7aaf4ddb43519112ad95c450b7414db55548216",
+      "anchors": [
+        {
+          "search": "String openPreview(",
+          "locations": [
+            {
+              "line": 115,
+              "source": "String openPreview() {"
+            }
+          ]
+        },
+        {
+          "search": "void disposePreviews(",
+          "locations": [
+            {
+              "line": 174,
+              "source": "void disposePreviews() {"
+            }
+          ]
+        },
+        {
+          "search": "void detachPreview(",
+          "locations": [
+            {
+              "line": 159,
+              "source": "void detachPreview(EditorPane pane) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/MarkdownPreviewPane.java",
+      "sha256": "29b341a7a7232b90fce4717ac11948084a4137878c214cd9012aecce1fc13b9a",
+      "anchors": [
+        {
+          "search": "void renderNow(",
+          "locations": [
+            {
+              "line": 146,
+              "source": "private void renderNow() {"
+            }
+          ]
+        },
+        {
+          "search": "new Timer(",
+          "locations": [
+            {
+              "line": 90,
+              "source": "renderTimer = new Timer(RENDER_DEBOUNCE_MS, event -> renderNow());"
+            }
+          ]
+        },
+        {
+          "search": "void disposePreview(",
+          "locations": [
+            {
+              "line": 132,
+              "source": "void disposePreview() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/MarkdownMediaRenderer.java",
+      "sha256": "af7db0cb6de5fae7d71fb2953876f63bd598adf0978dd26b293567c5f0a30d51",
+      "anchors": [
+        {
+          "search": "class MarkdownMediaRenderer",
+          "locations": [
+            {
+              "line": 20,
+              "source": "final class MarkdownMediaRenderer implements Renderer {"
+            }
+          ]
+        },
+        {
+          "search": "MAX",
+          "locations": [
+            {
+              "line": 21,
+              "source": "static final int MAX_FILE_BYTES = 4 * 1024 * 1024;"
+            },
+            {
+              "line": 22,
+              "source": "static final int MAX_SVG_CHARS = 2 * 1024 * 1024;"
+            },
+            {
+              "line": 43,
+              "source": "if (!before.isRegularFile() || before.size() < 1 || before.size() > MAX_FILE_BYTES) throw new Rejected(State.RESOURCE_LIMIT, \"Image exceeds 4 MiB compressed-input budget\");"
+            },
+            {
+              "line": 48,
+              "source": "while ((length = input.read(chunk)) != -1) { check(cancelled); if ((long) output.size() + length > MAX_FILE_BYTES) throw new Rejected(State.RESOURCE_LIMIT, \"Image input grew beyond budget\"); output.write(chunk, 0, length); }"
+            },
+            {
+              "line": 76,
+              "source": "if (svg.length() > MAX_SVG_CHARS) throw new Rejected(State.RESOURCE_LIMIT, \"SVG source budget\");"
+            },
+            {
+              "line": 95,
+              "source": "if (svg.length() > MAX_SVG_CHARS) throw new Rejected(State.RESOURCE_LIMIT, \"Mermaid SVG output budget\");"
+            },
+            {
+              "line": 145,
+              "source": "transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_MAX_WIDTH, (float) options.maxWidth());"
+            },
+            {
+              "line": 146,
+              "source": "transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_MAX_HEIGHT, (float) options.maxHeight());"
+            }
+          ]
+        },
+        {
+          "search": "Prepared prepare(",
+          "locations": [
+            {
+              "line": 23,
+              "source": "@Override public Prepared prepare(Request request, BooleanSupplier cancelled) throws Exception {"
+            }
+          ]
+        },
+        {
+          "search": "void validate(",
+          "locations": [
+            {
+              "line": 59,
+              "source": "@Override public void validate(Prepared prepared, BooleanSupplier cancelled) throws Exception {"
+            }
+          ]
+        },
+        {
+          "search": "BufferedImage render(",
+          "locations": [
+            {
+              "line": 63,
+              "source": "@Override public BufferedImage render(Prepared prepared, BooleanSupplier cancelled) throws Exception {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/NotebookController.java",
+      "sha256": "400089a0273f5cde0937298f95786e689a245c3ff8e6ad9eb8c2b59e3ae8e93a",
+      "anchors": [
+        {
+          "search": "class NotebookController",
+          "locations": [
+            {
+              "line": 17,
+              "source": "final class NotebookController {"
+            }
+          ]
+        },
+        {
+          "search": "NotebookController(",
+          "locations": [
+            {
+              "line": 36,
+              "source": "NotebookController(Texteditor editor) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/MiniJson.java",
+      "sha256": "a20fd6a1c05e0e7eabc2c71643c9a6d7ae2264e5fcbd5e64e75600567be0ba75",
+      "anchors": [
+        {
+          "search": "String escape(",
+          "locations": [
+            {
+              "line": 95,
+              "source": "private static String escape(String value) {"
+            }
+          ]
+        },
+        {
+          "search": "isHighSurrogate",
+          "locations": [
+            {
+              "line": 108,
+              "source": "boolean unpaired = Character.isHighSurrogate(c) ? i + 1 == value.length() || !Character.isLowSurrogate(value.charAt(i + 1))"
+            },
+            {
+              "line": 109,
+              "source": ": Character.isLowSurrogate(c) && (i == 0 || !Character.isHighSurrogate(value.charAt(i - 1)));"
+            }
+          ]
+        },
+        {
+          "search": "isLowSurrogate",
+          "locations": [
+            {
+              "line": 108,
+              "source": "boolean unpaired = Character.isHighSurrogate(c) ? i + 1 == value.length() || !Character.isLowSurrogate(value.charAt(i + 1))"
+            },
+            {
+              "line": 109,
+              "source": ": Character.isLowSurrogate(c) && (i == 0 || !Character.isHighSurrogate(value.charAt(i - 1)));"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/MarkdownMediaService.java",
+      "sha256": "209abacccc2a31e226b13f152d5dea0ac5b37e186592ddbcb70252b24ba0e6db",
+      "anchors": [
+        {
+          "search": "record Budget(",
+          "locations": [
+            {
+              "line": 13,
+              "source": "record Budget(int queued, int consumers, int sessions, int entries, long cacheBytes, long residentBytes, long residentPixels) {"
+            }
+          ]
+        },
+        {
+          "search": "Budget desktop()",
+          "locations": [
+            {
+              "line": 19,
+              "source": "static Budget desktop() { return new Budget(8, 64, 16, 32, 16L << 20, 32L << 20, 8L << 20); }"
+            }
+          ]
+        },
+        {
+          "search": "Session open(",
+          "locations": [
+            {
+              "line": 238,
+              "source": "synchronized Session open(Source source, long generation) {"
+            }
+          ]
+        },
+        {
+          "search": "Metrics metrics(",
+          "locations": [
+            {
+              "line": 243,
+              "source": "synchronized Metrics metrics() { return new Metrics(queuedCount(), running, consumers, sessions.size(), cache.size(), residents.size(),"
+            }
+          ]
+        },
+        {
+          "search": "void close(",
+          "locations": [
+            {
+              "line": 36,
+              "source": "@Override public void close() { lease.ifPresent(Lease::close); }"
+            },
+            {
+              "line": 71,
+              "source": "@Override public void close() {"
+            },
+            {
+              "line": 107,
+              "source": "@Override public void close() { synchronized (MarkdownMediaService.this) { finish(this, State.CANCELLED, \"Media request cancelled\"); } }"
+            },
+            {
+              "line": 147,
+              "source": "@Override public void close() {"
+            },
+            {
+              "line": 290,
+              "source": "@Override public synchronized void close() {"
+            }
+          ]
+        },
+        {
+          "search": "ThreadPoolExecutor executor(",
+          "locations": [
+            {
+              "line": 246,
+              "source": "private ThreadPoolExecutor executor() {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/UiDensity.java",
+      "sha256": "0b144462eb63e2cc767fbb8f230927f904964e197c11d0698d3953f3d80bdfc5",
+      "anchors": [
+        {
+          "search": "enum UiDensity",
+          "locations": [
+            {
+              "line": 11,
+              "source": "enum UiDensity {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/BundledEditorFont.java",
+      "sha256": "e478e85ab0e3323455df1dcb3e2046169ea196b47802b1c0e6b03a170a953196",
+      "anchors": [
+        {
+          "search": "class BundledEditorFont",
+          "locations": [
+            {
+              "line": 8,
+              "source": "final class BundledEditorFont {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/WorkspaceDocumentSource.java",
+      "sha256": "9744bca4adfba1e1bb1492d843a8b98e616398097206e02efad29bf989ffc23e",
+      "anchors": [
+        {
+          "search": "interface WorkspaceDocumentSource",
+          "locations": [
+            {
+              "line": 7,
+              "source": "public interface WorkspaceDocumentSource {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/RemoteWorkspaceSessionService.java",
+      "sha256": "1a8745aeb45a7534fd10b16c4f2a1d2e290528f2f43e9e45d02e4ac649a7cacb",
+      "anchors": [
+        {
+          "search": "connectionFor(Path",
+          "locations": [
+            {
+              "line": 26,
+              "source": "synchronized Connection connectionFor(Path candidate) {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/main/java/shed/DevContainerSessionService.java",
+      "sha256": "1551da4b577638e29b7c2fba6fb9ade4b24858e9893b34845dd21556683173a2",
+      "anchors": [
+        {
+          "search": "connectionFor(Path",
+          "locations": [
+            {
+              "line": 23,
+              "source": "synchronized Connection connectionFor(Path candidate) {"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "path": "src/test/java/shed/AgentPolicyTest.java",
+      "sha256": "7e9412cb82c29abd7ef74595db01e31a50ac6c03738e5b75dfdac454201eb352",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 11,
+          "source": "@Test void readOnlyDoesNotAuthorizeProposalsWritesProcessesOrNetwork() {"
+        },
+        {
+          "line": 21,
+          "source": "@Test void backgroundOnlyIsIndependentFromGrantedCapabilities() {"
+        },
+        {
+          "line": 30,
+          "source": "@Test void protectedPathsAndExclusionsCoverRootNestedAndAdministrativeFiles() {"
+        },
+        {
+          "line": 43,
+          "source": "@Test void policyIsImmutableAndRejectsAmbiguousPatterns() {"
+        },
+        {
+          "line": 52,
+          "source": "@Test void protectedAndExcludedDirectoryMatchesAlsoGuardTheirDescendants() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/AsyncJobPayloadLifecycleTest.java",
+      "sha256": "57b9dc0d84d37abb76f437e77d5a11d88dc1b9872ebb1328276c609932d04abc",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 12,
+          "source": "@Test void finishedTokensReleaseHooksEvenWhenTheTokenIsStillReferenced() throws Exception {"
+        },
+        {
+          "line": 36,
+          "source": "@Test void successfulAndFailedHistoryReleasesPayloads() throws Exception {"
+        },
+        {
+          "line": 54,
+          "source": "@Test void queuedCancellationAndRejectionReleaseHistoryAndCompleteOnce() throws Exception {"
+        },
+        {
+          "line": 73,
+          "source": "@Test void shutdownDeliversQueuedCancellationWithoutRunningTheTask() throws Exception {"
+        },
+        {
+          "line": 85,
+          "source": "@Test void runningNoninterruptibleTaskKeepsHooksUntilItActuallyFinishes() throws Exception {"
+        },
+        {
+          "line": 101,
+          "source": "@Test void cancellationBeforeTheSubmitReturnCannotLoseQueuedCompletion() throws Exception {"
+        },
+        {
+          "line": 140,
+          "source": "@Test void aPendingEdtCompletionStillReceivesItsResultAfterHistoryCleanup() throws Exception {"
+        },
+        {
+          "line": 156,
+          "source": "@Test void finishingDoesNotWaitForACancellationHookHoldingAnExternalResource() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/AsyncJobServiceTest.java",
+      "sha256": "a1df0e5e345c17bcf8762198fe61f99f7bbbb7a5ad28b4358f528b52aba4236d",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/BoundedUndoManagerTest.java",
+      "sha256": "b1cda43002f4c53016f0a55b34bb549ceb078f9483b1d545827f4e6d9f599c61",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/BundledEditorFontTest.java",
+      "sha256": "e8543d93f2706a60004f59f9a2be210a5fb4c4d43387a0e4607c0c30c1e27e11",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 8,
+          "source": "@Test void bundledFaceLoadsWithoutAUserFontInstallationAndDerivesEditorSizes() {"
+        },
+        {
+          "line": 17,
+          "source": "@Test void canonicalFamilyAndAliasValidateWhileOtherConfiguredFontsKeepTheirIdentity() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/CenteredWritingLayoutTest.java",
+      "sha256": "6d8f4fd76a5743559c4d3c9f733721d4b970efa117c36b4956864ef28a4e7180",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 7,
+          "source": "@Test void derivesColumnFromFontAndSubtractsChrome() {"
+        },
+        {
+          "line": 13,
+          "source": "@Test void narrowAndZeroWidthNeverCreateClippingInsets() {"
+        },
+        {
+          "line": 18,
+          "source": "@Test void configurationBoundsAndOverflowRemainSafe() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/DocumentFormatPreservationTest.java",
+      "sha256": "098a7cf65aa3f911192bfc70b0506ae11abcc7d501509d4e352e2157b268eb8e",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 15,
+          "source": "@Test void markedUnicodeFilesKeepBomEncodingAndNewlinesThroughHumanAndSnapshotSaves() throws Exception {"
+        },
+        {
+          "line": 35,
+          "source": "@Test void unmarkedFilesStayUnmarkedAndLiteralLeadingBomCharactersAreNotLost() throws Exception {"
+        },
+        {
+          "line": 46,
+          "source": "@Test void changingFormatDuringSnapshotSaveDoesNotMarkNewerEditorStateClean() throws Exception {"
+        },
+        {
+          "line": 59,
+          "source": "@Test void formatOnlyChangesAreDirtyAndEquivalentCharsetAliasesPreserveTheMark() throws Exception {"
+        },
+        {
+          "line": 68,
+          "source": "@Test void malformedMarkedFilesAreRejectedWithoutReplacingUndecodableBytes() throws Exception {"
+        },
+        {
+          "line": 77,
+          "source": "@Test void mixedNewlinesSurviveEditorSavesAndExplicitNormalizationRemainsDirtyDuringAnOlderSave() throws Exception {"
+        },
+        {
+          "line": 94,
+          "source": "@Test void repeatedSavesUseTheSelectedCharsetRatherThanGuessingItFromWrittenBytes() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/DocumentLifecycleTest.java",
+      "sha256": "2502b1f248645d47b58b7a65060fd4fe7c5fbccf4f95b28c02a639e9b2118d12",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/DocumentRequestsTest.java",
+      "sha256": "2e63fec4fb88ba341b5e95b98ef3c7621c44a0cf39e320dfbba5f6d629032425",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 7,
+          "source": "@Test void newerRequestOrClosedPaneRejectsLateLoadsWithoutInvalidatingOtherPanes() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/DocumentWorkbenchTest.java",
+      "sha256": "83172308e06b4d8b8ad4516e93027ac33acd8b5b596a7172de5f1f95a30ff6d5",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 37,
+          "source": "@Test void realDocumentLifecyclePreservesTextHistoryEncodingAndExplicitDirtyDecisions() throws Exception {"
+        },
+        {
+          "line": 62,
+          "source": "@Test void identitiesSurviveReorderingAndCloseRevalidatesActivation() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/EditorLocationTest.java",
+      "sha256": "6af2b939e7a8503ccce76c6bb7fc4d98bd2f068c4de99d0147cf2bb52f4d33c9",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/EditorSurfaceTest.java",
+      "sha256": "f9b989c95d3523f1f47a61c056574511cd29676eb667ec244c959638d4ee63ca",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 8,
+          "source": "@Test void twoSurfacesShareDocumentUndoButRetainLiveAnchorsAndIndependentSelections() throws Exception {"
+        },
+        {
+          "line": 36,
+          "source": "@Test void projectedReadOnlySurfaceRejectsProgrammaticEdits() throws Exception {"
+        },
+        {
+          "line": 45,
+          "source": "@Test void offsetsAreUtf16AndSelectionDirectionIsPreserved() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/EditorWorkspaceDocumentsTest.java",
+      "sha256": "de692ad37de83ed81b5fb48ec715518f7d1fe7a80002f6c33b1e1420ee0e54f5",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 16,
+          "source": "@Test void savedDiskProofDistinguishesAnEditorSaveFromAnIdenticalExternalReplacement() throws Exception {"
+        },
+        {
+          "line": 32,
+          "source": "@Test void detachingKeepsHumanTextFormatIdentityAndWorkspaceButRequiresSaveAs() throws Exception {"
+        },
+        {
+          "line": 51,
+          "source": "@Test void detachRollbackRestoresBindingsAndLateSaveCompletionCannotReattachADeletedFile() throws Exception {"
+        },
+        {
+          "line": 76,
+          "source": "@Test void retargetingRejectsOccupiedTabsAndAllowsAnAtomicSwap() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void anEarlierAsyncSaveCompletionCannotReplaceARestoredDiskBinding() throws Exception {"
+        },
+        {
+          "line": 111,
+          "source": "@Test void diskBindingAdoptionKeepsRestoredBuffersSaveableAndRetargetsWithoutLosingIdentity() throws Exception {"
+        },
+        {
+          "line": 133,
+          "source": "@Test void aFailedBatchRestoresBindingsAsWellAsTextAndPreservesHumanFormatChoices() throws Exception {"
+        },
+        {
+          "line": 155,
+          "source": "@Test void capturesActualUnsavedFileBuffersOnEdtAndKeepsVersionsStableUntilStateChanges() throws Exception {"
+        },
+        {
+          "line": 179,
+          "source": "@Test void scratchOwnershipDoesNotFollowLaterTabOrWorkspaceSelection() throws Exception {"
+        },
+        {
+          "line": 193,
+          "source": "@Test void capturesInsideEdtDoNotDeadlockAndFormatChangesAdvanceVersions() throws Exception {"
+        },
+        {
+          "line": 206,
+          "source": "@Test void batchesKeepSelectionAndNativeUndoWhileTargetingTheNamedDocument() throws Exception {"
+        },
+        {
+          "line": 227,
+          "source": "@Test void rawDocumentEditsAndUndoneChangesStillInvalidateOpaqueVersions() throws Exception {"
+        },
+        {
+          "line": 248,
+          "source": "@Test void staleBatchHasNoEffectsAndFailedBatchPreservesEarlierHumanUndoHistory() throws Exception {"
+        },
+        {
+          "line": 274,
+          "source": "@Test void cancellationOfAQueuedBatchCannotMutateLaterWhenTheEventThreadBecomesAvailable() throws Exception {"
+        },
+        {
+          "line": 300,
+          "source": "@Test void anExecutingBatchReturnsItsActualOutcomeAndRestoresTheCallersInterruptStatus() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/EmacsKeymapTest.java",
+      "sha256": "7b2aa3ddf66f8aa3e357961c8b6587cc9965418aad60349d8e99dd13a36c25aa",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/FileBufferTest.java",
+      "sha256": "3f2950b804c7652b70b7a7ce61dc625947ca6157b6a62ad603286c92b2fcde33",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/GlyphRenderingMeasurementTest.java",
+      "sha256": "a3d43a78f9e14ed6adae6e918358e3318f9ca39785d4e9e2598e87684786ffdd",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 50,
+          "source": "@Test void boundedFirstWarmGeometryAndLifecycleMeasurements() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/GlyphRenderingQualificationTest.java",
+      "sha256": "c9643805f13d0feed4ebaa56bd07c565f2b0500d85d2b6c68957205cffc6e60b",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 61,
+          "source": "@Test void recordCoverageShapingAndIndependentSwingPainting() throws Exception {"
+        },
+        {
+          "line": 137,
+          "source": "@Test void originalSourceAndGeometrySurviveScaledCaptureFontAndThemeRoundTrips() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/GraphemeBoundaryTest.java",
+      "sha256": "7bd4b980fa005dbce0e58401d2bda73fd1e131ccf62163687e5855cfca4504ad",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/GraphemeEditRangeTest.java",
+      "sha256": "967e4ea19e1f2e2a5a19652db5962855b82f6b5be83433fb73469b413e077ee6",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/GutterPerformanceTest.java",
+      "sha256": "edd55189d58ee9301727972ba7bfce1658f27b14625265750f8b1a2deb8d3ce2",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 83,
+          "source": "@Test void pairedGeometryLatencyAndDisposal() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/GutterRenderingTest.java",
+      "sha256": "2e91701c30e53f5f024e81044aa79ef644052c5b5a3c9981f51221378322c583",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 21,
+          "source": "@Test void impliedEndMappingPaintsExactlyLikeDocumentEnd() throws Exception {"
+        },
+        {
+          "line": 35,
+          "source": "@Test void unavailableOrInvalidMappingsPaintOnlyBackground() throws Exception {"
+        },
+        {
+          "line": 46,
+          "source": "@Test void temporarilyUnavailableLineBoundsRecoverWithoutNullDereference() throws Exception {"
+        },
+        {
+          "line": 56,
+          "source": "@Test void impliedEndRetainsAllMarkerAndNumberModesAtBothDisplayScales() throws Exception {"
+        },
+        {
+          "line": 78,
+          "source": "@Test void breakpointHitTestingUsesTheSameValidatedMapping() throws Exception {"
+        },
+        {
+          "line": 97,
+          "source": "@Test void eofLineInsertionRemovalAndUndoRestoreTheSameGutterPixels() throws Exception {"
+        },
+        {
+          "line": 123,
+          "source": "@Test void editsUndoBufferSwitchAndRetiredSplitPreserveSourceOwnership() throws Exception {"
+        },
+        {
+          "line": 171,
+          "source": "@Test void actualGeometrySurvivesScrollWrapFontAndPresentationInsets() throws Exception {"
+        },
+        {
+          "line": 204,
+          "source": "@Test void paintingUsesBoundedVisibleGeometryAndPreservesLegacyWidth() throws Exception {"
+        },
+        {
+          "line": 234,
+          "source": "@Test void impliedEndMappingDoesNotMeasureOffscreenDocumentLines() throws Exception {"
+        },
+        {
+          "line": 250,
+          "source": "@Test void unlaidOutGeometrySkipsNumbersWithoutLoggingAndRecovers() throws Exception {"
+        },
+        {
+          "line": 263,
+          "source": "@Test void actualMixedScriptViewMappingIsRecorded() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/IncrementalDiffGutterTest.java",
+      "sha256": "5bf89b4d0937e0005814adccca0a73002cca1dd6d6554eaffa71a3b2949c8816",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/IndicConjunctBoundaryTest.java",
+      "sha256": "6c0072ed4026adfc606c200250edd90cd6de24a026555595ee3a942c14aed22c",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 17,
+          "source": "@Test void lookupExactlyMatchesPinnedIndicPropertiesForEveryCodePoint() throws Exception {"
+        },
+        {
+          "line": 34,
+          "source": "@Test void allPinnedGb9cCasesHaveExactNavigationSelectionAndDeletionRanges() throws Exception {"
+        },
+        {
+          "line": 48,
+          "source": "@Test void preservesConjunctsAcrossScriptsWithoutJoiningNonLinkingContexts() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/KeymapOverlayTest.java",
+      "sha256": "85405d6171c27fa2f574b34460161a77427a97485ed33be7a8e1b149f1bd9066",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/LineNumberPanelTest.java",
+      "sha256": "15694838adf71ce89bcffe821f94ae139a8413f2d5a128ad064954217dc427df",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/LspCompletionApplicationTest.java",
+      "sha256": "24bbeb863949a6dc0b5e0c04fd4978c74645dfa4591ff4e8e713700b32dec311",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/LspDefinitionPerformanceTest.java",
+      "sha256": "708485946a6f2f4ba950ec9988e77e2a2171e27b51fde5664f3ed6e71d0d91b5",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 59,
+          "source": "@Test void boundedPairedInProcessQualification() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/LspDefinitionRequestsTest.java",
+      "sha256": "60d4ed6aa8a42305c973cc56ac59c9560a6d44b102099f63a37878a7a7db3068",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 98,
+          "source": "@Test void heldResponseDoesNotDelayQueuedTypingAndNavigationIsReadOnly() throws Exception {"
+        },
+        {
+          "line": 119,
+          "source": "@Test void emptyAndErrorResponsesReportWithoutNavigation() throws Exception {"
+        },
+        {
+          "line": 128,
+          "source": "@Test void multipleTargetsPreserveExistingFirstLocationPolicy() throws Exception {"
+        },
+        {
+          "line": 138,
+          "source": "@Test void editsBeforeDebouncedLspVersionUpdateRejectOldResultsAndPreserveUndo() throws Exception {"
+        },
+        {
+          "line": 152,
+          "source": "@Test void contextChangesRejectResultsIncludingAwayAndBackRevisionChanges() throws Exception {"
+        },
+        {
+          "line": 183,
+          "source": "@Test void cancellationEmitsProtocolCancelAndLateResponseCannotNavigate() throws Exception {"
+        },
+        {
+          "line": 196,
+          "source": "@Test void rapidRequestsCoalesceToOneLatestReplacement() throws Exception {"
+        },
+        {
+          "line": 216,
+          "source": "@Test void queuedCancellationAndWindowCloseRetireCallbacks() throws Exception {"
+        },
+        {
+          "line": 224,
+          "source": "@Test void transportFailureDoesNotBlockLaterDefinition() throws Exception {"
+        },
+        {
+          "line": 235,
+          "source": "@Test void cancellationBeforeWorkerStartsAndRepeatedCloseReleaseOwnedReferences() throws Exception {"
+        },
+        {
+          "line": 255,
+          "source": "@Test void workspaceEditReviewFromBackgroundResponseIsMarshalledToEdtAndNotApplied() throws Exception {"
+        },
+        {
+          "line": 273,
+          "source": "@Test void onlyChangesToTheOriginCancelThePendingRequest() throws Exception {"
+        },
+        {
+          "line": 286,
+          "source": "@Test void immediateResponseCannotOvertakeEdtRequestOwnership() throws Exception {"
+        },
+        {
+          "line": 294,
+          "source": "@Test void splitClosureWhileDefinitionIsPendingPreservesSharedSourceAndUndo() throws Exception {"
+        },
+        {
+          "line": 315,
+          "source": "@Test void independentClientsDoNotCrossNavigateOrCrossCancel() throws Exception {"
+        },
+        {
+          "line": 327,
+          "source": "@Test void closingWithACompletedResultStillQueuedOnEdtDoesNotResurrectNavigation() throws Exception {"
+        },
+        {
+          "line": 349,
+          "source": "@Test void cancellingBeforeServerStopDoesNotRequireTheOutstandingDefinitionResponse() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/LspDefinitionResponsivenessTest.java",
+      "sha256": "5ece7ebd4f1bda3334069872384f930bb7568e76379d2b98cd3c3d0748ffa555",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 15,
+          "source": "@Test void synchronousTransportReproducesEdtInputBlockWithoutNativeProcess() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/LspQueuedCancellationTest.java",
+      "sha256": "3e3a379a08b1c2f028919b6155aeaa4ce8f8dfe068b628509fedb1c2a651e6fd",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 11,
+          "source": "@Test void cancelledQueuedJobsDoNotAccumulateBehindBusyWorkers() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/LspTransportConcurrencyTest.java",
+      "sha256": "46f52c2977e1a2548a1b1609093602f21944a5f77bae23b606685b7e17e77c36",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 9,
+          "source": "@Test void cancellationDoesNotWaitForAnotherFeaturesResponse() throws Exception {"
+        },
+        {
+          "line": 36,
+          "source": "@Test void notificationPollingAndDocumentChangesDoNotWaitForDefinition() throws Exception {"
+        },
+        {
+          "line": 62,
+          "source": "@Test void definitionCompletionAndReferencesKeepTheirOwnResponses() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/LspWorkspaceFormatTest.java",
+      "sha256": "0cd492d2619c4c973db302cd3c98b42d70d9eb0ec7359e89e7b8421424d4ed3b",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 14,
+          "source": "@Test void workspaceEditsUseNormalizedOffsetsAndPreserveBomEncodingAndMixedNewlines() throws Exception {"
+        },
+        {
+          "line": 29,
+          "source": "@Test void renameThenEditRetainsTheSourcesFormatAndUndecodableResourceOnlyRenamesRemainLossless() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/MarkdownEditTest.java",
+      "sha256": "0922436d601cc8e514097043baa30400bf6b7423a4d9f6aea8601d93d29877dd",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 63,
+          "source": "@Test void staleRevisionDocumentSelectionAndCapabilityLeaveEveryInvariantUntouched() throws Exception {"
+        },
+        {
+          "line": 96,
+          "source": "@Test void atomicUndoKeepsPriorEditAndRedoAndRefusesOversizedCommands() throws Exception {"
+        },
+        {
+          "line": 114,
+          "source": "@Test void rangeEditPreservesCodecMetadataAndOriginalEofBytes() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/MarkdownHighlightTest.java",
+      "sha256": "320fb24f92ab7a6de56ea8fd7f62d7dcaab7229ebd86ef66953c369f843bf9b9",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 27,
+          "source": "@Test void matchesFullLexerAcrossFencesWhitespaceUnicodeAndExistingSyntax() {"
+        },
+        {
+          "line": 39,
+          "source": "@Test void supportsEmptySingleLongLinesAndChunkBoundaryNewlines() {"
+        },
+        {
+          "line": 49,
+          "source": "@Test void repeatedDeepRequestsAndOrdinaryEarlierEditsReuseState() {"
+        },
+        {
+          "line": 65,
+          "source": "@Test void changedUnclosedFenceMustRescanItsAffectedSuffix() {"
+        },
+        {
+          "line": 78,
+          "source": "@Test void randomizedEditsUndoRedoAndViewportsAgreeWithFullScan() {"
+        },
+        {
+          "line": 103,
+          "source": "@Test void cancelledOrStaleRequestsCannotPublishMetadata() {"
+        },
+        {
+          "line": 119,
+          "source": "@Test void sparseMetadataRemainsBoundedAndUnknownRevisionsResetIt() {"
+        },
+        {
+          "line": 134,
+          "source": "@Test void editDuringWorkerScanRejectsPublicationWithoutHoldingTheCacheLock() throws Exception {"
+        },
+        {
+          "line": 160,
+          "source": "@Test void statelessViewportAlsoEmitsOnlyItsLineContext() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/MarkdownLinkNavigationTest.java",
+      "sha256": "848814b032ba223301c2c4060d0ec8db7d4257eda2cfabde511bdba8f560b4fa",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 19,
+          "source": "@Test void relativeWikiUnicodeAndFragmentTargetsUseVerifiedLocations() throws Exception {"
+        },
+        {
+          "line": 26,
+          "source": "@Test void explicitAmbiguityChoiceIsRequiredAndPreservesHeading() throws Exception {"
+        },
+        {
+          "line": 32,
+          "source": "@Test void backlinkUsesSourceRevisionAndRejectsChangedOrDeletedDiskSource() throws Exception {"
+        },
+        {
+          "line": 38,
+          "source": "@Test void changedHeadingOrRenamedTargetCannotApplyOldOffset() throws Exception {"
+        },
+        {
+          "line": 43,
+          "source": "@Test void missingUnsupportedAndAmbiguousHeadingsDoNotGuess() throws Exception {"
+        },
+        {
+          "line": 47,
+          "source": "@Test void codeEscapesAndMalformedLinksHaveNoCaretOccurrence() throws Exception {"
+        },
+        {
+          "line": 54,
+          "source": "@Test void externalLinksAreClassifiedButNeverOpenedByWorker() throws Exception {"
+        },
+        {
+          "line": 59,
+          "source": "@Test void sourceAndTargetSymlinkBoundariesAreRechecked() throws Exception {"
+        },
+        {
+          "line": 71,
+          "source": "@Test void pendingAndPartialFeedbackCannotClaimCompleteEmptyResults() {"
+        },
+        {
+          "line": 79,
+          "source": "@Test void rowsAreBoundedOrderedAndSafeForExistingPlainRenderer() throws Exception {"
+        },
+        {
+          "line": 86,
+          "source": "@Test void unsavedSourceAndHeadingTargetUseCapturedBufferRevisions() throws Exception {"
+        },
+        {
+          "line": 99,
+          "source": "@Test void validationIsReadOnlyCancellableAndNotAllowedOnEdt() throws Exception {"
+        },
+        {
+          "line": 105,
+          "source": "@Test void linkedImagesPreferTheirVerifiedHyperlinkAndDuplicateMatchesAreRejected() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/MiniJsonStrictTest.java",
+      "sha256": "7a19dd89415f4456839708ed292ed0bb26c0e4cf49996b92c402a3327d56bc8b",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 11,
+          "source": "@Test void preservesAllControlCharactersAndMalformedSurrogateCodeUnitsOverUtf8Transport() {"
+        },
+        {
+          "line": 21,
+          "source": "@Test void acceptsExactNumbersAndNestedValues() {"
+        },
+        {
+          "line": 28,
+          "source": "@Test void malformedAmbiguousAndUnboundedInputsFailWithoutPartialResults() {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/NativeFixtureGateTest.java",
+      "sha256": "1b785570828fc39367661a571777cd9afdf071218d6557e82c6915aedbe75784",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 7,
+          "source": "@Test void nativePtyTestFailsBeforeAnyFixtureSetup() {"
+        },
+        {
+          "line": 13,
+          "source": "@Test void interactiveWorkbenchTestsRemainBlocked() {"
+        },
+        {
+          "line": 20,
+          "source": "@Test void unknownTestsFailClosed() {"
+        },
+        {
+          "line": 25,
+          "source": "@Test void reviewedPortableTestAndContextAreAccepted() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/NavigationHistoryTest.java",
+      "sha256": "049c4853237c06d9938b7331dc601e88aa164de2e7da76e5e3b2a8bb4bec3cd4",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/PlainKeymapTest.java",
+      "sha256": "72b7b3841d26024ea1b8177aaac1942e8592f7169181cb0b99143f9c4a31d635",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/PrivateWorkspaceFilesTest.java",
+      "sha256": "edcd9d51fbf29f21dab1f739460108bea58b1ac16578177f9a130f3eff0f9841",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 14,
+          "source": "@Test void privateStateIsBoundedAndCleanupNeverDeletesReplacedContent() throws Exception {"
+        },
+        {
+          "line": 28,
+          "source": "@Test void sharedPermissionsAndSymlinksAreRejected() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/RecoveryJournalTest.java",
+      "sha256": "ffbb918bb13394a41f45ba5cf1876c3dbac31bd6d3b76e57cc3a4c66b0144181",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/SourcePlainViewTest.java",
+      "sha256": "1559fedf2da505bb878cf5df62e625f63125823d76c0bffb57f0eb3470ee532e",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 53,
+          "source": "@Test void undoOfGrowthDoesNotReadTheDocumentAgain() throws Exception {"
+        },
+        {
+          "line": 90,
+          "source": "@Test void differentialEditingUndoAndGeometry() throws Exception {"
+        },
+        {
+          "line": 138,
+          "source": "@Test void fontsTabsWrappingResizingAndInternationalTextRetainStockGeometryAndPixels() throws Exception {"
+        },
+        {
+          "line": 181,
+          "source": "@Test void exhaustingWidthCandidatesAndBulkUndoRetainTheExactMaximum() throws Exception {"
+        },
+        {
+          "line": 207,
+          "source": "@Test void tabsAndUnicodeAfterCachedEditsHandBackToStockMetrics() throws Exception {"
+        },
+        {
+          "line": 224,
+          "source": "@Test void extremeLineExtentsUseStockGeometry() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/SyntaxHighlightServiceTest.java",
+      "sha256": "fb2af956cf000ae2ad1202b7c77836ef03fe099ee62901d5082e38643b79a61f",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/TerminalControllerTest.java",
+      "sha256": "4127eefdb07cec023b99160025aaf5433dd2581d9c25125716094564a32eef47",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/ThemePreviewTest.java",
+      "sha256": "a637053ac54f4c0cc1c53363893edaf875bbdf4a7233e8c4933c83614e2dae04",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/UiDensityTest.java",
+      "sha256": "dc1aa9115d79963688746a37bce36e8ebd6e466879f52c08f1bc88462381a007",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": [
+        {
+          "line": 26,
+          "source": "@Test void defaultPreservesLegacyDimensionsAcrossFontsAndZoom() {"
+        },
+        {
+          "line": 40,
+          "source": "@Test void nonDefaultPresetsRespectFontAndExistingInsetFloors() {"
+        },
+        {
+          "line": 55,
+          "source": "@Test void preferencePersistsAndResetsWithoutChangingOtherAppearanceChoices() throws Exception {"
+        },
+        {
+          "line": 75,
+          "source": "@Test void invalidSavedDensityFallsBackWithoutDiscardingValidPreferencesOrRewritingFile() throws Exception {"
+        },
+        {
+          "line": 86,
+          "source": "@Test void densityCannotBecomeProjectOwnedEvenWithUnsafeProjectSettingsEnabled() {"
+        },
+        {
+          "line": 94,
+          "source": "@Test void failedDensityPersistenceLeavesRuntimeAndCallbacksUnchanged() throws Exception {"
+        },
+        {
+          "line": 108,
+          "source": "@Test void sharedDensityAcknowledgementDoesNotSuppressUnrelatedExternalChanges() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/UnicodeEditingRegressionTest.java",
+      "sha256": "b034f22d0cdbaf45666c041a70f4cad89ac0500103ec5b5e72de92ecc1b29590",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/VersionedTextSnapshotTest.java",
+      "sha256": "8b385b150c5779ccb8c37d6164896a7f63a5bc6436ccbba10a9ec79f63e15d25",
+      "a0_execution": "safe-runner-selected",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceBridgeTest.java",
+      "sha256": "e249566fec88d47393d21196f36e9d0eb71cb03afd23de2b3d237a155be0a866",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 24,
+          "source": "@Test void liveHeadlessCliReadsUnsavedBuffersAndRejectsStaleVersionsWithoutSavingOrOpeningWindows() throws Exception {"
+        },
+        {
+          "line": 69,
+          "source": "@Test void authenticationAndWorkspaceIdentityFailBeforeReadingEditorState() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void notificationsMalformedMessagesAndLimitsDoNotDesynchronizeAuthenticatedStreams() throws Exception {"
+        },
+        {
+          "line": 117,
+          "source": "@Test void closingRevokesExistingClientsAndRemovesOnlyItsOwnDescriptor() throws Exception {"
+        },
+        {
+          "line": 130,
+          "source": "@Test void connectionStorageCannotBeExposedAsWorkspaceContent() throws Exception {"
+        },
+        {
+          "line": 137,
+          "source": "@Test void authenticationHasAnAbsoluteDeadlineEvenWhenAnUnauthenticatedClientKeepsSendingBytes() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceCliTest.java",
+      "sha256": "0c3e55a0987a781c7d3dd50488ebb481acd13055a0201ad29c8cfc41f780bd98",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 17,
+          "source": "@Test void stdioAcceptsCrLfAndFinalFramesWithoutNewlineAndKeepsDiagnosticsSeparate() {"
+        },
+        {
+          "line": 27,
+          "source": "@Test void malformedFramesAreReportedAndOversizedFramesTerminateTheStream() {"
+        },
+        {
+          "line": 39,
+          "source": "@Test void oneShotErrorsHaveNonzeroExitAndNeverCreateTargets() {"
+        },
+        {
+          "line": 50,
+          "source": "@Test void realApplicationEntryPointAnswersAndExitsWithHeadlessAwt() throws Exception {"
+        },
+        {
+          "line": 67,
+          "source": "@Test void headlessSearchWorksWithoutGitOnPathAndDoesNotCreateWorkspaceOrHomeState() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void filePaginationCanContinueFromAFreshHeadlessProcess() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceEditTransactionTest.java",
+      "sha256": "07cdc464139ed0531d1d9e9a5c7eb07da1db78bef8bbfb60030ee7895127b96e",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 16,
+          "source": "@Test void exclusiveRenameCannotOverwriteAWriterThatOccupiesTheDestinationDuringItsIntent() throws Exception {"
+        },
+        {
+          "line": 28,
+          "source": "@Test void exclusiveRenamePreservesIdentityAndRollsBackARecordedIntermediateLink() throws Exception {"
+        },
+        {
+          "line": 49,
+          "source": "@Test void aliasRecoveryAndItsRollbackNeverReplaceASeparateHumanFile() throws Exception {"
+        },
+        {
+          "line": 64,
+          "source": "@Test void retainedDeletionKeepsTheExactOriginalForUndoAndStillRollsBackNormally() throws Exception {"
+        },
+        {
+          "line": 90,
+          "source": "@Test void abandoningUninstalledStagingAlsoRemovesItsNewEmptyParentDirectories() throws Exception {"
+        },
+        {
+          "line": 100,
+          "source": "@Test void createHasAnAtomicAbsentTargetPreconditionEvenAfterItsIntentWasRecorded() throws Exception {"
+        },
+        {
+          "line": 113,
+          "source": "@Test void createdFilesParticipateInRollbackAndCommitWithoutLeavingTemporaryLinks() throws Exception {"
+        },
+        {
+          "line": 131,
+          "source": "@Test void reviewedResourceIdentitiesGuardWritesRenamesAndDeletion() throws Exception {"
+        },
+        {
+          "line": 155,
+          "source": "@Test void changesDuringIntentPersistenceAreRecheckedBeforeMovingReviewedResources() throws Exception {"
+        },
+        {
+          "line": 176,
+          "source": "@Test void preparedStepsDescribeResourcesBeforeMovingOriginalsAndObserverFailureRollsBack() throws Exception {"
+        },
+        {
+          "line": 198,
+          "source": "@Test void abruptWorkerExitLeavesJournaledOriginalAndStagedBytesDiscoverable() throws Exception {"
+        },
+        {
+          "line": 223,
+          "source": "@Test void mixedResourceEditsCommitPreservePermissionsAndRemoveOwnedArtifacts() throws Exception {"
+        },
+        {
+          "line": 247,
+          "source": "@Test void laterFailureRestoresAllEarlierFilesAndRemovesNewParentDirectories() throws Exception {"
+        },
+        {
+          "line": 263,
+          "source": "@Test void rollbackPreservesLaterHumanChangesAndRetainsRecoverableOriginalsWhileRestoringUnrelatedFiles() throws Exception {"
+        },
+        {
+          "line": 284,
+          "source": "@Test void anExternalWriterHoldingTheOriginalResourceInvalidatesCommitAndItsNewerDataSurvivesRollback() throws Exception {"
+        },
+        {
+          "line": 297,
+          "source": "@Test void directoryCleanupNeverFollowsLinksOutsideTheOwnedResource() throws Exception {"
+        },
+        {
+          "line": 311,
+          "source": "@Test void cleanupRetainsForeignAdditionsAndReportsThemWithoutChangingTheCommittedResult() throws Exception {"
+        },
+        {
+          "line": 326,
+          "source": "@Test void failedEditorCallbacksDoNotPreventOtherRollbackActions() throws Exception {"
+        },
+        {
+          "line": 343,
+          "source": "@Test void rollbackDoesNotDeleteANewerFileThatReplacedACreatedDirectory() throws Exception {"
+        },
+        {
+          "line": 355,
+          "source": "@Test void cleanupDoesNotDeleteAnOriginalMovedBackIntoTheBackupAfterRollback() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceProposalRecoveryTest.java",
+      "sha256": "36050bd6dd4cdf2caddc3053b0f3174471ac46ba5d8d85e5c077df833f0d189c",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 17,
+          "source": "@Test void completeEvidenceCanBeReconciledIdempotentlyWithoutWritingFiles() throws Exception {"
+        },
+        {
+          "line": 35,
+          "source": "@Test void changedEvidenceAndPartialOrMissingFilesNeverReceiveACompleteOutcome() throws Exception {"
+        },
+        {
+          "line": 53,
+          "source": "@Test void rawFormatDifferencesAndCorruptedPreimagesCannotBeReconciledAsExactResults() throws Exception {"
+        },
+        {
+          "line": 70,
+          "source": "@Test void anUndoThatNeverTookEffectRestoresTheOriginalApplicationEvidenceForAnotherUndo() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceProposalRestoreTest.java",
+      "sha256": "e86d16774e26a0e21dbd79544fbd97590a0b18d5d0c6883a6c1f5af43228cbc6",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 19,
+          "source": "@Test void aWorkerCrashDuringApplyOrRecoveryCanBeRestoredWithExactBytesAndIdempotentRetries() throws Exception {"
+        },
+        {
+          "line": 42,
+          "source": "@Test void changedOriginalsStaleEvidenceAndPolicyRestrictionsPreventRestorationWithoutLosingData() throws Exception {"
+        },
+        {
+          "line": 62,
+          "source": "@Test void mixedDiskAndOpenDocumentsRestoreAtomicallyAndRetainUsableSaveBindings() throws Exception {"
+        },
+        {
+          "line": 88,
+          "source": "@Test void conflictingHumanTextIsPreservedWhileTheInspectionExplainsWhyRestoreIsUnavailable() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceProposalRpcTest.java",
+      "sha256": "6e605e30809430e65cf6ba64b0c3a473ec24c679f8bc11cc1638ff16297af894",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 16,
+          "source": "@Test void connectedRenameHasExplicitDestinationAndCannotApplyWithoutHumanPermission() throws Exception {"
+        },
+        {
+          "line": 40,
+          "source": "@Test void connectedDeletionShowsDiskAndPreservedDraftSeparatelyAndNeverGrantsTheAgentApply() throws Exception {"
+        },
+        {
+          "line": 68,
+          "source": "@Test void creationIsExplicitStrictlyDecodedAndRequiresHumanApplyPermission() throws Exception {"
+        },
+        {
+          "line": 88,
+          "source": "@Test void restorationUsesTheInspectedEvidenceAndNeverGrantsProposalClientsApplyPermission() throws Exception {"
+        },
+        {
+          "line": 105,
+          "source": "@Test void recoveryEvidenceIsReadableButReconciliationRequiresAnInspectedRevisionAndApplyPermission() throws Exception {"
+        },
+        {
+          "line": 121,
+          "source": "@Test void connectedProposalWorkflowPersistsReviewAndNeverGrantsTheClientApply() throws Exception {"
+        },
+        {
+          "line": 156,
+          "source": "@Test void reviewPagesAreBoundedVersionedAndPreserveGraphemes() throws Exception {"
+        },
+        {
+          "line": 173,
+          "source": "@Test void protocolRejectsAmbiguousReviewAndActorOrWorkspaceSpoofing() throws Exception {"
+        },
+        {
+          "line": 192,
+          "source": "@Test void readOnlyListingDoesNotCreatePrivateStateAndFilteredPagesAdvanceTheirCursor() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceProposalServiceTest.java",
+      "sha256": "c03e310f9b98e367dcdcba0db23c1c939980bbd14120dcc089b90ad56cfdf192",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 16,
+          "source": "@Test void persistedResourceIntentsRetainBackupIdentityAndUndoKeepsTheOriginalApplicationRecord() throws Exception {"
+        },
+        {
+          "line": 42,
+          "source": "@Test void persistentProposalsSupportHunkReviewIdempotentApplyAndUndoWithLaterHumanEdits() throws Exception {"
+        },
+        {
+          "line": 76,
+          "source": "@Test void undoRestoresDeletedNewlineStylesAndOverlappingHumanEditsRequireReview() throws Exception {"
+        },
+        {
+          "line": 96,
+          "source": "@Test void staleProposalsHaveNoEffectsAndExplicitRebaseRetainsUnrelatedHumanChanges() throws Exception {"
+        },
+        {
+          "line": 111,
+          "source": "@Test void liveEditorEditsRemainUnsavedAndMixedDiskEditorFailuresRollBackDiskWithoutErasingHumanWork() throws Exception {"
+        },
+        {
+          "line": 151,
+          "source": "@Test void readOnlyAndProtectedPathsAreDeniedWithoutWorkspaceMutation() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceQueryServiceTest.java",
+      "sha256": "fd5291ce8b5f4fbd5c7c96946e8bd489479604a5f9369d5acfa55e82e7633e40",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 18,
+          "source": "@Test void retainedTransactionContentsCannotBypassSourceExclusionsThroughArtifactNamesOrAliases() throws Exception {"
+        },
+        {
+          "line": 35,
+          "source": "@Test void unsavedSnapshotWinsOverDiskAndIsCapturedOnceWithoutDependingOnActiveTab() throws Exception {"
+        },
+        {
+          "line": 54,
+          "source": "@Test void permissionsAndWorkspaceIdentityFailBeforeReadingEditorState() {"
+        },
+        {
+          "line": 66,
+          "source": "@Test void diskReadsPreserveBytesAndReportEncodingNewlinesAndVersion() throws Exception {"
+        },
+        {
+          "line": 82,
+          "source": "@Test void boundedReadsNeverSplitClustersOrInventCompleteResults() throws Exception {"
+        },
+        {
+          "line": 95,
+          "source": "@Test void scratchAndProjectionStatesAreExplicitAndExcludedBuffersAreNotListed() throws Exception {"
+        },
+        {
+          "line": 111,
+          "source": "@Test void aliasesCannotEscapeRootOrBypassProtectedFileIdentity() throws Exception {"
+        },
+        {
+          "line": 131,
+          "source": "@Test void unsupportedAndAdministrativeFilesAreRejected() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceRootResolverTest.java",
+      "sha256": "f5ca865b69be75ff0d01334408340c4f580a6a42a93041e62de5bebbae7b1c5b",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceRootsTest.java",
+      "sha256": "697261870a84a944756ef299cbea7eaaf735ab659f1e4403bc17d35e496fa155",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": []
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceRpcTest.java",
+      "sha256": "3139933300777cef26f74ebed2c4a59e4ef0c40ce52ee07d47db5aa25ef988bd",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 14,
+          "source": "@Test void handshakeAndExplicitWorkspaceQueriesPreserveCorrelationAndVersions() throws Exception {"
+        },
+        {
+          "line": 31,
+          "source": "@Test void protocolErrorsAreStrictAndDoNotMasqueradeAsEmptySuccesses() {"
+        },
+        {
+          "line": 44,
+          "source": "@Test void adapterServesTheConnectedEditorsUnsavedStateWithoutAWindow() throws Exception {"
+        }
+      ]
+    },
+    {
+      "path": "src/test/java/shed/WorkspaceSearchQueryServiceTest.java",
+      "sha256": "ccdbba0aaf76fa2046ef82a8ad793b2818737a0550fa3c62a6777951475f5bc0",
+      "a0_execution": "source-review-only; not executed",
+      "test_method_anchors": [
+        {
+          "line": 18,
+          "source": "@Test void localIgnoreRulesHonorNestedNegationDirectoryPruningEscapesAndDoubleStars() throws Exception {"
+        },
+        {
+          "line": 35,
+          "source": "@Test void listingPagesHaveStableMembershipVersionsAndDetectChangesIncludingUnsavedFiles() throws Exception {"
+        },
+        {
+          "line": 52,
+          "source": "@Test void searchUsesOneUnsavedCaptureAndReturnsExactVersionsUnicodeOffsetsAndBomText() throws Exception {"
+        },
+        {
+          "line": 73,
+          "source": "@Test void policyAndIgnoreRulesApplyToOpenBuffersAndCannotBeOverriddenByQueryFilters() throws Exception {"
+        },
+        {
+          "line": 89,
+          "source": "@Test void matchingSharesCaseWordRegexAndPathFiltersWithEditorSearch() throws Exception {"
+        },
+        {
+          "line": 103,
+          "source": "@Test void limitsReportIncompleteWorkWithoutInventingExtraMatchesOrFallingBackFromPartialBuffers() throws Exception {"
+        },
+        {
+          "line": 119,
+          "source": "@Test void unreadableIgnoreRulesFailClosedAndCancellationIsAnErrorRatherThanAnEmptySuccess() throws Exception {"
+        },
+        {
+          "line": 131,
+          "source": "@Test void expiredDeadlineAndExpensiveExpressionsRemainBounded() throws Exception {"
+        },
+        {
+          "line": 142,
+          "source": "@Test void symbolicLinksAndRetainedArtifactsCannotExposeOutsideOrExcludedContents() throws Exception {"
+        },
+        {
+          "line": 154,
+          "source": "@Test void wrongWorkspaceAndReadDenialPrecedeEditorCapture() throws Exception {"
+        }
+      ]
+    }
+  ],
+  "reviewed_reports": [
+    {
+      "path": "docs/WHOLE_IDE_AUDIT.md",
+      "sha256": "1f5fe1a7fc88bc5cc1e6ddd7abf1eaedda92650069f867bf5abbfc02cb0cce2b"
+    },
+    {
+      "path": "docs/WHOLE_IDE_CAPABILITIES.md",
+      "sha256": "1bea7dde6c42048252c67f344563946a57fafcd34794c91d5d25e5c374092be8"
+    },
+    {
+      "path": "docs/LSP_RESPONSIVENESS_REMEDIATION.md",
+      "sha256": "261f2fb0669f277cc9b408c6ef78fb5d84718c6b144c1be8da3b8bb6b5d0b79a"
+    },
+    {
+      "path": "docs/SPLIT_VIEW_LIFECYCLE_REMEDIATION.md",
+      "sha256": "d68ead89500eed28878e17ca44d52a6a7b183bb23a18411236cc681f3a916a62"
+    },
+    {
+      "path": "docs/GUTTER_PAINT_REMEDIATION.md",
+      "sha256": "b671eef8216f5eda7ad3a5b6033ac8dba3787aeebe98663aaa25649a53dd0010"
+    },
+    {
+      "path": "docs/MISSING_GLYPH_RENDERING_QUALIFICATION.md",
+      "sha256": "7809fca0462ba5cccc294ebaa77dd1b76c08232e8263e2be64dc8b68f849d8c5"
+    },
+    {
+      "path": "docs/NATIVE_SHELL_FIXTURE_ISOLATION.md",
+      "sha256": "c5a7208cc9a936845024bf894d99098b45848d306b2a598c1c79d03c246fb769"
+    },
+    {
+      "path": "docs/APPEARANCE_FINAL_QUALIFICATION.md",
+      "sha256": "d2007e6cd6ef42b13679b150cb6bca08da6edfed8c77e1cf7e783edee36a6200"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "sha256": "ef027afa1d32074fe161442d91ad5850a8dbdf6c0f61fe56f183233372a418ac"
+    },
+    {
+      "path": "docs/THREADING.md",
+      "sha256": "1e79a2d940fcb9c74c7baa0aaa628080b737809e0b3449edd178114b7380f714"
+    },
+    {
+      "path": "docs/AGENT_WORKSPACE.md",
+      "sha256": "a0cdff26ad32df3ae8d7932f3541f6f20d6b75604628f763856078f4db56ea07"
+    },
+    {
+      "path": "docs/MARKDOWN_ASYNC_MEDIA.md",
+      "sha256": "b4b3c8ca7fa77a5ef2be3d4e22d2f98737ee8b5076e68a959279a6173f8bdcb9"
+    },
+    {
+      "path": "docs/SOURCE_VIEW_PERFORMANCE.md",
+      "sha256": "a98911bb6db211e0dc585f63eedde9d11fa87aed0703021d619d21c55c03239a"
+    },
+    {
+      "path": "docs/GRAPHEME_EDITING.md",
+      "sha256": "6ee375f1f9983610ed774d1eb21d75031559c7366745a3ee57cae28b691c8437"
+    },
+    {
+      "path": "docs/UNICODE_CORRECTNESS_REMEDIATION.md",
+      "sha256": "7e67eadf89a161a3374d3580f79c305997474a88932123c56d59281793c155b5"
+    }
+  ],
+  "entry_and_safety_inputs": [
+    {
+      "path": "pom.xml",
+      "sha256": "c9d65dc851633a5cff118af5773e257cd1fef922a2aa9c42b5194627510c4352"
+    },
+    {
+      "path": "Makefile",
+      "sha256": "057f4f6344edf67985cadadb73b190d9e3d20d166fc2090256d5999ee2839487"
+    },
+    {
+      "path": "scripts/shed",
+      "sha256": "63b0f0f2b50721167876c6e3316c51fc50d67fddd22138bca5f56de5d347a7bb"
+    },
+    {
+      "path": "scripts/run-portable-tests.py",
+      "sha256": "f928360b5eb5b08b0b1a1663a9bde5cd9348d2767074c686a30c53d91f29e22c"
+    },
+    {
+      "path": "scripts/native_fixture.py",
+      "sha256": "c40f621abdfdd0ce61df030a30262d439dd9f73b013f60bf753c8c456b72db7a"
+    },
+    {
+      "path": "src/test/resources/shed/portable-fixture-tests.properties",
+      "sha256": "d7d6001375a25c19c3aa0182deeed0015d12411e59441df72aa4d846b37636f5"
+    }
+  ]
+}

@@ -15,6 +15,14 @@ final class WorkspaceFrames {
     private WorkspaceFrames() { }
 
     static byte[] read(InputStream input, int maximum) throws IOException {
+        return read(input, maximum, false);
+    }
+
+    static byte[] readComplete(InputStream input, int maximum) throws IOException {
+        return read(input, maximum, true);
+    }
+
+    private static byte[] read(InputStream input, int maximum, boolean complete) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         int next;
         while ((next = input.read()) != -1) {
@@ -23,6 +31,7 @@ final class WorkspaceFrames {
             bytes.write(next);
         }
         if (next == -1 && bytes.size() == 0) return null;
+        if (next == -1 && complete) throw new java.io.EOFException("Truncated frame");
         byte[] frame = bytes.toByteArray();
         return frame.length > 0 && frame[frame.length - 1] == '\r' ? java.util.Arrays.copyOf(frame, frame.length - 1) : frame;
     }

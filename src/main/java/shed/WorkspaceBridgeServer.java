@@ -6,6 +6,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +19,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Explicit, bounded, authenticated loopback bridge. Construction belongs on a worker. */
 final class WorkspaceBridgeServer implements AutoCloseable {
@@ -26,12 +30,17 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     private final Set<Socket> connections = ConcurrentHashMap.newKeySet();
     private final Semaphore slots = new Semaphore(MAX_CLIENTS);
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean terminated = new AtomicBoolean();
+    private final AtomicBoolean observed = new AtomicBoolean();
+    private final AtomicReference<Runnable> closeObserver = new AtomicReference<>();
     private final ScheduledThreadPoolExecutor deadlines = new ScheduledThreadPoolExecutor(1, task ->
         Thread.ofPlatform().daemon(true).name("shed-workspace-deadline").unstarted(task));
     private final int authenticationTimeoutMillis;
     private final WorkspaceBridgeEndpoint endpoint;
     private final Path descriptor;
     private final byte[] descriptorBytes;
+    private final WorkspaceStatusAttachment statusAttachment;
+    private final ApplicationStatus applicationStatus;
 
     WorkspaceBridgeServer(WorkspaceQueryService workspace, Path privateDirectory) throws IOException {
         this(workspace, privateDirectory, 3000);
@@ -46,27 +55,68 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     }
 
     private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {
+        this(workspace, proposals, privateDirectory, authenticationTimeoutMillis, null, List.of(), WorkspaceStatusAttachment.LIFETIME, Clock.systemUTC());
+    }
+
+    static WorkspaceBridgeServer status(ApplicationStatus application, Path directory, List<Path> roots) throws IOException {
+        return status(application, directory, roots, WorkspaceStatusAttachment.LIFETIME, Clock.systemUTC());
+    }
+
+    static WorkspaceBridgeServer status(ApplicationStatus application, Path directory, List<Path> roots, Duration lifetime, Clock clock) throws IOException {
+        return new WorkspaceBridgeServer(null, null, directory, WorkspaceStatusProtocol.AUTH_MILLIS, application, roots, lifetime, clock);
+    }
+
+    private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory,
+                                  int authenticationTimeoutMillis, ApplicationStatus application, List<Path> roots,
+                                  Duration lifetime, Clock clock) throws IOException {
         if (authenticationTimeoutMillis < 1 || authenticationTimeoutMillis > 3000) throw new IllegalArgumentException("Invalid authentication deadline");
         this.authenticationTimeoutMillis = authenticationTimeoutMillis;
+        this.applicationStatus = application;
         deadlines.setRemoveOnCancelPolicy(true);
-        this.rpc = new WorkspaceRpc(workspace, proposals);
+        this.rpc = application == null ? new WorkspaceRpc(workspace, proposals) : new WorkspaceRpc(application);
+        Path directory = application == null ? PrivateWorkspaceFiles.directory(privateDirectory) : WorkspaceStatusAttachment.privateDirectory(privateDirectory);
         this.listener = new ServerSocket(0, MAX_CLIENTS, loopback());
+        WorkspaceStatusAttachment created = null;
         try {
-            Path directory = PrivateWorkspaceFiles.directory(privateDirectory);
-            if (directory.startsWith(workspace.root()))
-                throw new IOException("Private connection storage must be outside the exposed workspace");
-            this.endpoint = new WorkspaceBridgeEndpoint(workspace, listener.getLocalPort());
-            this.descriptorBytes = endpoint.serialized();
-            this.descriptor = PrivateWorkspaceFiles.create(directory,
-                "editor-" + endpoint.instanceId + ".json", descriptorBytes);
+            if (application == null) {
+                if (directory.startsWith(workspace.root())) throw new IOException("Private connection storage must be outside the exposed workspace");
+                this.endpoint = new WorkspaceBridgeEndpoint(workspace, listener.getLocalPort());
+                this.descriptorBytes = endpoint.serialized();
+                this.descriptor = PrivateWorkspaceFiles.create(directory, "editor-" + endpoint.instanceId + ".json", descriptorBytes);
+                this.statusAttachment = null;
+            } else {
+                this.endpoint = null; this.descriptorBytes = null;
+                created = new WorkspaceStatusAttachment(application, listener.getLocalPort(), directory, roots, lifetime, clock);
+                this.statusAttachment = created; this.descriptor = created.discoveryFile();
+                deadlines.schedule(() -> {
+                    try { close(); } catch (IOException cleanup) {
+                        System.getLogger("shed.workspace").log(System.Logger.Level.WARNING, "Expired status attachment could not remove its private files");
+                    }
+                }, lifetime.toMillis(), TimeUnit.MILLISECONDS);
+            }
             Thread.ofPlatform().daemon(true).name("shed-workspace-listener").start(this::accept);
         } catch (IOException | RuntimeException failure) {
+            if (created != null) try { created.close(); } catch (IOException cleanup) { failure.addSuppressed(cleanup); }
             listener.close(); clients.shutdownNow(); deadlines.shutdownNow(); throw failure;
         }
     }
 
     Path descriptor() { return descriptor; }
-    String workspaceId() { return endpoint.workspaceId; }
+    String workspaceId() { return endpoint == null ? null : endpoint.workspaceId; }
+    Path credential() { return statusAttachment == null ? null : statusAttachment.credentialFile(); }
+    boolean statusOnly() { return statusAttachment != null; }
+    ApplicationStatus statusApplication() { return applicationStatus; }
+    int connectionCount() { return connections.size(); }
+    void onClosed(Runnable observer) {
+        java.util.Objects.requireNonNull(observer);
+        if (!observed.compareAndSet(false, true)) throw new IllegalStateException("Bridge close observer is already registered");
+        closeObserver.set(observer);
+        if (terminated.get()) notifyClosed();
+    }
+    private void notifyClosed() {
+        Runnable observer = closeObserver.getAndSet(null);
+        if (observer != null) observer.run();
+    }
     boolean running() { return !closed.get() && !listener.isClosed(); }
     int port() { return listener.getLocalPort(); }
     static InetAddress loopback() throws IOException { return InetAddress.getByAddress(new byte[]{127, 0, 0, 1}); }
@@ -102,6 +152,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     }
 
     private void serveFrames(Socket connection) throws IOException {
+        if (statusAttachment != null) { serveStatus(connection); return; }
         connection.setSoTimeout(authenticationTimeoutMillis);
         connection.setTcpNoDelay(true);
         BufferedInputStream input = new BufferedInputStream(connection.getInputStream());
@@ -133,6 +184,42 @@ final class WorkspaceBridgeServer implements AutoCloseable {
         }
     }
 
+    private void serveStatus(Socket connection) throws IOException {
+        connection.setSoTimeout(WorkspaceStatusProtocol.AUTH_MILLIS);
+        connection.setTcpNoDelay(true);
+        BufferedInputStream input = new BufferedInputStream(connection.getInputStream());
+        var output = connection.getOutputStream();
+        WorkspaceStatusProtocol.Session session;
+        ScheduledFuture<?> authenticationDeadline = deadline(connection, WorkspaceStatusProtocol.AUTH_MILLIS);
+        try { session = WorkspaceStatusProtocol.accept(statusAttachment, input, output); }
+        catch (WorkspaceApiException rejected) {
+            WorkspaceStatusProtocol.write(output, WorkspaceRpc.error("attach", -32000, "Status attachment rejected", Map.of("code", rejected.code().name())));
+            return;
+        } finally { authenticationDeadline.cancel(false); }
+        try (session) {
+            connection.setSoTimeout(WorkspaceStatusProtocol.IDLE_MILLIS);
+            for (long sequence = 1; sequence <= WorkspaceStatusProtocol.MAX_QUERIES && !closed.get(); sequence++) {
+                ScheduledFuture<?> frameDeadline = deadline(connection, WorkspaceStatusProtocol.IDLE_MILLIS);
+                try {
+                    String request = session.unpack(WorkspaceStatusProtocol.read(input), "request", sequence);
+                    if (statusAttachment.expired()) {
+                        WorkspaceStatusProtocol.write(output, session.pack(WorkspaceRpc.error(statusRequestId(request), -32000,
+                            "Attachment has expired", Map.of("code", "SESSION_EXPIRED")), "response", sequence));
+                        return;
+                    }
+                    WorkspaceStatusProtocol.write(output, session.pack(rpc.handle(request), "response", sequence));
+                } finally { frameDeadline.cancel(false); }
+            }
+        }
+    }
+
+    private static Object statusRequestId(String request) {
+        try {
+            var value = MiniJson.asObject(MiniJson.parseStrict(request)); Object id = value == null ? null : value.get("id");
+            return id instanceof Long || id instanceof String text && text.length() <= 256 ? id : null;
+        } catch (IllegalArgumentException invalid) { return null; }
+    }
+
     private ScheduledFuture<?> deadline(Socket connection, int milliseconds) {
         return deadlines.schedule(() -> {
             try { connection.close(); } catch (IOException ignored) { }
@@ -146,9 +233,13 @@ final class WorkspaceBridgeServer implements AutoCloseable {
         for (Socket connection : connections) {
             try { connection.close(); } catch (IOException error) { if (failure == null) failure = error; }
         }
-        clients.shutdownNow(); deadlines.shutdownNow();
-        try { PrivateWorkspaceFiles.deleteIfMatching(descriptor, descriptorBytes); }
+        clients.shutdownNow();
+        try {
+            if (statusAttachment != null) statusAttachment.close();
+            else PrivateWorkspaceFiles.deleteIfMatching(descriptor, descriptorBytes);
+        }
         catch (IOException error) { if (failure == null) failure = error; }
+        finally { deadlines.shutdownNow(); terminated.set(true); notifyClosed(); }
         if (failure != null) throw failure;
     }
 }

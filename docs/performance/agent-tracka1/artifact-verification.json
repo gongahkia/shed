@@ -1,0 +1,16 @@
+{
+  "jar_sha256": "453b5b1baecea96629b14f0484a5250950fd3d2b3a9e5f4b1fe5a9a904147ad5",
+  "current_class_matches": {
+    "ApplicationStatus": true,
+    "WorkspaceStatusAttachment": true,
+    "WorkspaceStatusProtocol": true,
+    "WorkspaceCli": true,
+    "WorkspaceRpc": true,
+    "WorkspaceBridgeServer": true,
+    "WorkspaceBridgeClient": true,
+    "AgentWorkspaceController": true,
+    "Texteditor": true,
+    "HelpService": true
+  },
+  "smoke": "PASS"
+}

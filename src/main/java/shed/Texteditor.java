@@ -530,6 +530,7 @@ public class Texteditor extends JFrame implements KeyListener {
         editorUiController.prepareStagedWindow();
 
         this.setVisible(true);
+        if (!stagedStartupPending) agentWorkspaceController.applicationReady();
         perfService.recordDuration("startup.window-visible", startupStartedAt, "constructor to visible");
         startupProfile.printAfterVisible();
         if (stagedStartupPending) {
@@ -543,6 +544,7 @@ public class Texteditor extends JFrame implements KeyListener {
                     SwingUtilities.invokeLater(() -> {
                         if (closingDown || !isDisplayable()) return;
                         editorUiController.finishStagedStartup();
+                        agentWorkspaceController.applicationReady();
                         perfService.recordDuration("startup.full-ui-ready", startupStartedAt, "menu and footer attached");
                         startupProfile.printFullUiReady();
                         promptRecoveryRestoreIfAvailable();

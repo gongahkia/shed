@@ -270,9 +270,23 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'ThemePreviewTest',
             'UiDensityTest',
             'VersionedTextSnapshotTest',
+            'WorkspaceStatusContractTest',
+            'WorkspaceStatusTransportTest',
+            'WorkspaceRpcTest',
+            'PrivateWorkspaceFilesTest',
+            'WorkspaceCliProcessGuardTest',
+            'WorkspaceStatusProcessTest',
+            'WorkspaceCliTest',
+            'WorkspaceBridgeTest',
+            'WorkspaceStatusMeasurementTest',
         }
         self.assertEqual({line.split("=", 1)[0] for line in lines}, set(approved))
         for line in lines:
+            name, expected = line.split('=')
+            self.assertEqual(digest(root / 'src/test/java/shed' / (name + '.java')), expected)
+        helpers = (root / 'src/test/resources/shed/portable-fixture-helpers.properties').read_text().splitlines()
+        self.assertEqual({'WorkspaceCliTestProcess'}, {line.split('=', 1)[0] for line in helpers})
+        for line in helpers:
             name, expected = line.split('=')
             self.assertEqual(digest(root / 'src/test/java/shed' / (name + '.java')), expected)
 
@@ -337,7 +351,7 @@ class SafeVerificationModeTest(unittest.TestCase):
         import subprocess
         import sys
         script = Path(__file__).with_name('run-portable-tests.py')
-        for mode in ['--compile-only', '--verify-gate', '--measure-lsp', '--measure-glyph']:
+        for mode in ['--compile-only', '--verify-gate', '--measure-lsp', '--measure-glyph', '--measure-status']:
             with tempfile.TemporaryDirectory() as scratch:
                 output = Path(scratch) / 'not-created'
                 result = subprocess.run([sys.executable, str(script), '--jdk', '/unused', '--maven', '/unused',

@@ -150,6 +150,7 @@ public class HelpService {
                     + "Advanced workspace API\n"
                     + ":agent api start enables read-only access to the selected workspace, including unsaved editor buffers.\n"
                     + ":agent api start propose additionally allows durable proposals; it never grants permission to apply them.\n"
+                    + ":agent api start status enables only authenticated application status, without workspace or source access.\n"
                     + ":agent api status shows the private connection descriptor path; :agent api stop revokes its clients.\n"
                     + "Starting the workspace API does not launch an agent process or provider connection.\n"
                     + "From a terminal: shed --workspace-api --root <folder> --connect <descriptor> --stdio\n"

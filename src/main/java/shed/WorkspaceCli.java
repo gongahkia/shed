@@ -20,18 +20,27 @@ public final class WorkspaceCli {
     public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true);
         PrintWriter diagnostics = new PrintWriter(new OutputStreamWriter(errors, StandardCharsets.UTF_8), true);
+        boolean status = false;
         try {
             if (!handles(args)) throw new IllegalArgumentException("Expected --workspace-api");
-            String root = null, request = null, connection = null; boolean stdio = false;
+            String root = null, request = null, connection = null, credential = null; boolean stdio = false;
             for (int i = 1; i < args.length; i++) {
                 switch (args[i]) {
                     case "--root" -> { if (root != null || ++i == args.length) throw new IllegalArgumentException("Expected one --root directory"); root = args[i]; }
                     case "--request" -> { if (request != null || ++i == args.length) throw new IllegalArgumentException("Expected one --request JSON value"); request = args[i]; }
                     case "--stdio" -> { if (stdio) throw new IllegalArgumentException("Duplicate --stdio"); stdio = true; }
                     case "--connect" -> { if (connection != null || ++i == args.length) throw new IllegalArgumentException("Expected one --connect descriptor"); connection = args[i]; }
+                    case "--credential" -> { if (credential != null || ++i == args.length) throw new IllegalArgumentException("Expected one --credential file"); credential = args[i]; }
+                    case "--status" -> { if (status) throw new IllegalArgumentException("Duplicate --status"); status = true; }
                     default -> throw new IllegalArgumentException("Unsupported workspace API argument");
                 }
             }
+            if (status) {
+                if (root != null || connection == null || credential == null || stdio || request != null)
+                    throw new IllegalArgumentException("Usage: shed --workspace-api --status --connect <descriptor> --credential <file>");
+                return status(Path.of(connection), Path.of(credential), writer);
+            }
+            if (credential != null) throw new IllegalArgumentException("--credential requires --status");
             if (root == null || stdio && request != null) throw new IllegalArgumentException(
                 "Usage: shed --workspace-api --root <directory> [--connect <descriptor>] [--stdio | --request <JSON>]");
             try (WorkspaceBridgeClient remote = connection == null ? null : new WorkspaceBridgeClient(Path.of(connection), Path.of(root))) {
@@ -46,12 +55,53 @@ public final class WorkspaceCli {
             else diagnostics.println(MiniJson.stringify(Map.of("error", error.toMap())));
             return 65;
         } catch (IllegalArgumentException invalid) {
+            if (status) {
+                writer.println(WorkspaceRpc.error("status", -32602, "Invalid status arguments", Map.of("code", "INVALID_REQUEST")));
+                return 64;
+            }
             diagnostics.println(MiniJson.stringify(Map.of("error", Map.of("code", "INVALID_REQUEST", "message", invalid.getMessage()))));
             return 64;
         } catch (IOException error) {
             diagnostics.println(MiniJson.stringify(Map.of("error", Map.of("code", "IO_ERROR", "message", "Workspace stream failed"))));
             return 74;
         }
+    }
+
+    private static int status(Path descriptor, Path credential, PrintWriter output) {
+        String response;
+        try (WorkspaceBridgeClient client = WorkspaceBridgeClient.status(descriptor, credential)) {
+            response = client.exchange(MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "status", "method", "editor/status",
+                "params", Map.of("schemaVersion", 1))));
+        } catch (WorkspaceApiException failure) { return statusFailure(output, failure.code().name()); }
+        catch (java.net.SocketTimeoutException timeout) { return statusFailure(output, "TIMEOUT"); }
+        catch (java.nio.file.NoSuchFileException | java.net.ConnectException unavailable) { return statusFailure(output, "INSTANCE_UNAVAILABLE"); }
+        catch (java.nio.file.FileSystemException denied) { return statusFailure(output, "UNAUTHORIZED"); }
+        catch (IOException failure) { return statusFailure(output, "TRANSPORT_ERROR"); }
+        catch (RuntimeException invalid) { return statusFailure(output, "SESSION_INVALID"); }
+        Map<String, Object> value = MiniJson.asObject(MiniJson.parseStrict(response));
+        if (value.containsKey("error")) {
+            var error = MiniJson.asObject(value.get("error")); var data = error == null ? null : MiniJson.asObject(error.get("data"));
+            try { return statusFailure(output, WorkspaceApiException.Code.valueOf((String) data.get("code")).name()); }
+            catch (RuntimeException invalid) { return statusFailure(output, "SESSION_INVALID"); }
+        }
+        output.println(response);
+        return output.checkError() ? 74 : 0;
+    }
+
+    private static int statusFailure(PrintWriter output, String code) {
+        output.println(WorkspaceRpc.error("status", -32000, "Status attachment failed", Map.of("code", code)));
+        return output.checkError() ? 74 : statusExit(code);
+    }
+    private static int statusExit(String code) {
+        return switch (code) {
+            case "INSTANCE_UNAVAILABLE" -> 69;
+            case "UNAUTHORIZED" -> 77;
+            case "UNSUPPORTED_PROTOCOL" -> 76;
+            case "SESSION_INVALID", "SESSION_EXPIRED" -> 78;
+            case "APP_NOT_READY" -> 75;
+            case "TIMEOUT" -> 70;
+            default -> 74;
+        };
     }
 
     private static int serve(RequestHandler handler, String request, InputStream input, PrintWriter writer) throws IOException {

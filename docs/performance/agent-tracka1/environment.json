@@ -1,0 +1,22 @@
+{
+  "recorded_utc": "2026-11-21T02:50:50.824024+00:00",
+  "os": "Darwin",
+  "os_release": "25.5.0",
+  "macos": "26.5.2",
+  "architecture": "arm64",
+  "logical_cpus": 8,
+  "jdk": {
+    "IMPLEMENTOR": "Eclipse Adoptium",
+    "JAVA_VERSION": "21.0.13",
+    "OS_ARCH": "aarch64",
+    "OS_NAME": "Darwin"
+  },
+  "maven": "3.9.11",
+  "artifact_sha256": "453b5b1baecea96629b14f0484a5250950fd3d2b3a9e5f4b1fe5a9a904147ad5",
+  "artifact_bytes": 50423941,
+  "fixture": "native_fixture.Fixture, reviewed Java CLI launcher; no shell, PTY or native desktop",
+  "jvm_arguments": "exact commands in individual reports; default heap for status tests; packaged media retains its established 64m/512m smoke heap",
+  "load_memory_pressure": "not sampled independently; compiler deltas captured in idle observations; RSS and native attribution unmeasured",
+  "native_shell": "NO-GO; not executed",
+  "windows_linux": "not executed"
+}

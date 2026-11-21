@@ -61,7 +61,7 @@ class WorkspaceCliTest {
             var result = MiniJson.asObject(MiniJson.parseStrict(output));
             assertEquals("headless", result.get("id")); assertNotNull(result.get("result"));
             assertEquals("", errors);
-        } finally { if (process.isAlive()) process.destroyForcibly(); }
+        } finally { WorkspaceCliTestProcess.stop(process); }
     }
 
     @Test void headlessSearchWorksWithoutGitOnPathAndDoesNotCreateWorkspaceOrHomeState() throws Exception {
@@ -89,7 +89,7 @@ class WorkspaceCliTest {
             try (var files = Files.list(project)) { assertEquals(3, files.count()); }
             try (var files = Files.list(home)) { assertEquals(0, files.count()); }
             assertEquals("needle private", Files.readString(project.resolve("ignored.txt")));
-        } finally { if (process.isAlive()) process.destroyForcibly(); }
+        } finally { WorkspaceCliTestProcess.stop(process); }
     }
 
     @Test void filePaginationCanContinueFromAFreshHeadlessProcess() throws Exception {
@@ -114,14 +114,11 @@ class WorkspaceCliTest {
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             assertEquals(0, process.exitValue(), output + new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8));
             return MiniJson.asObject(MiniJson.asObject(MiniJson.parseStrict(output)).get("result"));
-        } finally { if (process.isAlive()) process.destroyForcibly(); }
+        } finally { WorkspaceCliTestProcess.stop(process); }
     }
 
     private static Process startIsolated(ProcessBuilder builder) throws java.io.IOException {
-        // These children set headless mode explicitly. Inherited launcher options emit JVM
-        // banners on stderr and would contaminate assertions about the application's diagnostics.
-        for (String name : java.util.List.of("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) builder.environment().remove(name);
-        return builder.start();
+        return WorkspaceCliTestProcess.start(builder);
     }
 
     private static void sendRequest(Process process, String request) throws java.io.IOException {

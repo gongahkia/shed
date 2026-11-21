@@ -1,0 +1,104 @@
+{
+  "server_kind": "production bridge and ApplicationStatus fixture; no Texteditor window",
+  "external_program": "shed.Texteditor --workspace-api --status through fixed guarded JDK route",
+  "runs": [
+    {
+      "run": "stage-c",
+      "server": "production bridge with status fixture; no desktop",
+      "round_trip_with_jvm_start_ms": 110.3205,
+      "exit": 0,
+      "bytes": 250,
+      "cycle": 0
+    },
+    {
+      "run": "stage-c",
+      "server": "production bridge with status fixture; no desktop",
+      "round_trip_with_jvm_start_ms": 119.856458,
+      "exit": 0,
+      "bytes": 250,
+      "cycle": 1
+    },
+    {
+      "run": "stage-c",
+      "server": "production bridge with status fixture; no desktop",
+      "round_trip_with_jvm_start_ms": 122.222458,
+      "exit": 0,
+      "bytes": 250,
+      "cycle": 2
+    },
+    {
+      "run": "final-safe-tests",
+      "round_trip_with_jvm_start_ms": 117.359416,
+      "exit": 0,
+      "bytes": 250,
+      "cycle": 0,
+      "server": "production bridge with status fixture; no desktop"
+    },
+    {
+      "run": "final-safe-tests",
+      "round_trip_with_jvm_start_ms": 116.318625,
+      "exit": 0,
+      "bytes": 250,
+      "cycle": 1,
+      "server": "production bridge with status fixture; no desktop"
+    },
+    {
+      "run": "final-safe-tests",
+      "round_trip_with_jvm_start_ms": 117.645458,
+      "exit": 0,
+      "bytes": 250,
+      "cycle": 2,
+      "server": "production bridge with status fixture; no desktop"
+    },
+    {
+      "run": "qualification-safe-tests",
+      "exit": 0,
+      "round_trip_with_jvm_start_ms": 122.211458,
+      "server": "production bridge with status fixture; no desktop",
+      "cycle": 0,
+      "bytes": 250
+    },
+    {
+      "run": "qualification-safe-tests",
+      "exit": 0,
+      "round_trip_with_jvm_start_ms": 120.290917,
+      "server": "production bridge with status fixture; no desktop",
+      "cycle": 1,
+      "bytes": 250
+    },
+    {
+      "run": "qualification-safe-tests",
+      "exit": 0,
+      "round_trip_with_jvm_start_ms": 118.411417,
+      "server": "production bridge with status fixture; no desktop",
+      "cycle": 2,
+      "bytes": 250
+    },
+    {
+      "run": "release-safe-tests",
+      "cycle": 0,
+      "server": "production bridge with status fixture; no desktop",
+      "round_trip_with_jvm_start_ms": 122.735667,
+      "exit": 0,
+      "bytes": 250
+    },
+    {
+      "run": "release-safe-tests",
+      "cycle": 1,
+      "server": "production bridge with status fixture; no desktop",
+      "round_trip_with_jvm_start_ms": 109.319917,
+      "exit": 0,
+      "bytes": 250
+    },
+    {
+      "run": "release-safe-tests",
+      "cycle": 2,
+      "server": "production bridge with status fixture; no desktop",
+      "round_trip_with_jvm_start_ms": 123.886084,
+      "exit": 0,
+      "bytes": 250
+    }
+  ],
+  "real_desktop_shed_attachment": "OPEN",
+  "sentinel_checks": "exact synthetic bytes and modification time asserted unchanged; no personal files monitored"
+}

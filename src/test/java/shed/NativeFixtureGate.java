@@ -22,6 +22,16 @@ public final class NativeFixtureGate implements BeforeAllCallback {
         Path source = Path.of("src/test/java/shed", name + ".java");
         String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(source)));
         if (!expected.equals(actual)) throw new IllegalStateException("B0.1: reviewed test source changed: " + name);
+        Properties helpers = new Properties();
+        try (var input = NativeFixtureGate.class.getResourceAsStream("/shed/portable-fixture-helpers.properties")) {
+            if (input == null) throw new IllegalStateException("Portable helper manifest missing");
+            helpers.load(input);
+        }
+        for (String helper : helpers.stringPropertyNames()) {
+            Path file = Path.of("src/test/java/shed", helper + ".java");
+            String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+            if (!digest.equals(helpers.getProperty(helper))) throw new IllegalStateException("Reviewed fixture helper changed: " + helper);
+        }
     }
 
     static void requireContext() throws Exception {

@@ -20,11 +20,14 @@ final class AgentWorkspaceController implements AutoCloseable {
     private int startingJob = -1;
     private boolean stopping;
     private boolean proposalMode;
+    private boolean applicationReady;
+    private ApplicationStatus applicationStatus;
     private String status = "Agent API is stopped; no listener is running.";
 
     AgentWorkspaceController(Texteditor editor) { this.editor = editor; }
 
     void ownSession(AgentSessionService session) { sessions.own(session); }
+    void applicationReady() { applicationReady = true; if (applicationStatus != null) applicationStatus.ready(); }
 
     String handle(String argument) {
         if (active != null && !active.running()) { active = null; status = "Agent API connection has stopped."; }
@@ -39,35 +42,55 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
             case "proposals" -> { if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentReview(); yield "Review proposals in the Agents panel."; }
             case "status", "api", "api status" -> status;
-            case "api start" -> start(false);
-            case "api start propose" -> start(true);
+            case "api start" -> start(false, false);
+            case "api start propose" -> start(true, false);
+            case "api start status" -> start(false, true);
             case "api stop" -> stop();
-            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose]|status|stop";
+            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose|status]|status|stop";
         };
     }
 
-    private String start(boolean allowProposals) {
+    private String start(boolean allowProposals, boolean statusOnly) {
         if (disposed.get()) return "Agent API is unavailable while the editor closes.";
-        if (active != null && active.running()) return proposalMode == allowProposals ? status
+        if (active != null && active.running()) return active.statusOnly() == statusOnly && proposalMode == allowProposals ? status
             : "Stop the current API before starting it with different permissions.";
         if (startingJob >= 0) return "Agent API startup is already running.";
-        Path root = editor.workspaceController.activeRoot();
-        if (root == null) return "Select a workspace folder before starting the agent API.";
+        Path root = statusOnly ? null : editor.workspaceController.activeRoot();
+        if (!statusOnly && root == null) return "Select a workspace folder before starting the agent API.";
+        ApplicationStatus capturedStatus = applicationStatus;
+        boolean capturedReady = applicationReady;
+        var excludedRoots = statusOnly ? java.util.List.copyOf(editor.workspaceController.roots()) : java.util.List.<Path>of();
         long request = generation.incrementAndGet();
         stopping = false;
         Path directory = Path.of(editor.configManager.getSessionDirectory(), "agent-api");
         proposalMode = allowProposals;
-        String mode = allowProposals ? "Proposal-only" : "Read-only";
+        String mode = statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
         AgentPolicy policy = allowProposals ? new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE),
             java.util.List.of("**/README.md"), java.util.List.of(), true) : AgentPolicy.readOnly();
         Path sessions = Path.of(editor.configManager.getSessionDirectory());
         status = "Starting " + mode.toLowerCase(java.util.Locale.ROOT) + " agent API…";
         startingJob = editor.asyncJobService.submit("Start local agent API", token -> {
-            var workspace = editor.workspaceQueries(root, policy);
-            var proposals = new WorkspaceProposalService(workspace, editor.workspaceDocuments(),
-                sessions.resolve("agent-workspace").resolve(workspace.workspaceId()), "workspace-api");
-            WorkspaceBridgeServer server = new WorkspaceBridgeServer(workspace, proposals, directory);
+            WorkspaceBridgeServer server;
+            if (statusOnly) server = WorkspaceBridgeServer.status(capturedStatus == null ? new ApplicationStatus(capturedReady) : capturedStatus, directory, excludedRoots);
+            else {
+                var workspace = editor.workspaceQueries(root, policy);
+                var proposals = new WorkspaceProposalService(workspace, editor.workspaceDocuments(),
+                    sessions.resolve("agent-workspace").resolve(workspace.workspaceId()), "workspace-api");
+                server = new WorkspaceBridgeServer(workspace, proposals, directory);
+            }
             owned.add(server);
+            var owner = new java.lang.ref.WeakReference<>(this);
+            var ownedServers = owned; var releasingServers = releasing;
+            server.onClosed(() -> {
+                ownedServers.remove(server); releasingServers.remove(server);
+                var live = owner.get();
+                if (live != null && !live.disposed.get()) SwingUtilities.invokeLater(() -> {
+                    var controller = owner.get();
+                    if (controller != null && !controller.disposed.get() && controller.active == server) {
+                        controller.active = null; controller.status = "Agent API attachment has stopped or expired.";
+                    }
+                });
+            });
             token.onCancel(() -> release(server));
             if (disposed.get() || generation.get() != request || token.isCancelled()) { release(server); return null; }
             return server;
@@ -79,7 +102,12 @@ final class AgentWorkspaceController implements AutoCloseable {
                 status = "Agent API could not start. Check local diagnostics and owner-only session directory permissions.";
             } else {
                 active = server;
-                status = mode + " agent API for " + root + ". Connection descriptor: " + server.descriptor();
+                if (statusOnly) {
+                    applicationStatus = server.statusApplication();
+                    if (applicationReady) applicationStatus.ready();
+                }
+                status = statusOnly ? "Status-only attachment. Descriptor: " + server.descriptor() + ". Credential file: " + server.credential()
+                    : mode + " agent API for " + root + ". Connection descriptor: " + server.descriptor();
             }
             editor.showMessage(status);
         });
@@ -115,6 +143,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     }
 
     @Override public void close() {
+        if (applicationStatus != null) applicationStatus.stopping();
         disposed.set(true); sessions.close(); stop();
     }
 }

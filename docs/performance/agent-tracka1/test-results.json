@@ -1,0 +1,195 @@
+{
+  "runs": [
+    {
+      "run": "compile",
+      "exit": 0,
+      "fixture_removed": true
+    },
+    {
+      "run": "final-measurements",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 1,
+      "passes": 1,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "final-safe-tests",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 248,
+      "passes": 244,
+      "failures": 0,
+      "errors": 0,
+      "skips": 4
+    },
+    {
+      "run": "measurements",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 1,
+      "passes": 1,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "package",
+      "exit": 0,
+      "fixture_removed": true
+    },
+    {
+      "run": "packaged-smoke-driver",
+      "exit": 0,
+      "fixture_removed": true
+    },
+    {
+      "run": "packaged-smoke",
+      "exit": 0,
+      "fixture_removed": null,
+      "media_state": "PASS"
+    },
+    {
+      "run": "qualification-safe-tests",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 248,
+      "passes": 244,
+      "failures": 0,
+      "errors": 0,
+      "skips": 4
+    },
+    {
+      "run": "qualification-tooling",
+      "exit": 0,
+      "fixture_removed": true,
+      "passes": 87,
+      "failures": 0,
+      "skips": 0
+    },
+    {
+      "run": "release-measurements",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 1,
+      "passes": 1,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "release-package",
+      "exit": 0,
+      "fixture_removed": true
+    },
+    {
+      "run": "release-packaged-smoke-driver",
+      "exit": 0,
+      "fixture_removed": true
+    },
+    {
+      "run": "release-packaged-smoke",
+      "exit": 0,
+      "fixture_removed": null,
+      "media_state": "PASS"
+    },
+    {
+      "run": "release-safe-tests",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 248,
+      "passes": 244,
+      "failures": 0,
+      "errors": 0,
+      "skips": 4
+    },
+    {
+      "run": "release-tooling",
+      "exit": 0,
+      "fixture_removed": true,
+      "passes": 87,
+      "failures": 0,
+      "skips": 0
+    },
+    {
+      "run": "settled-measurements",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 1,
+      "passes": 1,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "stage-a",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 16,
+      "passes": 16,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "stage-b-corrected",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 16,
+      "passes": 16,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "stage-b",
+      "exit": 1,
+      "fixture_removed": true,
+      "cases": 16,
+      "passes": 15,
+      "failures": 1,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "stage-c-admission",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 2,
+      "passes": 2,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "stage-c",
+      "exit": 0,
+      "fixture_removed": true,
+      "cases": 14,
+      "passes": 14,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    {
+      "run": "tooling",
+      "exit": 0,
+      "fixture_removed": true,
+      "passes": 87,
+      "failures": 0,
+      "skips": 0
+    }
+  ],
+  "final_safe": "release-safe-tests",
+  "do_not_sum_repeated_runs": true,
+  "exclusions": [
+    "full native/GUI/PTY Maven suite",
+    "B0.1 native harness",
+    "real language servers/providers",
+    "real Texteditor window attachment",
+    "native capture",
+    "Windows/Linux acceptance"
+  ]
+}

@@ -28,11 +28,13 @@ final class EditorInteraction implements AutoCloseable {
         if (closed.get()) throw EditorMetadata.failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
         return revision;
     }
-    void watch(EditorPane pane) {
+    boolean watch(EditorPane pane) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Interaction tracking belongs to the EDT");
-        if (closed.get() || pane == null || pane.isDisposed() || targets.containsKey(pane)) return;
+        if (closed.get() || pane == null || pane.isDisposed()) return false;
+        if (targets.containsKey(pane)) return true;
+        if (targets.size() >= EditorMetadata.MAX_PANES) return false;
         targets.put(pane, new Tracking(pane.getTextArea(), pane.getScrollPane().getViewport()));
-        changed();
+        changed(); return true;
     }
 
     private final class Tracking {

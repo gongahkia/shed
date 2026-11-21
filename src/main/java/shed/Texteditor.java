@@ -296,7 +296,7 @@ public class Texteditor extends JFrame implements KeyListener {
     EditorNavigation.State captureEditorNavigation() {
         var metadata = captureEditorMetadata();
         if (agentNavigationInteraction == null) throw EditorMetadata.failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
-        agentNavigationInteraction.watch(getActivePane());
+        if (!agentNavigationInteraction.watch(getActivePane())) throw EditorMetadata.failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
         return new EditorNavigation.State(metadata, agentNavigationInteraction.revision());
     }
 

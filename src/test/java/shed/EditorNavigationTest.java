@@ -244,4 +244,18 @@ class EditorNavigationTest {
         }
     }
 
+    @Test void trackingCapacityRejectsObservationWithoutInterruptingHumanPaneCreation() throws Exception {
+        try(var f=new Fixture(temporary)) {
+            EditorMetadataTest.edt(()->{
+                var buffer=f.editor.active.getBuffer();
+                for(int i=1;i<EditorMetadata.MAX_PANES;i++)assertTrue(f.interaction.watch(f.editor.split(buffer)));
+                var excess=f.editor.split(buffer);assertFalse(f.interaction.watch(excess));
+                assertEquals(0,excess.getTextArea().getCaretListeners().length);
+                f.interaction.close();
+                for(var pane:f.editor.panes)assertEquals(0,pane.getTextArea().getCaretListeners().length);
+                return null;
+            });
+        }
+    }
+
 }

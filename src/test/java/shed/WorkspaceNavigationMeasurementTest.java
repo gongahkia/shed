@@ -77,6 +77,10 @@ class WorkspaceNavigationMeasurementTest {
                     var typing=type(area,image,client,output);output.put("typing_with_navigation_1mib",WorkspaceStatusMeasurementTest.samples(typing));
                     assertTrue((double)WorkspaceStatusMeasurementTest.samples(typing).get("warm_p95_ms")<=16,"Navigation traffic typing p95 exceeds 16 ms");
                 }
+                var appliedTyping=typeAfterApplyAdmission(f,server,area,image);
+                output.put("typing_queued_at_applied_navigation_1mib",WorkspaceStatusMeasurementTest.samples(appliedTyping));
+                output.put("applied_navigation_between_inputs",51);
+                assertTrue((double)WorkspaceStatusMeasurementTest.samples(appliedTyping).get("warm_p95_ms")<=16,"Typing queued at navigation application exceeds 16 ms");
                 assertEquals(source,EditorMetadataTest.edt(()->f.editor.active.getBuffer().getContent()));image.flush();
                 measured.times.forEach((key,value)->output.put("edt_"+key,WorkspaceStatusMeasurementTest.samples(value)));
                 output.put("edt_allocated_bytes",measured.allocations);
@@ -130,6 +134,32 @@ class WorkspaceNavigationMeasurementTest {
                 if(client!=null)barrier.await(5,TimeUnit.SECONDS);
             }
             if(traffic!=null){assertTrue(traffic.get(5,TimeUnit.SECONDS));output.put("navigation_traffic_outcomes_during_human_edits",outcomes);}
+        }
+        return values;
+    }
+    static List<Double> typeAfterApplyAdmission(EditorNavigationTest.Fixture f,WorkspaceBridgeServer server,javax.swing.JTextArea area,BufferedImage image) throws Exception {
+        var values=new ArrayList<Double>();var begin=new CyclicBarrier(2);var end=new CyclicBarrier(2);
+        try(var client=WorkspaceBridgeClient.navigation(server.descriptor(),server.credential());var worker=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var traffic=worker.submit(()->{
+                for(int i=0;i<51;i++) {
+                    begin.await(5,TimeUnit.SECONDS);var context=exchange(client,client.navigationContextRequest());
+                    assertEquals(true,exchange(client,command(context,i%2==0?"editor/caret/set":"editor/selection/set",1,6)).get("applied"));
+                    end.await(5,TimeUnit.SECONDS);
+                }
+                return true;
+            });
+            for(int i=0;i<51;i++) {
+                var admitted=new java.util.concurrent.CountDownLatch(1);
+                // notification only: the EDT never waits for the benchmark driver
+                f.beforeApply=admitted::countDown;begin.await(5,TimeUnit.SECONDS);assertTrue(admitted.await(5,TimeUnit.SECONDS));
+                long start=System.nanoTime();
+                EditorMetadataTest.edt(()->{
+                    area.insert("x",0);var graphics=image.createGraphics();
+                    try{graphics.setClip(0,0,720,450);EditorUiController.applyEditorTextRenderingHints(graphics);area.paint(graphics);}finally{graphics.dispose();}return null;
+                });
+                values.add((System.nanoTime()-start)/1e6);EditorMetadataTest.edt(()->{area.getDocument().remove(0,1);return null;});end.await(5,TimeUnit.SECONDS);
+            }
+            assertTrue(traffic.get(5,TimeUnit.SECONDS));f.beforeApply=()->{};
         }
         return values;
     }

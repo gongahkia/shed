@@ -1,0 +1,152 @@
+{
+  "verdict": "PARTIAL investigation; default-font international rendering remains P1; NO-GO for the investigated local font-lookup corrections",
+  "primary_missing_visible_scalars_by_fixture": {
+    "ascii": [],
+    "latin": [],
+    "combining": [],
+    "punctuation-math": [],
+    "cjk": [
+      "U+4E2D",
+      "U+6587",
+      "U+65E5",
+      "U+672C",
+      "U+8A9E"
+    ],
+    "kana": [
+      "U+3072",
+      "U+3089",
+      "U+304C",
+      "U+306A",
+      "U+30AB",
+      "U+30BF",
+      "U+30AB",
+      "U+30CA"
+    ],
+    "hangul": [
+      "U+D55C",
+      "U+AE00"
+    ],
+    "indic-gb9c": [
+      "U+0915",
+      "U+094D",
+      "U+0937",
+      "U+0915",
+      "U+094D",
+      "U+0937"
+    ],
+    "bengali": [
+      "U+0995",
+      "U+09CD",
+      "U+09B7"
+    ],
+    "arabic": [
+      "U+0627",
+      "U+0644",
+      "U+0639",
+      "U+0631",
+      "U+0628",
+      "U+064A",
+      "U+0629"
+    ],
+    "hebrew": [
+      "U+05E2",
+      "U+05D1",
+      "U+05E8",
+      "U+05D9",
+      "U+05EA"
+    ],
+    "bidi": [
+      "U+0627",
+      "U+0644",
+      "U+0639",
+      "U+0631",
+      "U+0628",
+      "U+064A",
+      "U+0629",
+      "U+05E2",
+      "U+05D1",
+      "U+05E8",
+      "U+05D9",
+      "U+05EA"
+    ],
+    "supplementary": [
+      "U+1D11E",
+      "U+10400"
+    ],
+    "emoji": [
+      "U+1F600",
+      "U+1F469",
+      "U+1F3FD"
+    ],
+    "zwj": [
+      "U+1F469",
+      "U+1F4BB",
+      "U+1F468",
+      "U+1F469",
+      "U+1F467",
+      "U+1F466"
+    ],
+    "variation": [
+      "U+2708",
+      "U+2708"
+    ],
+    "mixed": [
+      "U+0915",
+      "U+094D",
+      "U+0937",
+      "U+1F469",
+      "U+1F4BB",
+      "U+4E2D",
+      "U+6587"
+    ],
+    "unsupported-negative-control": [
+      "U+10FFFF"
+    ]
+  },
+  "negative_control": "U+10FFFF is a noncharacter; unsupported in all tested fonts, not an assigned-script rendering promise",
+  "rejected_candidates": [
+    "registered JetBrains Mono family lookup",
+    "public StyleContext same-family font lookup"
+  ],
+  "logical_font_controls": "restore sampled scalar coverage but change primary typography and do not fully join sampled ZWJ sequences; not an accepted production substitute",
+  "raw_mapping_limitation": [
+    {
+      "raw_hit_test": 0,
+      "raw_hit_test_is_source_offset": true,
+      "bounds": "java.awt.geom.Rectangle2D$Float[x=0.0,y=0.0,w=1.0,h=21.0]",
+      "utf16_offset": 0
+    },
+    {
+      "raw_hit_test": 4,
+      "raw_hit_test_is_source_offset": true,
+      "bounds": "java.awt.geom.Rectangle2D$Float[x=40.0,y=0.0,w=1.0,h=21.0]",
+      "utf16_offset": 4
+    },
+    {
+      "raw_hit_test": 12,
+      "raw_hit_test_is_source_offset": true,
+      "bounds": "java.awt.geom.Rectangle2D$Float[x=120.0,y=0.0,w=1.0,h=21.0]",
+      "utf16_offset": 12
+    },
+    {
+      "raw_hit_test": 28,
+      "raw_hit_test_is_source_offset": true,
+      "bounds": "java.awt.geom.Rectangle2D$Float[x=120.0,y=21.0,w=1.0,h=21.0]",
+      "utf16_offset": 28
+    },
+    {
+      "raw_hit_test": 33,
+      "raw_hit_test_is_source_offset": true,
+      "bounds": "java.awt.geom.Rectangle2D$Float[x=170.0,y=21.0,w=1.0,h=21.0]",
+      "utf16_offset": 33
+    },
+    {
+      "raw_hit_test": 431,
+      "raw_hit_test_is_source_offset": false,
+      "bounds": "java.awt.geom.Rectangle2D$Float[x=0.0,y=420.0,w=1.0,h=21.0]",
+      "utf16_offset": 430
+    }
+  ],
+  "png_roundtrip_assertions": "PASS; no native desktop equivalence claimed",
+  "source_and_history_preserved": true
+}

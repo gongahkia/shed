@@ -1,0 +1,17 @@
+{
+  "files": {
+    "docs/performance/ide-trackb0/visual/initial-native.png": "bf6cb31c1c965fb7a33efc7a9aadb1cb0e0095578e56ae737fa9706584bc9a48",
+    "docs/performance/ide-trackb0/visual/after-appearance-native.png": "4a29f662a3a67fe28d126a18e353467c4fd926b8ebb2602500a82caa7f1dac62",
+    "docs/performance/ide-trackb0/visual/initial-component-1x.png": "50b947431529e7e32c0d214a0ec4bcc55cf1d33c084cfbc42c90782449d59438",
+    "docs/performance/ide-trackb0/visual/initial-component-2x.png": "f4b39bb570008c3255b0a62a216e8704665ac6c8b3fb60e1a092c7d118245ec3",
+    "docs/performance/ide-trackb0/capture-comparison.jsonl": "38b11b5cef635705fcf7aa018eb77be62016097087286b183e443bc8ba3d8158",
+    "docs/performance/ide-trackb0/final-matrix-mixed-visual-stdout.log.gz": "ca87110cc978cb0ecae644f353caca446e0a2566e7783d4150efeff41190a187",
+    "docs/performance/appearance-tranche8h/visual.log.gz": "f2ca552f69b1fd01a7b4238cc96ea4566bba73d7ceec4fa499aae29f44bcd96b"
+  },
+  "b0_fixture_utf8_sha256": "2481b5a8bd7b37aad5d78bc374658f14a26d177c15dd367741ae59e0e35f0545",
+  "b0_fixture_utf8_bytes": 600,
+  "b0_fixture_utf16_units": 430,
+  "native_scale": 2,
+  "historical_native_capture": "process-PID/window-size/title selection through existing CoreGraphics/JNA helper; screencapture -l window ID; not replayed",
+  "component_capture": "root.paint into scaled BufferedImage; current qualification paints standalone source views, no full main window/live syntax overlay"
+}

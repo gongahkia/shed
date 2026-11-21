@@ -1,0 +1,1256 @@
+[
+  {
+    "fixture": "ascii",
+    "source": "Source alpha 0123 !?",
+    "utf16_length": 20,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0053"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006F"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0075"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0072"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0063"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0065"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0061"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006C"
+      },
+      {
+        "utf16_offset": 9,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0070"
+      },
+      {
+        "utf16_offset": 10,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0068"
+      },
+      {
+        "utf16_offset": 11,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0061"
+      },
+      {
+        "utf16_offset": 12,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 13,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0030"
+      },
+      {
+        "utf16_offset": 14,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0031"
+      },
+      {
+        "utf16_offset": 15,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0032"
+      },
+      {
+        "utf16_offset": 16,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0033"
+      },
+      {
+        "utf16_offset": 17,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 18,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0021"
+      },
+      {
+        "utf16_offset": 19,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+003F"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "2e58e3ebc0f234d8b61fa575b8ab31ab6b31bcb6814d1cbbead2534c85d0bc2f",
+    "reference_family_requested": "Monospaced",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "latin",
+    "source": "caf\u00e9 \u00c5ngstr\u00f6m na\u00efve",
+    "utf16_length": 19,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0063"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0061"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0066"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+00E9"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+00C5"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006E"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0067"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0073"
+      },
+      {
+        "utf16_offset": 9,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0074"
+      },
+      {
+        "utf16_offset": 10,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0072"
+      },
+      {
+        "utf16_offset": 11,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+00F6"
+      },
+      {
+        "utf16_offset": 12,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006D"
+      },
+      {
+        "utf16_offset": 13,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 14,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006E"
+      },
+      {
+        "utf16_offset": 15,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0061"
+      },
+      {
+        "utf16_offset": 16,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+00EF"
+      },
+      {
+        "utf16_offset": 17,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0076"
+      },
+      {
+        "utf16_offset": 18,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0065"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "331748a44438aa1b0f398c5161894849be2a0464095aa225d12a05ce71524da2",
+    "reference_family_requested": "Dialog",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "combining",
+    "source": "e\u0301 a\u0308 n\u0303",
+    "utf16_length": 8,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0065"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0301"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0061"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0308"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006E"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0303"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "f1ccc99a55dcca8f66095016e7723ebf17016f5a15e9ce795db369a2f93f7968",
+    "reference_family_requested": "Dialog",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "punctuation-math",
+    "source": "\u2018text\u2019 \u2014 \u2026 \u2211 \u222b \u2260 \u2264 \u221e",
+    "utf16_length": 20,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2018"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0074"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0065"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0078"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0074"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2019"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2014"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 9,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2026"
+      },
+      {
+        "utf16_offset": 10,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 11,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2211"
+      },
+      {
+        "utf16_offset": 12,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 13,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+222B"
+      },
+      {
+        "utf16_offset": 14,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 15,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2260"
+      },
+      {
+        "utf16_offset": 16,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 17,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+2264"
+      },
+      {
+        "utf16_offset": 18,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 19,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+221E"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "e1e430f10681aaf37c4e760ae6348d5e78ac4d8a4e800224f9365fc6e2bb038f",
+    "reference_family_requested": "Apple Symbols",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "cjk",
+    "source": "\u4e2d\u6587\u65e5\u672c\u8a9e",
+    "utf16_length": 5,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+4E2D"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+6587"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+65E5"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+672C"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+8A9E"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "48d52e9ec0d88aacc5782cf3b182c10dd6a17fc101f1ec268cabed3f43d51d0d",
+    "reference_family_requested": "PingFang SC",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "kana",
+    "source": "\u3072\u3089\u304c\u306a \u30ab\u30bf\u30ab\u30ca",
+    "utf16_length": 9,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+3072"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+3089"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+304C"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+306A"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+30AB"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+30BF"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+30AB"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+30CA"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "49440e724d4e5129e4d0180e044bf57b628a9fc6aa6b544eb8f481b5185e4a0a",
+    "reference_family_requested": "Hiragino Sans",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "hangul",
+    "source": "\ud55c\uae00",
+    "utf16_length": 2,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+D55C"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+AE00"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "bd87f9bb68b67d2fa1cb82b6751820e946d5b1316d25d5fd96512fb4be44a2a8",
+    "reference_family_requested": "Apple SD Gothic Neo",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "indic-gb9c",
+    "source": "\u0915\u094d\u0937 \u0915\u094d\u200d\u0937",
+    "utf16_length": 8,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0915"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+094D"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0937"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0915"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+094D"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": true,
+        "default_ignorable_control": true,
+        "code_point": "U+200D"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0937"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "2650355fc33e6febd8eb4ca8566ecb8588ba29f77321fc2e87d2e3966a61e2e7",
+    "reference_family_requested": "Devanagari Sangam MN",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "bengali",
+    "source": "\u0995\u09cd\u09b7",
+    "utf16_length": 3,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0995"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+09CD"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+09B7"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "36453afcc630bfc554890cfd47dfae76db1b2df617898e24471fbeed9d79f84f",
+    "reference_family_requested": "Bangla Sangam MN",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "arabic",
+    "source": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629",
+    "utf16_length": 7,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0627"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0644"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0639"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0631"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0628"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+064A"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0629"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "d274159863057eb5c633116c3b54e4f8659167f0b73fabbee256e881fa1ac8c8",
+    "reference_family_requested": "Geeza Pro",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "hebrew",
+    "source": "\u05e2\u05d1\u05e8\u05d9\u05ea",
+    "utf16_length": 5,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05E2"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05D1"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05E8"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05D9"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05EA"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "9b1919717ec3013e338e9172d374770da80a1d7f6d5d7c00f790d618fc94c0c3",
+    "reference_family_requested": "Arial Hebrew",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "bidi",
+    "source": "abc \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u05e2\u05d1\u05e8\u05d9\u05ea 123",
+    "utf16_length": 21,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0061"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0062"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0063"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0627"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0644"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0639"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0631"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0628"
+      },
+      {
+        "utf16_offset": 9,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+064A"
+      },
+      {
+        "utf16_offset": 10,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0629"
+      },
+      {
+        "utf16_offset": 11,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 12,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05E2"
+      },
+      {
+        "utf16_offset": 13,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05D1"
+      },
+      {
+        "utf16_offset": 14,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05E8"
+      },
+      {
+        "utf16_offset": 15,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05D9"
+      },
+      {
+        "utf16_offset": 16,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+05EA"
+      },
+      {
+        "utf16_offset": 17,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 18,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0031"
+      },
+      {
+        "utf16_offset": 19,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0032"
+      },
+      {
+        "utf16_offset": 20,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0033"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "94e7e11cf8dead66d7d5ade4782ffe33fa46c5c7fecd9d1d2b25e5f5edf3a897",
+    "reference_family_requested": "Dialog",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "supplementary",
+    "source": "\ud834\udd1e \ud801\udc00",
+    "utf16_length": 5,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1D11E"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+10400"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "eeb21734b80fa420467187baeea279e732d6b57f88405c5649b7d0ccec77d553",
+    "reference_family_requested": "Apple Symbols",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "emoji",
+    "source": "\ud83d\ude00 \ud83d\udc69\ud83c\udffd",
+    "utf16_length": 7,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F600"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F469"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F3FD"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "2d99f4654376cd1046a75b32de701b14e8a315f96329a33ca972f304f754b7ed",
+    "reference_family_requested": "Apple Color Emoji",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "zwj",
+    "source": "\ud83d\udc69\u200d\ud83d\udcbb \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66",
+    "utf16_length": 17,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F469"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": true,
+        "code_point": "U+200D"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F4BB"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F468"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": true,
+        "default_ignorable_control": true,
+        "code_point": "U+200D"
+      },
+      {
+        "utf16_offset": 9,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F469"
+      },
+      {
+        "utf16_offset": 11,
+        "can_display": true,
+        "default_ignorable_control": true,
+        "code_point": "U+200D"
+      },
+      {
+        "utf16_offset": 12,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F467"
+      },
+      {
+        "utf16_offset": 14,
+        "can_display": true,
+        "default_ignorable_control": true,
+        "code_point": "U+200D"
+      },
+      {
+        "utf16_offset": 15,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F466"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "ff2737438b161395d50d933bb3b140709b2ed72b1512ae265a7449c95e9153af",
+    "reference_family_requested": "Apple Color Emoji",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "variation",
+    "source": "\u2708\ufe0f \u2708\ufe0e",
+    "utf16_length": 5,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+2708"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": false,
+        "default_ignorable_control": true,
+        "code_point": "U+FE0F"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+2708"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": false,
+        "default_ignorable_control": true,
+        "code_point": "U+FE0E"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "d31b555e98e372c873623a8dfd101ff91046462a9192f7f1d15e86d8fb7b0e3c",
+    "reference_family_requested": "Apple Color Emoji",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "mixed",
+    "source": "Unicode: e\u0301, \u0915\u094d\u0937, \ud83d\udc69\u200d\ud83d\udcbb, \u4e2d\u6587",
+    "utf16_length": 27,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0055"
+      },
+      {
+        "utf16_offset": 1,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006E"
+      },
+      {
+        "utf16_offset": 2,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0069"
+      },
+      {
+        "utf16_offset": 3,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0063"
+      },
+      {
+        "utf16_offset": 4,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+006F"
+      },
+      {
+        "utf16_offset": 5,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0064"
+      },
+      {
+        "utf16_offset": 6,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0065"
+      },
+      {
+        "utf16_offset": 7,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+003A"
+      },
+      {
+        "utf16_offset": 8,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 9,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0065"
+      },
+      {
+        "utf16_offset": 10,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0301"
+      },
+      {
+        "utf16_offset": 11,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+002C"
+      },
+      {
+        "utf16_offset": 12,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 13,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0915"
+      },
+      {
+        "utf16_offset": 14,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+094D"
+      },
+      {
+        "utf16_offset": 15,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+0937"
+      },
+      {
+        "utf16_offset": 16,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+002C"
+      },
+      {
+        "utf16_offset": 17,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 18,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F469"
+      },
+      {
+        "utf16_offset": 20,
+        "can_display": true,
+        "default_ignorable_control": true,
+        "code_point": "U+200D"
+      },
+      {
+        "utf16_offset": 21,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+1F4BB"
+      },
+      {
+        "utf16_offset": 23,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+002C"
+      },
+      {
+        "utf16_offset": 24,
+        "can_display": true,
+        "default_ignorable_control": false,
+        "code_point": "U+0020"
+      },
+      {
+        "utf16_offset": 25,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+4E2D"
+      },
+      {
+        "utf16_offset": 26,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+6587"
+      }
+    ],
+    "expected_behavior": "assigned visible text; combining, ZWJ and variation controls may have no independent ink; shaping is not certified by scalar coverage",
+    "source_utf8_sha256": "ba9d5489f5cdc8dc3264ddc383df2a9d180ae6fadef2783b3d56e19661fb5292",
+    "reference_family_requested": "Dialog",
+    "reference_family_available": true
+  },
+  {
+    "fixture": "unsupported-negative-control",
+    "source": "\udbff\udfff",
+    "utf16_length": 2,
+    "coverage": [
+      {
+        "utf16_offset": 0,
+        "can_display": false,
+        "default_ignorable_control": false,
+        "code_point": "U+10FFFF"
+      }
+    ],
+    "expected_behavior": "noncharacter negative control; missing glyph permitted",
+    "source_utf8_sha256": "708b8add9f6b5b556a07b72973b10ff9a3ec30e002034ef24aa076fab4b40e50",
+    "reference_family_requested": "Dialog",
+    "reference_family_available": true
+  }
+]

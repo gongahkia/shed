@@ -1,0 +1,7 @@
+{
+  "scripts/run-portable-tests.py": "f928360b5eb5b08b0b1a1663a9bde5cd9348d2767074c686a30c53d91f29e22c",
+  "scripts/test_native_fixture.py": "a29ea03e3591b9f68f2a765301e5ec785fc0e970d018c984f00d7756e50b227b",
+  "src/test/resources/shed/portable-fixture-tests.properties": "d7d6001375a25c19c3aa0182deeed0015d12411e59441df72aa4d846b37636f5",
+  "src/test/java/shed/GlyphRenderingQualificationTest.java": "c9643805f13d0feed4ebaa56bd07c565f2b0500d85d2b6c68957205cffc6e60b",
+  "src/test/java/shed/GlyphRenderingMeasurementTest.java": "a3d43a78f9e14ed6adae6e918358e3318f9ca39785d4e9e2598e87684786ffdd"
+}

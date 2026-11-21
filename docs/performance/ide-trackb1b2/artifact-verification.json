@@ -1,0 +1,8 @@
+{
+  "jar_sha256": "885dd51ae7ca684632f5eb19df04618a372e8bcf85769256c6acb277363315b5",
+  "production_source_files_byte_identical": 407,
+  "compiled_production_classes_matching_unchanged_jar": 1429,
+  "font_resource_sha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f",
+  "no_new_test_classes_shipped": true,
+  "production_changes": []
+}

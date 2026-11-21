@@ -46,6 +46,9 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     static WorkspaceBridgeClient metadata(Path descriptor, Path credential) throws IOException {
         return authenticated(descriptor, credential, "editor-metadata");
     }
+    static WorkspaceBridgeClient navigation(Path descriptor, Path credential) throws IOException {
+        return authenticated(descriptor, credential, "editor-navigation");
+    }
 
     private static WorkspaceBridgeClient authenticated(Path descriptor, Path credential, String scope) throws IOException {
         var endpoint = WorkspaceStatusAttachment.Descriptor.read(descriptor);
@@ -57,8 +60,13 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     }
 
     String metadataRequest() {
-        if (statusSession == null || !"editor-metadata".equals(statusSession.scope())) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
+        if (statusSession == null || !("editor-metadata".equals(statusSession.scope()) || "editor-navigation".equals(statusSession.scope()))) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
         return MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "metadata", "method", "editor/metadata",
+            "params", Map.of("schemaVersion", 1, "projectId", statusSession.projectId())));
+    }
+    String navigationContextRequest() {
+        if (statusSession == null || !"editor-navigation".equals(statusSession.scope())) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
+        return MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "context", "method", EditorNavigation.CONTEXT,
             "params", Map.of("schemaVersion", 1, "projectId", statusSession.projectId())));
     }
 
@@ -116,9 +124,7 @@ final class WorkspaceBridgeClient implements AutoCloseable {
             if (!"2.0".equals(response.get("jsonrpc")) || !id.equals(response.get("id"))
                 || !(response.keySet().equals(Set.of("jsonrpc", "id", "result")) || response.keySet().equals(Set.of("jsonrpc", "id", "error"))))
                 throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
-            if (response.containsKey("result") && !("editor/status".equals(original.get("method"))
-                ? statusSession.acceptsStatus(MiniJson.asObject(response.get("result")))
-                : "editor/metadata".equals(original.get("method")) && statusSession.acceptsMetadata(MiniJson.asObject(response.get("result")))))
+            if (response.containsKey("result") && !acceptsResult(original, MiniJson.asObject(response.get("result"))))
                 throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
             if (response.containsKey("result") && "editor/metadata".equals(original.get("method"))) {
                 var params = MiniJson.asObject(original.get("params")); var result = MiniJson.asObject(response.get("result"));
@@ -134,6 +140,18 @@ final class WorkspaceBridgeClient implements AutoCloseable {
             if (failed instanceof java.io.EOFException) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
             throw failed;
         } finally { timeout.cancel(false); }
+    }
+
+    private boolean acceptsResult(Map<String, Object> request, Map<String, Object> result) {
+        String method = (String) request.get("method");
+        if ("editor/status".equals(method)) return statusSession.acceptsStatus(result);
+        if ("editor/metadata".equals(method)) return statusSession.acceptsMetadata(result);
+        if (EditorNavigation.CONTEXT.equals(method)) return statusSession.acceptsNavigation(result, false);
+        if (!EditorNavigation.MUTATIONS.contains(method) || !statusSession.acceptsNavigation(result, true) || !method.equals(result.get("operation"))) return false;
+        var params = MiniJson.asObject(request.get("params"));
+        return params != null && result.get("projectId").equals(params.get("projectId")) && result.get("paneId").equals(params.get("paneId"))
+            && result.get("documentId").equals(params.get("documentId")) && result.get("documentRevision").equals(params.get("documentRevision"))
+            && params.get("contextRevision") instanceof Long expected && (long) result.get("contextRevision") > expected;
     }
 
     private ScheduledFuture<?> deadline() {

@@ -33,7 +33,7 @@ final class WorkspaceCliTestProcess {
         }
         for (int i = main + 2; i < given.size(); i++) {
             String option = given.get(i);
-            if (Set.of("--stdio", "--status", "--metadata").contains(option)) continue;
+            if (Set.of("--stdio", "--status", "--metadata", "--navigate").contains(option)) continue;
             if (!Set.of("--root", "--connect", "--credential", "--request").contains(option) || ++i == given.size())
                 throw new IOException("Unsupported workspace CLI option");
             if (!"--request".equals(option)) confined(Path.of(given.get(i)), run);

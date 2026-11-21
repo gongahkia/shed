@@ -9,6 +9,7 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
 
 /** Window-free entry point. Disk-only by default; live attachment is explicit. */
 public final class WorkspaceCli {
@@ -20,7 +21,7 @@ public final class WorkspaceCli {
     public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true);
         PrintWriter diagnostics = new PrintWriter(new OutputStreamWriter(errors, StandardCharsets.UTF_8), true);
-        boolean status = false, metadata = false;
+        boolean status = false, metadata = false, navigation = false;
         try {
             if (!handles(args)) throw new IllegalArgumentException("Expected --workspace-api");
             String root = null, request = null, connection = null, credential = null; boolean stdio = false;
@@ -32,9 +33,15 @@ public final class WorkspaceCli {
                     case "--connect" -> { if (connection != null || ++i == args.length) throw new IllegalArgumentException("Expected one --connect descriptor"); connection = args[i]; }
                     case "--credential" -> { if (credential != null || ++i == args.length) throw new IllegalArgumentException("Expected one --credential file"); credential = args[i]; }
                     case "--metadata" -> { if (metadata) throw new IllegalArgumentException("Duplicate --metadata"); metadata = true; }
+                    case "--navigate" -> { if (navigation) throw new IllegalArgumentException("Duplicate --navigate"); navigation = true; }
                     case "--status" -> { if (status) throw new IllegalArgumentException("Duplicate --status"); status = true; }
                     default -> throw new IllegalArgumentException("Unsupported workspace API argument");
                 }
+            }
+            if (navigation) {
+                if (status || metadata || root != null || connection == null || credential == null || stdio)
+                    throw new IllegalArgumentException("Navigation requires one explicit descriptor and credential");
+                return navigation(Path.of(connection), Path.of(credential), request, writer);
             }
             if (status || metadata) {
                 if (status && metadata || root != null || connection == null || credential == null || stdio || request != null)
@@ -56,8 +63,9 @@ public final class WorkspaceCli {
             else diagnostics.println(MiniJson.stringify(Map.of("error", error.toMap())));
             return 65;
         } catch (IllegalArgumentException invalid) {
-            if (status || metadata) {
-                writer.println(WorkspaceRpc.error(metadata ? "metadata" : "status", -32602, metadata ? "Invalid metadata arguments" : "Invalid status arguments", Map.of("code", "INVALID_REQUEST")));
+            if (status || metadata || navigation) {
+                writer.println(WorkspaceRpc.error(navigation ? "navigation" : metadata ? "metadata" : "status", -32602,
+                    navigation ? "Invalid navigation arguments" : metadata ? "Invalid metadata arguments" : "Invalid status arguments", Map.of("code", "INVALID_REQUEST")));
                 return 64;
             }
             diagnostics.println(MiniJson.stringify(Map.of("error", Map.of("code", "INVALID_REQUEST", "message", invalid.getMessage()))));
@@ -66,6 +74,35 @@ public final class WorkspaceCli {
             diagnostics.println(MiniJson.stringify(Map.of("error", Map.of("code", "IO_ERROR", "message", "Workspace stream failed"))));
             return 74;
         }
+    }
+
+    private static int navigation(Path descriptor, Path credential, String request, PrintWriter output) {
+        boolean mutation = false;
+        String response;
+        try (var client = WorkspaceBridgeClient.navigation(descriptor, credential)) {
+            String query = request == null ? client.navigationContextRequest() : request;
+            var envelope = MiniJson.asObject(MiniJson.parseStrict(query));
+            mutation = envelope != null && envelope.get("method") instanceof String method && EditorNavigation.MUTATIONS.contains(method);
+            response = client.exchange(query);
+        } catch (WorkspaceApiException failure) { return navigationFailure(output, "navigation", failure.code().name(), failure.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN
+            || mutation && Set.of(WorkspaceApiException.Code.TIMEOUT, WorkspaceApiException.Code.SESSION_INVALID, WorkspaceApiException.Code.SESSION_EXPIRED).contains(failure.code())); }
+        catch (java.nio.file.NoSuchFileException | java.net.ConnectException absent) { return navigationFailure(output, "navigation", "INSTANCE_UNAVAILABLE", false); }
+        catch (java.nio.file.FileSystemException denied) { return navigationFailure(output, "navigation", "UNAUTHORIZED", false); }
+        catch (java.io.IOException failed) { return navigationFailure(output, "navigation", "TRANSPORT_ERROR", mutation); }
+        catch (RuntimeException invalid) { return navigationFailure(output, "navigation", "INVALID_REQUEST", false); }
+        var value = MiniJson.asObject(MiniJson.parseStrict(response));
+        if (value.containsKey("error")) {
+            var error = MiniJson.asObject(value.get("error")); var data = error == null ? null : MiniJson.asObject(error.get("data"));
+            try {
+                String code = WorkspaceApiException.Code.valueOf((String) data.get("code")).name();
+                return navigationFailure(output, value.get("id"), code, "unknown".equals(data.get("outcome")) || "OUTCOME_UNKNOWN".equals(code));
+            } catch (RuntimeException invalid) { return navigationFailure(output, "navigation", "SESSION_INVALID", mutation); }
+        }
+        output.println(response); return output.checkError() ? 74 : 0;
+    }
+    private static int navigationFailure(PrintWriter output, Object id, String code, boolean unknown) {
+        output.println(WorkspaceRpc.error(id, -32000, "Navigation request failed", Map.of("code", code, "outcome", unknown ? "unknown" : "rejected")));
+        return output.checkError() ? 74 : unknown ? 79 : statusExit(code);
     }
 
     private static int status(Path descriptor, Path credential, PrintWriter output, boolean metadata) {
@@ -99,7 +136,8 @@ public final class WorkspaceCli {
             case "UNAUTHORIZED", "PROJECT_UNAUTHORIZED", "PERMISSION_DENIED" -> 77;
             case "UNSUPPORTED_PROTOCOL" -> 76;
             case "SESSION_INVALID", "SESSION_EXPIRED", "AUTHORIZATION_REVOKED", "APP_SHUTTING_DOWN" -> 78;
-            case "APP_NOT_READY", "NO_ACTIVE_EDITOR", "PANE_UNAVAILABLE", "CONTEXT_CHANGED", "INVALID_CONTEXT", "BUSY" -> 75;
+            case "APP_NOT_READY", "NO_ACTIVE_EDITOR", "PANE_UNAVAILABLE", "CONTEXT_CHANGED", "INVALID_CONTEXT", "BUSY",
+                "STALE_REVISION", "INVALID_OFFSET", "BOUNDARY_UNAVAILABLE", "GEOMETRY_UNAVAILABLE", "UNSUPPORTED_MODE" -> 75;
             case "INVALID_REQUEST" -> 64;
             case "TIMEOUT" -> 70;
             default -> 74;

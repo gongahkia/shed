@@ -118,6 +118,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     Path credential() { return statusAttachment == null ? null : statusAttachment.credentialFile(); }
     boolean statusOnly() { return statusAttachment != null && metadata == null; }
     boolean metadataEnabled() { return metadata != null; }
+    boolean navigationEnabled() { return metadata != null && metadata.navigation != null; }
     void revokeObservation() { if (metadata != null) metadata.close(); }
     ApplicationStatus statusApplication() { return applicationStatus; }
     int connectionCount() { return connections.size(); }
@@ -221,13 +222,16 @@ final class WorkspaceBridgeServer implements AutoCloseable {
                             "Attachment has expired", Map.of("code", "SESSION_EXPIRED")), "response", sequence));
                         return;
                     }
-                    String response = rpc.handle(request);
+                    String response = rpc.handle(request, () -> !closed.get() && !connection.isClosed() && !statusAttachment.expired());
+                    boolean uncertain = navigationEnabled() && navigationMutation(request) && navigationMayHaveApplied(response);
                     if (statusAttachment.expired() || closed.get()) {
-                        response = WorkspaceRpc.error(statusRequestId(request), -32000, "Attachment is no longer valid", Map.of("code", "SESSION_EXPIRED"));
-                    } else if (metadata != null && requestMethodIsMetadata(request)) {
+                        response = WorkspaceRpc.error(statusRequestId(request), -32000, "Attachment is no longer valid",
+                            uncertain ? Map.of("code", "OUTCOME_UNKNOWN", "outcome", "unknown") : Map.of("code", "SESSION_EXPIRED"));
+                    } else if (metadata != null && (requestMethodIsMetadata(request) || navigationMutation(request) || requestMethod(request).equals(EditorNavigation.CONTEXT))) {
                         try { metadata.validateAuthorization(); }
                         catch (WorkspaceApiException revoked) {
-                            response = WorkspaceRpc.error(statusRequestId(request), -32000, "Observation authorization is unavailable", Map.of("code", revoked.code().name()));
+                            response = WorkspaceRpc.error(statusRequestId(request), -32000, "Attachment authorization is unavailable",
+                                uncertain ? Map.of("code", "OUTCOME_UNKNOWN", "outcome", "unknown") : Map.of("code", revoked.code().name()));
                         }
                     }
                     if (metadata != null) {
@@ -254,6 +258,18 @@ final class WorkspaceBridgeServer implements AutoCloseable {
             var value = MiniJson.asObject(MiniJson.parseStrict(request));
             return value != null && "editor/metadata".equals(value.get("method"));
         } catch (IllegalArgumentException invalid) { return false; }
+    }
+
+    private static String requestMethod(String request) {
+        try { var value = MiniJson.asObject(MiniJson.parseStrict(request)); return value != null && value.get("method") instanceof String method ? method : ""; }
+        catch (IllegalArgumentException invalid) { return ""; }
+    }
+    private static boolean navigationMutation(String request) { return EditorNavigation.MUTATIONS.contains(requestMethod(request)); }
+    private static boolean navigationMayHaveApplied(String response) {
+        var value = MiniJson.asObject(MiniJson.parseStrict(response));
+        if (value.containsKey("result")) return true;
+        var error = MiniJson.asObject(value.get("error")); var data = error == null ? null : MiniJson.asObject(error.get("data"));
+        return data != null && "OUTCOME_UNKNOWN".equals(data.get("code"));
     }
 
     private ScheduledFuture<?> deadline(Socket connection, int milliseconds) {

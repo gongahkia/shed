@@ -789,6 +789,7 @@ final class EditorUiController {
         editor.searchManager = pane.getSearchManager();
         if (pane.getBuffer() != null) editor.undoManager = pane.getBuffer().getUndoManager();
         if (editor.inlineFindBar != null) editor.inlineFindBar.onBufferChanged();
+        editor.navigationContextChanged(pane);
     }
 
 

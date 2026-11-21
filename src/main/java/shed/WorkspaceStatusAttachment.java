@@ -31,7 +31,7 @@ final class WorkspaceStatusAttachment implements AutoCloseable {
             Map<String, Object> value = object(privateBytes(file));
             if (!Long.valueOf(2).equals(value.get("schemaVersion")))
                 throw failure(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
-            boolean metadata = "editor-metadata".equals(value.get("scope"));
+            boolean metadata = "editor-metadata".equals(value.get("scope")) || "editor-navigation".equals(value.get("scope"));
             Set<String> fields = metadata ? Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope", "projectId")
                 : Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope");
             if (!value.keySet().equals(fields) || !metadata && !"status".equals(value.get("scope"))
@@ -66,7 +66,7 @@ final class WorkspaceStatusAttachment implements AutoCloseable {
             throw new IOException("Private attachment storage must be outside configured roots");
         this.clock = clock;
         descriptor = new Descriptor(application.instanceId, application.windowId, UUID.randomUUID().toString(), port,
-            Math.addExact(clock.millis(), lifetime.toMillis()), metadata == null ? "status" : "editor-metadata", metadata == null ? null : metadata.projectId);
+            Math.addExact(clock.millis(), lifetime.toMillis()), metadata == null ? "status" : metadata.scope(), metadata == null ? null : metadata.projectId);
         deadlineNanos = System.nanoTime() + lifetime.toNanos();
         discoveryBytes = MiniJson.stringify(descriptor.fields()).getBytes(StandardCharsets.UTF_8);
         credentialBytes = MiniJson.stringify(Map.of("schemaVersion", 2, "attachmentId", descriptor.attachmentId(),

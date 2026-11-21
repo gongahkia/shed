@@ -2974,6 +2974,8 @@ final class InputController {
     }
 
     boolean allowsAiCompletion() { return !composingText && !isCompletionPopupVisible() && !snippetSession.active(editor.writingArea); }
+    boolean allowsMachineNavigation() { return allowsAiCompletion() && emacsPrefix == EmacsKeymap.Prefix.NONE
+        && editor.editorState.pendingKey == '\0' && editor.editorState.pendingCount.isEmpty() && editor.editorState.pendingRegister == null; }
 
     String expandNativeSnippetAtCursor() {
         FileBuffer buffer = editor.getCurrentBuffer();

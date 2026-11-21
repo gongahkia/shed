@@ -59,6 +59,9 @@ final class EditorMetadata implements AutoCloseable {
     }
 
     String scope() { return navigation == null ? "editor-metadata" : "editor-navigation"; }
+    void requireIdentity(String instance, String window) {
+        if (!application.instanceId.equals(instance) || !application.windowId.equals(window)) throw failure(WorkspaceApiException.Code.UNAUTHORIZED);
+    }
 
     static Context capture(EditorPane pane, EditorWorkspaceDocuments documents, Path activeRoot, List<Path> roots, long generation) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor metadata belongs to the EDT");

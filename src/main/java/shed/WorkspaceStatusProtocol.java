@@ -60,7 +60,7 @@ final class WorkspaceStatusProtocol {
         String scope() { return target.scope(); }
         String projectId() { return target.projectId(); }
         boolean acceptsMetadata(Map<String, Object> value) {
-            if (!"editor-metadata".equals(scope()) || value == null || !value.keySet().equals(Set.of("schemaVersion", "protocolVersion",
+            if (!("editor-metadata".equals(scope()) || "editor-navigation".equals(scope())) || value == null || !value.keySet().equals(Set.of("schemaVersion", "protocolVersion",
                 "instanceId", "windowId", "capabilities", "projectId", "paneId", "documentId", "documentLength", "documentRevision",
                 "dirty", "caretOffset", "selectionStart", "selectionEnd", "coordinateUnit", "available", "valid"))) return false;
             if (!Long.valueOf(1).equals(value.get("schemaVersion")) || !Long.valueOf(2).equals(value.get("protocolVersion"))
@@ -80,6 +80,17 @@ final class WorkspaceStatusProtocol {
         private static int integer(Object value) {
             if (!(value instanceof Long number) || number < 0 || number > Integer.MAX_VALUE) throw denied();
             return number.intValue();
+        }
+        boolean acceptsNavigation(Map<String, Object> value, boolean mutation) {
+            if (!"editor-navigation".equals(scope()) || value == null || !(value.get("contextRevision") instanceof Long revision) || revision < 0
+                || !List.of("status", "editor-metadata", "editor-navigation").equals(value.get("capabilities"))) return false;
+            var base = new java.util.LinkedHashMap<>(value); base.remove("contextRevision");
+            base.put("capabilities", List.of("status", "editor-metadata"));
+            if (mutation) {
+                if (!Boolean.TRUE.equals(base.remove("applied")) || !(base.remove("operation") instanceof String operation) || !EditorNavigation.MUTATIONS.contains(operation)
+                    || !(base.remove("visibility") instanceof String visibility) || !Set.of("caret", "selection", "start", "range").contains(visibility)) return false;
+            }
+            return acceptsMetadata(base);
         }
     }
 

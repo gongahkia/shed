@@ -29,6 +29,10 @@ public final class WorkspaceRpc {
 
     /** Null is a valid notification's no-response result. */
     public String handle(String json) {
+        return handle(json, () -> true);
+    }
+
+    String handle(String json, java.util.function.BooleanSupplier connection) {
         Object decoded;
         try { decoded = MiniJson.parseStrict(json); }
         catch (IllegalArgumentException error) { return error(null, -32700, "Invalid JSON", Map.of("code", "INVALID_REQUEST")); }
@@ -40,7 +44,7 @@ public final class WorkspaceRpc {
         if (!validEnvelope(request))
             return error(id, -32600, "Expected a supported JSON-RPC 2.0 request envelope", Map.of("code", "INVALID_REQUEST"));
         String method = (String) request.get("method");
-        if (status != null) return status(request, id, notification, method);
+        if (status != null) return status(request, id, notification, method, connection);
         if (!WorkspaceQueryService.OPERATIONS.contains(method) && (proposals == null || !WorkspaceProposalRpc.OPERATIONS.contains(method))) return notification ? null
             : error(id, -32601, "Workspace operation is not supported", Map.of("code", "UNSUPPORTED", "method", method));
         try {
@@ -56,8 +60,18 @@ public final class WorkspaceRpc {
         }
     }
 
-    private String status(Map<String, Object> request, Object id, boolean notification, String method) {
+    private String status(Map<String, Object> request, Object id, boolean notification, String method, java.util.function.BooleanSupplier connection) {
         if (notification || id == null) return error(null, -32600, "Status requires a request ID", Map.of("code", "INVALID_REQUEST"));
+        if (metadata != null && metadata.navigation != null && (EditorNavigation.CONTEXT.equals(method) || EditorNavigation.MUTATIONS.contains(method))) {
+            try {
+                var params = MiniJson.asObject(request.get("params"));
+                if (params == null) throw WorkspaceApiException.invalidRequest("Navigation parameters must be an object");
+                return result(id, metadata.navigation.dispatch(method, params, id, connection));
+            } catch (WorkspaceApiException unavailable) {
+                return error(id, -32000, unavailable.getMessage(), Map.of("code", unavailable.code().name(),
+                    "outcome", unavailable.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN ? "unknown" : "rejected"));
+            } catch (RuntimeException invalid) { return error(id, -32603, "Navigation context is unavailable", Map.of("code", "INVALID_CONTEXT", "outcome", "rejected")); }
+        }
         if (metadata == null && "editor/metadata".equals(method))
             return error(id, -32000, "Metadata observation is not authorized", Map.of("code", "PERMISSION_DENIED"));
         if (metadata != null && "editor/metadata".equals(method)) {
@@ -160,6 +174,7 @@ public final class WorkspaceRpc {
     static String error(Object id, int code, String message, Map<String, Object> data) {
         return MiniJson.stringify(response(id, "error", Map.of("code", code, "message", message, "data", data)));
     }
+    static String result(Object id, Object value) { return MiniJson.stringify(response(id, "result", value)); }
     private static Map<String, Object> response(Object id, String key, Object value) {
         Map<String, Object> result = new LinkedHashMap<>(); result.put("jsonrpc", "2.0"); result.put("id", id); result.put(key, value); return result;
     }

@@ -279,6 +279,42 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
+    EditorInteraction agentNavigationInteraction;
+    EditorInteraction beginAgentNavigation() {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Navigation grant belongs to the EDT");
+        if (editorPanes.size() > EditorMetadata.MAX_PANES) throw EditorMetadata.failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        if (agentNavigationInteraction != null) agentNavigationInteraction.close();
+        agentNavigationInteraction = new EditorInteraction();
+        for (var pane : editorPanes) agentNavigationInteraction.watch(pane);
+        return agentNavigationInteraction;
+    }
+
+    void navigationContextChanged(EditorPane pane) {
+        if (agentNavigationInteraction != null) { agentNavigationInteraction.watch(pane); agentNavigationInteraction.changed(); }
+    }
+
+    EditorNavigation.State captureEditorNavigation() {
+        var metadata = captureEditorMetadata();
+        if (agentNavigationInteraction == null) throw EditorMetadata.failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+        agentNavigationInteraction.watch(getActivePane());
+        return new EditorNavigation.State(metadata, agentNavigationInteraction.revision());
+    }
+
+    private boolean allowsMachineNavigation() {
+        var focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        return editorState.mode == EditorMode.INSERT && extraSelections.isEmpty() && recordingRegister == null
+            && inputController.allowsMachineNavigation() && (!isFocused() || focused == writingArea);
+    }
+
+    EditorNavigation.Prepared prepareEditorNavigation(EditorNavigation.Command command) {
+        return EditorNavigation.prepare(getActivePane(), captureEditorNavigation(), command, allowsMachineNavigation());
+    }
+
+    EditorNavigation.Applied applyEditorNavigation(EditorNavigation.Prepared prepared, java.util.function.BooleanSupplier authorized) {
+        return EditorNavigation.apply(getActivePane(), prepared, captureEditorNavigation(), allowsMachineNavigation(), agentNavigationInteraction,
+            authorized, this::captureEditorNavigation);
+    }
+
     EditorMetadata.Context captureEditorMetadata() {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor observation belongs to the EDT");
         if (closingDown || !isDisplayable()) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
@@ -2794,6 +2830,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Mode management
     void setMode(EditorMode mode) {
+        if (agentNavigationInteraction != null) agentNavigationInteraction.changed();
         dismissAiCompletion();
         editorUiController.setMode(mode);
     }

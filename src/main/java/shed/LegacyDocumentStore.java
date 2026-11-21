@@ -32,4 +32,12 @@ final class LegacyDocumentStore {
         var file = path.toFile();
         return file.exists() ? new FileBuffer(file, config) : new FileBuffer(file.getAbsolutePath(), config);
     }
+
+    /** Internal prepared resource only; no agent route or editor installation is exposed. */
+    FileBuffer loadProjectFile(ProjectBoundFileAcquisition.RootPin approvedRoot, String relativeName,
+                               java.util.function.BooleanSupplier cancelled) throws IOException {
+        ProjectBoundFileAcquisition.Snapshot acquired = ProjectBoundFileAcquisition.acquire(
+                approvedRoot, relativeName, ProjectBoundFileAcquisition.MAX_BYTES, cancelled);
+        return new FileBuffer(acquired.path().toFile(), config, acquired);
+    }
 }

@@ -71,6 +71,11 @@ public class FileBuffer {
     }
 
     public FileBuffer(File file, ConfigManager configManager) throws IOException {
+        this(file, configManager, null);
+    }
+
+    FileBuffer(File file, ConfigManager configManager, ProjectBoundFileAcquisition.Snapshot acquired)
+            throws IOException {
         this.undoManager = new BoundedUndoManager(configManager == null
             ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
@@ -90,7 +95,8 @@ public class FileBuffer {
         this.largeFileError = null;
         this.showingPreviewOnly = false;
         this.fileSizeBytes = 0L;
-        load(configManager);
+        if (acquired == null) load(configManager);
+        else loadAcquired(acquired);
     }
 
     // Constructor for new unsaved file
@@ -191,6 +197,43 @@ public class FileBuffer {
         updateLineCount();
         this.savedContent = getFullContent();
         this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = digest(bytes);
+    }
+
+    /**
+     * Populate the ordinary document and disk baseline from already-authorized bytes.
+     * No pathname is reopened during this initial load; agent install is separate.
+     */
+    private void loadAcquired(ProjectBoundFileAcquisition.Snapshot acquired) throws IOException {
+        if (file == null || !file.toPath().toAbsolutePath().normalize().equals(acquired.path())) {
+            throw new IOException("Acquired resource does not match the requested buffer path");
+        }
+        byte[] bytes = acquired.bytes();
+        LargeFilePolicy policy = resolveLargeFilePolicy(configManager);
+        if (bytes.length > policy.maxSizeBytes
+                || ProjectBoundFileAcquisition.exceedsLineLimit(bytes, policy.maxLineCount)) {
+            throw new IOException("Project-bound loading does not support large-file projections");
+        }
+        TextFileCodec.Image decoded = TextFileCodec.decode(bytes, true);
+        this.diskTextImage = decoded;
+        this.largeFileStore = null;
+        this.largeFileError = null;
+        this.largeFile = false;
+        this.showingPreviewOnly = false;
+        this.largeFileTail = null;
+        this.fileSizeBytes = bytes.length;
+        this.explicitLineEnding = false;
+        this.encodingName = decoded.encoding();
+        this.byteOrderMark = decoded.bom();
+        this.lineEnding = detectLineEnding(decoded.rawText());
+        this.fileType = FileType.detect(file, decoded.text());
+        this.backupFile = null;
+        this.lastKnownModifiedTime = acquired.modified().toMillis();
+        setDocumentText(decoded.text(), false);
+        updateLineCount();
+        this.savedContent = getFullContent();
+        this.externalFileStamp = new ExternalFileStamp(ExternalFileKind.REGULAR, acquired.fileKey(),
+                acquired.created(), acquired.modified(), acquired.size(), null);
         this.savedDiskDigest = digest(bytes);
     }
 

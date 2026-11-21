@@ -102,15 +102,17 @@ final class EditorNavigation implements AutoCloseable {
     }
     private <T> T ui(Lease lease, Callable<T> operation, boolean mutation) {
         var stage = new AtomicInteger(); // 0 queued, 1 running, 2 completed, 3 cancelled before start
+        var released = new AtomicBoolean();
+        Runnable complete = () -> { if (released.compareAndSet(false, true)) { lease.pending.decrementAndGet(); lease.release(); } };
         var task = new FutureTask<T>(() -> {
             if (!stage.compareAndSet(0, 1)) throw fail(WorkspaceApiException.Code.CANCELLED);
             long start = System.nanoTime();
             try { return operation.call(); }
-            finally { lastEdtNanos = System.nanoTime() - start; stage.set(2); }
+            finally { lastEdtNanos = System.nanoTime() - start; stage.set(2); complete.run(); }
         });
         lease.pending.incrementAndGet();
         SwingUtilities.invokeLater(() -> {
-            try { task.run(); } finally { lease.pending.decrementAndGet(); lease.release(); }
+            try { task.run(); } finally { complete.run(); }
         });
         try { return task.get(EditorMetadata.EDT_WAIT_MILLIS, TimeUnit.MILLISECONDS); }
         catch (java.util.concurrent.TimeoutException timeout) {

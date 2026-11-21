@@ -38,15 +38,27 @@ final class EditorMetadata implements AutoCloseable {
     private final Semaphore admission = new Semaphore(1);
     private final AtomicBoolean awaitingEdt = new AtomicBoolean();
     private volatile long lastEdtNanos;
+    final EditorNavigation navigation;
 
     EditorMetadata(ApplicationStatus application, Approval approval, Host host) {
+        this(application, approval, host, null);
+    }
+
+    static EditorMetadata navigation(ApplicationStatus application, Approval approval, EditorNavigation.Host host, EditorInteraction interaction) {
+        return new EditorMetadata(application, approval, host, interaction);
+    }
+
+    private EditorMetadata(ApplicationStatus application, Approval approval, Host host, EditorInteraction interaction) {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Grant validation belongs off the EDT");
         this.application = Objects.requireNonNull(application);
         this.approval = Objects.requireNonNull(approval);
         this.host = new AtomicReference<>(Objects.requireNonNull(host));
         root = canonical(approval.root());
         rootKey = rootKey(root);
+        navigation = interaction == null ? null : new EditorNavigation(this, (EditorNavigation.Host) host, interaction);
     }
+
+    String scope() { return navigation == null ? "editor-metadata" : "editor-navigation"; }
 
     static Context capture(EditorPane pane, EditorWorkspaceDocuments documents, Path activeRoot, List<Path> roots, long generation) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor metadata belongs to the EDT");
@@ -92,7 +104,12 @@ final class EditorMetadata implements AutoCloseable {
             Context current = snapshot();
             if (!first.equals(current)) throw failure(WorkspaceApiException.Code.CONTEXT_CHANGED);
             requireLive();
-            return Map.ofEntries(Map.entry("schemaVersion", 1), Map.entry("protocolVersion", 2),
+            return result(first);
+        } finally { admission.release(); }
+    }
+
+    Map<String, Object> result(Context first) {
+        return Map.ofEntries(Map.entry("schemaVersion", 1), Map.entry("protocolVersion", 2),
                 Map.entry("instanceId", application.instanceId), Map.entry("windowId", application.windowId),
                 Map.entry("capabilities", List.of("status", "editor-metadata")), Map.entry("projectId", projectId),
                 Map.entry("paneId", first.paneId()), Map.entry("documentId", first.documentId()),
@@ -100,10 +117,9 @@ final class EditorMetadata implements AutoCloseable {
                 Map.entry("dirty", first.dirty()), Map.entry("caretOffset", first.caret()),
                 Map.entry("selectionStart", first.start()), Map.entry("selectionEnd", first.end()),
                 Map.entry("coordinateUnit", "utf-16"), Map.entry("available", true), Map.entry("valid", true));
-        } finally { admission.release(); }
     }
 
-    private void authorize(Context context) {
+    void authorize(Context context) {
         validateCoordinates(context.length(), context.revision(), context.caret(), context.start(), context.end());
         if (context.generation() != approval.generation()) { close(); throw failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED); }
         if (!approval.root().equals(context.activeRoot()) || !context.roots().contains(approval.root()))
@@ -149,11 +165,11 @@ final class EditorMetadata implements AutoCloseable {
 
     long lastEdtNanos() { return lastEdtNanos; }
     void validateAuthorization() { requireLive(); }
-    private void requireLive() {
+    void requireLive() {
         application.requireObservationReady();
         if (host.get() == null) throw failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
     }
-    @Override public void close() { host.set(null); }
+    @Override public void close() { host.set(null); if (navigation != null) navigation.close(); }
 
     private static Path canonical(Path path) {
         try {

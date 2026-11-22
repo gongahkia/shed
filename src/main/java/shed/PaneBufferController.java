@@ -483,6 +483,36 @@ final class PaneBufferController {
         openFileAsync(file, current, openValid, loadedValid, true, beforeInstall, completion);
     }
 
+    /**
+     * Internal-only prepared-file installation. External agent file opening stays disabled.
+     * Preparation happens on the existing worker path; this commit must run on the EDT.
+     * No project trust/configuration work is allowed before the final context check.
+     * A failed post-commit component operation is reported as OUTCOME_UNKNOWN.
+     */
+    ProjectDocumentInstall.Result installPreparedProjectFile(
+            ProjectDocumentInstall.Ticket ticket, LegacyDocumentStore.PreparedProjectFile prepared,
+            EditorPane targetPane, EditorNavigation.State expected,
+            java.util.function.BooleanSupplier stillAuthorized) {
+        return ProjectDocumentInstall.commit(ticket, () -> {
+            if (prepared == null || targetPane == null || expected == null || stillAuthorized == null
+                    || editor.closingDown || targetPane.isDisposed()
+                    || !editor.editorPanes.contains(targetPane) || targetPane != editor.getActivePane()
+                    || targetPane.getBuffer() == null || targetPane.getTerminalPane() != null
+                    || targetPane.getAlternateComponent() != null || targetPane.isMarkdownPreview()) return false;
+            FileBuffer loaded = prepared.buffer();
+            if (!loaded.hasFilePath() || loaded.isLargeFile()) return false;
+            if (!java.util.Objects.equals(expected.metadata().activeRoot(), prepared.root().path())) return false;
+            if (!loaded.getFile().toPath().toAbsolutePath().normalize().startsWith(prepared.root().path())) return false;
+            if (!expected.equals(editor.captureEditorNavigation())) return false;
+            return stillAuthorized.getAsBoolean();
+        }, () -> {
+            FileBuffer buffer = prepared.buffer();
+            // The normal controller reuses a live dirty buffer for the same path.
+            // Do not call applyProjectConfigurationForFile before this gate.
+            installLoadedBuffer(buffer.getFile(), buffer, null, targetPane);
+        });
+    }
+
     private void openFileAsync(File file, java.util.function.BooleanSupplier current,
                                java.util.function.Predicate<FileBuffer> openValid,
                                java.util.function.Predicate<FileBuffer> loadedValid, boolean checked, Runnable beforeInstall,

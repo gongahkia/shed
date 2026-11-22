@@ -40,4 +40,22 @@ final class LegacyDocumentStore {
                 approvedRoot, relativeName, ProjectBoundFileAcquisition.MAX_BYTES, cancelled);
         return new FileBuffer(acquired.path().toFile(), config, acquired);
     }
+
+    /** Internal provenance wrapper for A2.2.2a's checked resource acquisition. */
+    static final class PreparedProjectFile {
+        private final ProjectBoundFileAcquisition.RootPin root;
+        private final FileBuffer buffer;
+        private PreparedProjectFile(ProjectBoundFileAcquisition.RootPin root, FileBuffer buffer) {
+            this.root = java.util.Objects.requireNonNull(root);
+            this.buffer = java.util.Objects.requireNonNull(buffer);
+        }
+        ProjectBoundFileAcquisition.RootPin root() { return root; }
+        FileBuffer buffer() { return buffer; }
+    }
+
+    /** Prepare on a worker; do not install, configure, register or activate the buffer. */
+    PreparedProjectFile prepareProjectFile(ProjectBoundFileAcquisition.RootPin approvedRoot, String relativeName,
+                                           java.util.function.BooleanSupplier cancelled) throws IOException {
+        return new PreparedProjectFile(approvedRoot, loadProjectFile(approvedRoot, relativeName, cancelled));
+    }
 }

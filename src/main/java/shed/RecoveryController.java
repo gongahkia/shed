@@ -18,6 +18,16 @@ final class RecoveryController {
     private int lastWarnedDroppedEntries = -1;
     private Timer snapshotCaptureTimer;
     private final Map<FileBuffer, FileWatcherService.WatchRegistration> fileWatches = new IdentityHashMap<>();
+    // acknowledgment only; this never authorizes a save over the disk version
+    private final Map<FileBuffer, ConflictObservation> observedConflicts = new IdentityHashMap<>();
+    private record ConflictObservation(FileBuffer.ExternalFileState state,Object key,Object modified,Object created,long size) { }
+    private static ConflictObservation observeConflict(FileBuffer buffer,FileBuffer.ExternalFileState state) {
+        try {
+            var attributes=Files.readAttributes(buffer.getFile().toPath(),java.nio.file.attribute.BasicFileAttributes.class,java.nio.file.LinkOption.NOFOLLOW_LINKS);
+            return new ConflictObservation(state,attributes.fileKey(),attributes.lastModifiedTime(),attributes.creationTime(),attributes.size());
+        } catch(java.nio.file.NoSuchFileException missing) { return new ConflictObservation(state,null,null,null,0); }
+        catch(IOException unavailable) { return null; }
+    }
 
     RecoveryController(Texteditor editor) {
         this.editor = editor;
@@ -66,16 +76,19 @@ final class RecoveryController {
         int autoReloaded = 0;
         int retainedAfterDeletion = 0;
         int unsupportedExternalTargets = 0;
-        for (FileBuffer buffer : editor.buffers) {
-            if (buffer == null || !buffer.hasFilePath()) {
+        // conflict dialogs run a nested event loop and may open or close buffers
+        for (FileBuffer buffer : new ArrayList<>(editor.buffers)) {
+            if (buffer == null || !editor.buffers.contains(buffer) || !buffer.hasFilePath()) {
                 continue;
             }
             FileBuffer.ExternalFileState state = buffer.getExternalFileState();
             if (state == FileBuffer.ExternalFileState.UNCHANGED) {
+                observedConflicts.remove(buffer);
                 continue;
             }
             editor.markdownLinksChanged(buffer, true);
             if (!buffer.isModified()) {
+                observedConflicts.remove(buffer);
                 if (state == FileBuffer.ExternalFileState.EXTERNALLY_CHANGED
                     || state == FileBuffer.ExternalFileState.REPLACED) {
                     try {
@@ -102,7 +115,11 @@ final class RecoveryController {
                 }
                 continue;
             }
-            promptExternalConflictForModifiedBuffer(buffer, state);
+            var observation=observeConflict(buffer,state);
+            if(observation!=null&&observation.equals(observedConflicts.get(buffer)))continue;
+            if(observation!=null)observedConflicts.put(buffer,observation);
+            try { promptExternalConflictForModifiedBuffer(buffer, state); }
+            catch(RuntimeException failed) { observedConflicts.remove(buffer);throw failed; }
         }
         if (!hasModifiedSettingsBuffer()) {
             String configReload = editor.reloadConfigIfChanged();
@@ -549,6 +566,7 @@ final class RecoveryController {
     }
 
     void unregisterFileWatch(FileBuffer buffer) {
+        observedConflicts.remove(buffer);
         var registration = fileWatches.remove(buffer);
         if (registration != null) registration.close();
     }

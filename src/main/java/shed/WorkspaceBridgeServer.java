@@ -119,6 +119,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     boolean statusOnly() { return statusAttachment != null && metadata == null; }
     boolean metadataEnabled() { return metadata != null; }
     boolean navigationEnabled() { return metadata != null && metadata.navigation != null; }
+    boolean controlEnabled() { return metadata != null && metadata.control != null; }
     void revokeObservation() { if (metadata != null) metadata.close(); }
     ApplicationStatus statusApplication() { return applicationStatus; }
     int connectionCount() { return connections.size(); }
@@ -216,16 +217,16 @@ final class WorkspaceBridgeServer implements AutoCloseable {
             for (long sequence = 1; sequence <= WorkspaceStatusProtocol.MAX_QUERIES && !closed.get(); sequence++) {
                 ScheduledFuture<?> frameDeadline = deadline(connection, WorkspaceStatusProtocol.IDLE_MILLIS);
                 try {
-                    String request = session.unpack(WorkspaceStatusProtocol.read(input), "request", sequence);
+                    String request = session.unpack(session.read(input), "request", sequence);
                     if (statusAttachment.expired()) {
-                        WorkspaceStatusProtocol.write(output, session.pack(WorkspaceRpc.error(statusRequestId(request), -32000,
+                        session.write(output, session.pack(WorkspaceRpc.error(statusRequestId(request), -32000,
                             "Attachment has expired", Map.of("code", "SESSION_EXPIRED")), "response", sequence));
                         return;
                     }
                     String response;
                     if (navigationEnabled()) {
                         var requestActive = new AtomicBoolean(true);
-                        try { response = rpc.handle(request, () -> requestActive.get() && !closed.get() && !statusAttachment.expired()); }
+                        try { response = rpc.handle(request, () -> requestActive.get() && !closed.get() && !connection.isClosed() && !statusAttachment.expired()); }
                         finally { requestActive.set(false); }
                     } else response = rpc.handle(request);
                     boolean uncertain = navigationEnabled() && navigationMutation(request) && navigationMayHaveApplied(response);
@@ -240,12 +241,12 @@ final class WorkspaceBridgeServer implements AutoCloseable {
                         }
                     }
                     if (metadata != null) {
-                        try { WorkspaceStatusProtocol.size(response); }
+                        try { session.size(response); }
                         catch (WorkspaceApiException oversized) {
                             response = WorkspaceRpc.error(statusRequestId(request), -32000, "Observation response exceeds its limit", Map.of("code", "LIMIT_EXCEEDED"));
                         }
                     }
-                    WorkspaceStatusProtocol.write(output, session.pack(response, "response", sequence));
+                    session.write(output, session.pack(response, "response", sequence));
                 } finally { frameDeadline.cancel(false); }
             }
         }
@@ -269,7 +270,11 @@ final class WorkspaceBridgeServer implements AutoCloseable {
         try { var value = MiniJson.asObject(MiniJson.parseStrict(request)); return value != null && value.get("method") instanceof String method ? method : ""; }
         catch (IllegalArgumentException invalid) { return ""; }
     }
-    private static boolean navigationMutation(String request) { return EditorNavigation.MUTATIONS.contains(requestMethod(request)); }
+    private static boolean navigationMutation(String request) {
+        String method = requestMethod(request);
+        return EditorNavigation.MUTATIONS.contains(method)
+            || EditorControl.OPERATIONS.contains(method) && !method.equals("editor/source/read");
+    }
     private static boolean navigationMayHaveApplied(String response) {
         var value = MiniJson.asObject(MiniJson.parseStrict(response));
         if (value.containsKey("result")) return true;

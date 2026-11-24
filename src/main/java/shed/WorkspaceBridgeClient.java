@@ -49,6 +49,9 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     static WorkspaceBridgeClient navigation(Path descriptor, Path credential) throws IOException {
         return authenticated(descriptor, credential, "editor-navigation");
     }
+    static WorkspaceBridgeClient control(Path descriptor, Path credential) throws IOException {
+        return authenticated(descriptor, credential, EditorControl.SCOPE);
+    }
 
     private static WorkspaceBridgeClient authenticated(Path descriptor, Path credential, String scope) throws IOException {
         var endpoint = WorkspaceStatusAttachment.Descriptor.read(descriptor);
@@ -65,7 +68,7 @@ final class WorkspaceBridgeClient implements AutoCloseable {
             "params", Map.of("schemaVersion", 1, "projectId", statusSession.projectId())));
     }
     String navigationContextRequest() {
-        if (statusSession == null || !"editor-navigation".equals(statusSession.scope())) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
+        if (statusSession == null || !("editor-navigation".equals(statusSession.scope()) || EditorControl.SCOPE.equals(statusSession.scope()))) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
         return MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "context", "method", EditorNavigation.CONTEXT,
             "params", Map.of("schemaVersion", 1, "projectId", statusSession.projectId())));
     }
@@ -103,7 +106,7 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     private String statusExchange(String request) throws IOException {
         if (socket.isClosed()) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
         if (statusSession.expired()) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_EXPIRED);
-        WorkspaceStatusProtocol.size(request);
+        statusSession.size(request);
         Map<String, Object> original;
         try { original = MiniJson.asObject(MiniJson.parseStrict(request)); }
         catch (IllegalArgumentException invalid) { throw WorkspaceApiException.invalidRequest("Invalid status request"); }
@@ -113,13 +116,13 @@ final class WorkspaceBridgeClient implements AutoCloseable {
         long next = sequence + 1;
         if (next > WorkspaceStatusProtocol.MAX_QUERIES) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
         String frame = statusSession.pack(request, "request", next);
-        if (frame.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > WorkspaceStatusProtocol.FRAME_BYTES)
+        if (frame.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > statusSession.frameBytes())
             throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "Status frame exceeds its limit");
         ScheduledFuture<?> timeout = deadline();
         sequence = next;
         try {
-            WorkspaceStatusProtocol.write(socket.getOutputStream(), frame);
-            String payload = statusSession.unpack(WorkspaceStatusProtocol.read(input), "response", sequence);
+            statusSession.write(socket.getOutputStream(), frame);
+            String payload = statusSession.unpack(statusSession.read(input), "response", sequence);
             Map<String, Object> response = WorkspaceStatusAttachment.object(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             if (!"2.0".equals(response.get("jsonrpc")) || !id.equals(response.get("id"))
                 || !(response.keySet().equals(Set.of("jsonrpc", "id", "result")) || response.keySet().equals(Set.of("jsonrpc", "id", "error"))))
@@ -147,6 +150,7 @@ final class WorkspaceBridgeClient implements AutoCloseable {
         if ("editor/status".equals(method)) return statusSession.acceptsStatus(result);
         if ("editor/metadata".equals(method)) return statusSession.acceptsMetadata(result);
         if (EditorNavigation.CONTEXT.equals(method)) return statusSession.acceptsNavigation(result, false);
+        if (EditorControl.OPERATIONS.contains(method)) return statusSession.acceptsControl(method, result);
         if (!EditorNavigation.MUTATIONS.contains(method) || !statusSession.acceptsNavigation(result, true) || !method.equals(result.get("operation"))) return false;
         var params = MiniJson.asObject(request.get("params"));
         boolean identity = params != null && result.get("projectId").equals(params.get("projectId")) && result.get("paneId").equals(params.get("paneId"))

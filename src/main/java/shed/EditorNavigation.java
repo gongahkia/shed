@@ -92,7 +92,8 @@ final class EditorNavigation implements AutoCloseable {
 
     Map<String, Object> result(State state) {
         var value = new java.util.LinkedHashMap<>(grant.result(state.metadata()));
-        value.put("capabilities", List.of("status", "editor-metadata", "editor-navigation"));
+        value.put("capabilities", grant.control == null ? List.of("status", "editor-metadata", "editor-navigation")
+            : List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE));
         value.put("contextRevision", state.interaction()); return value;
     }
     private Host owner() {

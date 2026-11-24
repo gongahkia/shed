@@ -62,6 +62,18 @@ public final class WorkspaceRpc {
 
     private String status(Map<String, Object> request, Object id, boolean notification, String method, java.util.function.BooleanSupplier connection) {
         if (notification || id == null) return error(null, -32600, "Status requires a request ID", Map.of("code", "INVALID_REQUEST"));
+        if (metadata != null && metadata.control != null && EditorControl.OPERATIONS.contains(method)) {
+            try {
+                var params = MiniJson.asObject(request.get("params"));
+                if (params == null) throw WorkspaceApiException.invalidRequest("Control parameters must be an object");
+                return result(id, metadata.control.dispatch(method, params, connection));
+            } catch (WorkspaceApiException unavailable) {
+                return error(id, -32000, "Editor control request failed", Map.of("code", unavailable.code().name(),
+                    "outcome", unavailable.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN ? "unknown" : "rejected"));
+            } catch (RuntimeException invalid) {
+                return error(id, -32603, "Editor control request failed", Map.of("code", "INVALID_REQUEST", "outcome", "rejected"));
+            }
+        }
         if (metadata != null && metadata.navigation != null && (EditorNavigation.CONTEXT.equals(method) || EditorNavigation.MUTATIONS.contains(method))) {
             try {
                 var params = MiniJson.asObject(request.get("params"));

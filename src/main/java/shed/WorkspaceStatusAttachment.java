@@ -31,7 +31,8 @@ final class WorkspaceStatusAttachment implements AutoCloseable {
             Map<String, Object> value = object(privateBytes(file));
             if (!Long.valueOf(2).equals(value.get("schemaVersion")))
                 throw failure(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
-            boolean metadata = "editor-metadata".equals(value.get("scope")) || "editor-navigation".equals(value.get("scope"));
+            boolean metadata = "editor-metadata".equals(value.get("scope")) || "editor-navigation".equals(value.get("scope"))
+                || EditorControl.SCOPE.equals(value.get("scope"));
             Set<String> fields = metadata ? Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope", "projectId")
                 : Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope");
             if (!value.keySet().equals(fields) || !metadata && !"status".equals(value.get("scope"))

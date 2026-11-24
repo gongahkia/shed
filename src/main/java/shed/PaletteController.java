@@ -118,6 +118,7 @@ final class PaletteController {
         action("AI: Edit Selection", "agent edit", "Describe a change to selected code, then review the proposal before applying."),
         action("AI: Ask/Search", "agent ask", "Ask about the project and navigate to referenced code."),
         action("AI: Run Task", "agent run", "Request changes across files and review the proposed changes."),
+        action("Agents: Enable Reviewed Editor Control", "agent api start control", "Explicitly authorize local file opening, bounded source reads and proposed edits. Changes require review."),
         action("Go to Definition", "lsp definition", "Go to the definition at the caret."),
         action("Go to Type Definition", "lsp type definition", "Go to the type definition at the caret."),
         action("Go to Implementation", "lsp implementation", "Go to the implementation at the caret."),

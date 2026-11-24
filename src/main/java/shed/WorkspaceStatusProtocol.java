@@ -51,6 +51,18 @@ final class WorkspaceStatusProtocol {
         }
         @Override public void close() { Arrays.fill(key, (byte) 0); }
         boolean expired() { return System.currentTimeMillis() >= target.expiresAt(); }
+        int frameBytes() { return EditorControl.SCOPE.equals(scope()) ? 65536 : FRAME_BYTES; }
+        void size(String payload) {
+            int maximum = EditorControl.SCOPE.equals(scope()) ? 32768 : PAYLOAD_BYTES;
+            if (payload.getBytes(StandardCharsets.UTF_8).length > maximum)
+                throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "Attachment payload exceeds its limit");
+        }
+        String read(InputStream input) throws IOException {
+            byte[] frame = WorkspaceFrames.readComplete(input, frameBytes());
+            if (frame == null) throw new java.io.EOFException("Attachment disconnected");
+            return WorkspaceFrames.decode(frame);
+        }
+        void write(OutputStream output, String frame) throws IOException { WorkspaceFrames.write(output, frame, frameBytes()); }
         boolean acceptsStatus(Map<String, Object> value) {
             return value != null && value.keySet().equals(Set.of("schemaVersion", "protocolVersion", "instanceId", "windowId", "readiness", "authenticated", "capabilities"))
                 && Long.valueOf(1).equals(value.get("schemaVersion")) && Long.valueOf(2).equals(value.get("protocolVersion"))
@@ -60,7 +72,7 @@ final class WorkspaceStatusProtocol {
         String scope() { return target.scope(); }
         String projectId() { return target.projectId(); }
         boolean acceptsMetadata(Map<String, Object> value) {
-            if (!("editor-metadata".equals(scope()) || "editor-navigation".equals(scope())) || value == null || !value.keySet().equals(Set.of("schemaVersion", "protocolVersion",
+            if (!("editor-metadata".equals(scope()) || "editor-navigation".equals(scope()) || EditorControl.SCOPE.equals(scope())) || value == null || !value.keySet().equals(Set.of("schemaVersion", "protocolVersion",
                 "instanceId", "windowId", "capabilities", "projectId", "paneId", "documentId", "documentLength", "documentRevision",
                 "dirty", "caretOffset", "selectionStart", "selectionEnd", "coordinateUnit", "available", "valid"))) return false;
             if (!Long.valueOf(1).equals(value.get("schemaVersion")) || !Long.valueOf(2).equals(value.get("protocolVersion"))
@@ -82,8 +94,9 @@ final class WorkspaceStatusProtocol {
             return number.intValue();
         }
         boolean acceptsNavigation(Map<String, Object> value, boolean mutation) {
-            if (!"editor-navigation".equals(scope()) || value == null || !(value.get("contextRevision") instanceof Long revision) || revision < 0
-                || !List.of("status", "editor-metadata", "editor-navigation").equals(value.get("capabilities"))) return false;
+            if (!("editor-navigation".equals(scope()) || EditorControl.SCOPE.equals(scope())) || value == null || !(value.get("contextRevision") instanceof Long revision) || revision < 0
+                || !(EditorControl.SCOPE.equals(scope()) ? List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE)
+                    : List.of("status", "editor-metadata", "editor-navigation")).equals(value.get("capabilities"))) return false;
             var base = new java.util.LinkedHashMap<>(value); base.remove("contextRevision");
             base.put("capabilities", List.of("status", "editor-metadata"));
             if (mutation) {
@@ -91,6 +104,30 @@ final class WorkspaceStatusProtocol {
                     || !(base.remove("visibility") instanceof String visibility) || !Set.of("caret", "selection", "start", "range").contains(visibility)) return false;
             }
             return acceptsMetadata(base);
+        }
+
+        boolean acceptsControl(String method, Map<String, Object> value) {
+            if (!EditorControl.SCOPE.equals(scope()) || value == null || !EditorControl.OPERATIONS.contains(method)
+                    || !method.equals(value.get("operation"))
+                    || !List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE).equals(value.get("capabilities"))) return false;
+            var base = new java.util.LinkedHashMap<>(value);
+            base.remove("operation"); Object outcome = base.remove("outcome");
+            base.put("capabilities", List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE));
+            switch (method) {
+                case "editor/file/open" -> { if (!"applied".equals(outcome)) return false; }
+                case "editor/agent/activity" -> { if (!"shown".equals(outcome)) return false; }
+                case "editor/edits/propose" -> {
+                    if (!"proposed".equals(outcome) || !(base.remove("proposalId") instanceof String id)
+                            || !id.matches("proposal-[a-f0-9]{32}") || !Boolean.TRUE.equals(base.remove("reviewRequired"))) return false;
+                }
+                case "editor/source/read" -> {
+                    if (!"read".equals(outcome) || !(base.remove("content") instanceof String content) || content.length() > EditorControl.MAX_READ
+                            || !(base.remove("offset") instanceof Long offset) || !(base.remove("nextOffset") instanceof Long end)
+                            || offset < 0 || end != offset + content.length() || !(base.remove("truncated") instanceof Boolean)) return false;
+                }
+                default -> { return false; }
+            }
+            return acceptsNavigation(base, false);
         }
     }
 

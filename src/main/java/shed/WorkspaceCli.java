@@ -21,7 +21,7 @@ public final class WorkspaceCli {
     public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true);
         PrintWriter diagnostics = new PrintWriter(new OutputStreamWriter(errors, StandardCharsets.UTF_8), true);
-        boolean status = false, metadata = false, navigation = false;
+        boolean status = false, metadata = false, navigation = false, control = false;
         try {
             if (!handles(args)) throw new IllegalArgumentException("Expected --workspace-api");
             String root = null, request = null, connection = null, credential = null; boolean stdio = false;
@@ -34,14 +34,15 @@ public final class WorkspaceCli {
                     case "--credential" -> { if (credential != null || ++i == args.length) throw new IllegalArgumentException("Expected one --credential file"); credential = args[i]; }
                     case "--metadata" -> { if (metadata) throw new IllegalArgumentException("Duplicate --metadata"); metadata = true; }
                     case "--navigate" -> { if (navigation) throw new IllegalArgumentException("Duplicate --navigate"); navigation = true; }
+                    case "--control" -> { if (control) throw new IllegalArgumentException("Duplicate --control"); control = true; }
                     case "--status" -> { if (status) throw new IllegalArgumentException("Duplicate --status"); status = true; }
                     default -> throw new IllegalArgumentException("Unsupported workspace API argument");
                 }
             }
-            if (navigation) {
-                if (status || metadata || root != null || connection == null || credential == null || stdio)
+            if (navigation || control) {
+                if (navigation && control || status || metadata || root != null || connection == null || credential == null || stdio)
                     throw new IllegalArgumentException("Navigation requires one explicit descriptor and credential");
-                return navigation(Path.of(connection), Path.of(credential), request, writer);
+                return navigation(Path.of(connection), Path.of(credential), request, writer, control);
             }
             if (status || metadata) {
                 if (status && metadata || root != null || connection == null || credential == null || stdio || request != null)
@@ -63,7 +64,7 @@ public final class WorkspaceCli {
             else diagnostics.println(MiniJson.stringify(Map.of("error", error.toMap())));
             return 65;
         } catch (IllegalArgumentException invalid) {
-            if (status || metadata || navigation) {
+            if (status || metadata || navigation || control) {
                 writer.println(WorkspaceRpc.error(navigation ? "navigation" : metadata ? "metadata" : "status", -32602,
                     navigation ? "Invalid navigation arguments" : metadata ? "Invalid metadata arguments" : "Invalid status arguments", Map.of("code", "INVALID_REQUEST")));
                 return 64;
@@ -76,13 +77,14 @@ public final class WorkspaceCli {
         }
     }
 
-    private static int navigation(Path descriptor, Path credential, String request, PrintWriter output) {
+    private static int navigation(Path descriptor, Path credential, String request, PrintWriter output, boolean control) {
         boolean mutation = false;
         String response;
-        try (var client = WorkspaceBridgeClient.navigation(descriptor, credential)) {
+        try (var client = control ? WorkspaceBridgeClient.control(descriptor, credential) : WorkspaceBridgeClient.navigation(descriptor, credential)) {
             String query = request == null ? client.navigationContextRequest() : request;
             var envelope = MiniJson.asObject(MiniJson.parseStrict(query));
-            mutation = envelope != null && envelope.get("method") instanceof String method && EditorNavigation.MUTATIONS.contains(method);
+            mutation = envelope != null && envelope.get("method") instanceof String method && (EditorNavigation.MUTATIONS.contains(method)
+                || EditorControl.OPERATIONS.contains(method) && !method.equals("editor/source/read"));
             response = client.exchange(query);
         } catch (WorkspaceApiException failure) { return navigationFailure(output, "navigation", failure.code().name(), failure.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN
             || mutation && Set.of(WorkspaceApiException.Code.TIMEOUT, WorkspaceApiException.Code.SESSION_INVALID, WorkspaceApiException.Code.SESSION_EXPIRED).contains(failure.code())); }

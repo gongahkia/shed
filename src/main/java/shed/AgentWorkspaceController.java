@@ -47,8 +47,9 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "api start status" -> start(false, true);
             case "api start metadata" -> start(false, false, true);
             case "api start navigation" -> start(false, false, true, true);
+            case "api start control" -> start(false, false, true, true, true);
             case "api stop" -> stop();
-            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose|status|metadata|navigation]|status|stop";
+            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose|status|metadata|navigation|control]|status|stop";
         };
     }
 
@@ -61,9 +62,13 @@ final class AgentWorkspaceController implements AutoCloseable {
     }
 
     private String start(boolean allowProposals, boolean statusOnly, boolean metadataMode, boolean navigationMode) {
+        return start(allowProposals, statusOnly, metadataMode, navigationMode, false);
+    }
+
+    private String start(boolean allowProposals, boolean statusOnly, boolean metadataMode, boolean navigationMode, boolean controlMode) {
         if (disposed.get()) return "Agent API is unavailable while the editor closes.";
         if (active != null && active.running()) return active.statusOnly() == statusOnly && active.metadataEnabled() == metadataMode
-            && active.navigationEnabled() == navigationMode && proposalMode == allowProposals ? status
+            && active.navigationEnabled() == navigationMode && active.controlEnabled() == controlMode && proposalMode == allowProposals ? status
             : "Stop the current API before starting it with different permissions.";
         if (startingJob >= 0) return "Agent API startup is already running.";
         Path root = statusOnly ? null : editor.workspaceController.activeRoot();
@@ -81,12 +86,12 @@ final class AgentWorkspaceController implements AutoCloseable {
             if (live == null) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
             return live.captureEditorMetadata();
         };
-        EditorNavigation.Host navigationHost = navigationHost(editorOwner);
+        EditorControl.Host navigationHost = navigationHost(editorOwner, controlMode);
         long request = generation.incrementAndGet();
         stopping = false;
         Path directory = Path.of(editor.configManager.getSessionDirectory(), "agent-api");
         proposalMode = allowProposals;
-        String mode = navigationMode ? "Editor navigation" : metadataMode ? "Editor metadata" : statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
+        String mode = controlMode ? "Reviewed editor control" : navigationMode ? "Editor navigation" : metadataMode ? "Editor metadata" : statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
         AgentPolicy policy = allowProposals ? new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE),
             java.util.List.of("**/README.md"), java.util.List.of(), true) : AgentPolicy.readOnly();
         Path sessions = Path.of(editor.configManager.getSessionDirectory());
@@ -97,8 +102,16 @@ final class AgentWorkspaceController implements AutoCloseable {
             else if (metadataMode) {
                 var application = capturedStatus == null ? new ApplicationStatus(capturedReady) : capturedStatus;
                 EditorMetadata observation;
-                try { observation = navigationMode ? EditorMetadata.navigation(application, approval, navigationHost, interaction)
-                    : new EditorMetadata(application, approval, observationHost); }
+                try {
+                    if (controlMode) {
+                        var queries = editor.workspaceQueries(root, new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE),
+                            java.util.List.of("**/README.md"), java.util.List.of("**/*.env", "**/*.env.*"), true));
+                        var proposals = new WorkspaceProposalService(queries, editor.workspaceDocuments(),
+                            sessions.resolve("agent-workspace").resolve(queries.workspaceId()), "editor-control");
+                        observation = EditorMetadata.control(application, approval, navigationHost, interaction, queries, proposals);
+                    } else observation = navigationMode ? EditorMetadata.navigation(application, approval, navigationHost, interaction)
+                        : new EditorMetadata(application, approval, observationHost);
+                }
                 catch (RuntimeException failed) { if (interaction != null) interaction.close(); throw failed; }
                 try { server = WorkspaceBridgeServer.metadata(application, observation, directory, excludedRoots); }
                 catch (IOException | RuntimeException failed) { observation.close(); throw failed; }
@@ -146,8 +159,8 @@ final class AgentWorkspaceController implements AutoCloseable {
         return status;
     }
 
-    private static EditorNavigation.Host navigationHost(java.lang.ref.WeakReference<Texteditor> editorOwner) {
-        return new EditorNavigation.Host() {
+    private static EditorControl.Host navigationHost(java.lang.ref.WeakReference<Texteditor> editorOwner, boolean controlMode) {
+        return new EditorControl.Host() {
             private Texteditor owner() {
                 var live = editorOwner.get();
                 if (live == null) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
@@ -156,7 +169,22 @@ final class AgentWorkspaceController implements AutoCloseable {
             public EditorMetadata.Context capture() { return owner().captureEditorMetadata(); }
             public EditorNavigation.State state() { return owner().captureEditorNavigation(); }
             public EditorNavigation.Prepared prepare(EditorNavigation.Command command) { return owner().prepareEditorNavigation(command); }
-            public EditorNavigation.Applied apply(EditorNavigation.Prepared prepared, java.util.function.BooleanSupplier authorized) { return owner().applyEditorNavigation(prepared, authorized); }
+            public EditorNavigation.Applied apply(EditorNavigation.Prepared prepared, java.util.function.BooleanSupplier authorized) {
+                var result = owner().applyEditorNavigation(prepared, authorized);
+                if (controlMode) owner().getActivePane().agentPresentation().showPending(prepared.command().start(), prepared.command().end());
+                return result;
+            }
+            public ProjectFileOpen.Request open(ProjectBoundFileAcquisition.RootPin root, String path, EditorNavigation.State expected,
+                    java.util.function.BooleanSupplier current, java.util.function.Consumer<ProjectDocumentInstall.Result> completed) {
+                return owner().openAgentProjectFile(root, path, expected, current, completed);
+            }
+            public void activity(int start, int end) {
+                var presentation = owner().getActivePane().agentPresentation();
+                if (!presentation.available()) throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                presentation.showPending(start, end);
+            }
+            public void review(String proposal) { owner().toolWindowHost.showAgentProposal(proposal); }
+            public void clearActivity() { var live = editorOwner.get(); if (live != null) live.clearAgentActivity(); }
         };
     }
 

@@ -315,6 +315,13 @@ public class Texteditor extends JFrame implements KeyListener {
             authorized, this::captureEditorNavigation);
     }
 
+    ProjectFileOpen.Request openAgentProjectFile(ProjectBoundFileAcquisition.RootPin root, String path,
+            EditorNavigation.State expected, java.util.function.BooleanSupplier current,
+            java.util.function.Consumer<ProjectDocumentInstall.Result> completed) {
+        return paneBufferController.openProjectFileAsync(root, path, getActivePane(), expected,
+            () -> current.getAsBoolean() && allowsMachineNavigation(), completed);
+    }
+
     void clearAgentActivity() { for (var pane : editorPanes) pane.clearAgentPresentation(); }
 
     void agentEditsApplied(WorkspaceProposalService.Preview preview) {

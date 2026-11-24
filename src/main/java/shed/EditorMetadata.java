@@ -39,6 +39,7 @@ final class EditorMetadata implements AutoCloseable {
     private final AtomicBoolean awaitingEdt = new AtomicBoolean();
     private volatile long lastEdtNanos;
     final EditorNavigation navigation;
+    EditorControl control;
 
     EditorMetadata(ApplicationStatus application, Approval approval, Host host) {
         this(application, approval, host, null);
@@ -46,6 +47,13 @@ final class EditorMetadata implements AutoCloseable {
 
     static EditorMetadata navigation(ApplicationStatus application, Approval approval, EditorNavigation.Host host, EditorInteraction interaction) {
         return new EditorMetadata(application, approval, host, interaction);
+    }
+
+    static EditorMetadata control(ApplicationStatus application, Approval approval, EditorControl.Host host,
+            EditorInteraction interaction, WorkspaceQueryService workspace, WorkspaceProposalService proposals) throws java.io.IOException {
+        var grant = new EditorMetadata(application, approval, host, interaction);
+        try { grant.control = new EditorControl(grant, host, workspace, proposals); return grant; }
+        catch (java.io.IOException | RuntimeException failed) { grant.close(); throw failed; }
     }
 
     private EditorMetadata(ApplicationStatus application, Approval approval, Host host, EditorInteraction interaction) {
@@ -58,7 +66,7 @@ final class EditorMetadata implements AutoCloseable {
         navigation = interaction == null ? null : new EditorNavigation(this, (EditorNavigation.Host) host, interaction);
     }
 
-    String scope() { return navigation == null ? "editor-metadata" : "editor-navigation"; }
+    String scope() { return control != null ? EditorControl.SCOPE : navigation == null ? "editor-metadata" : "editor-navigation"; }
     void requireIdentity(String instance, String window) {
         if (!application.instanceId.equals(instance) || !application.windowId.equals(window)) throw failure(WorkspaceApiException.Code.UNAUTHORIZED);
     }
@@ -172,7 +180,7 @@ final class EditorMetadata implements AutoCloseable {
         application.requireObservationReady();
         if (host.get() == null) throw failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
     }
-    @Override public void close() { host.set(null); if (navigation != null) navigation.close(); }
+    @Override public void close() { host.set(null); if (control != null) control.close(); if (navigation != null) navigation.close(); }
 
     private static Path canonical(Path path) {
         try {

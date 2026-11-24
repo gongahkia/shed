@@ -229,7 +229,7 @@ final class ProjectBoundFileAcquisition {
         return false;
     }
 
-    private static Path checkedRelativePath(String name) throws IOException {
+    static Path checkedRelativePath(String name) throws IOException {
         if (name == null || name.isBlank() || name.length() > 8192 || name.indexOf('\0') >= 0
                 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0) {
             throw new IOException("A bounded project-relative file name is required");

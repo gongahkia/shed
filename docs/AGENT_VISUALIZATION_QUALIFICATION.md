@@ -58,3 +58,7 @@ Windows/Linux desktop behavior, other display scales, very large workspaces, lon
 Automatic conflict acknowledgment compares disk metadata, not a new content-security identity. Existing save-time content/disk checks remain authoritative; metadata acknowledgment does not authorize saving or claim to detect every same-size/restored-timestamp external edit.
 
 README was never edited. Before/after SHA-256: `48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`. All work is local; no push.
+
+## Subsequent config, move and motion work
+
+The safe-dotfile and edited-move omissions above are superseded for the bounded supported subset by [the motion qualification](AGENT_CHANGE_MOTION.md). Binary comparisons and a Git-operation/session timeline remain deferred. Earlier evidence is preserved.

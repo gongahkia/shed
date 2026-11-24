@@ -1,0 +1,153 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "c9cb18c7cdcd646bff8fd7e4ebfe2bed036601a54b83cac2b165f6c98f09dbf6",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-pff9urc8",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "9ebfc2266dcc7f051e48c28752fb6a62c36e2253ca3de8e29a4a39a534cbf2f0",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-pff9urc8/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-pff9urc8/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-pff9urc8/run/config",
+    "-cp",
+    "/private/tmp/shed-native-pff9urc8/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-pff9urc8/run/live",
+    "/private/tmp/shed-native-pff9urc8/run/project"
+  ],
+  "pid": 54524,
+  "live_codex": {
+    "exit": 0,
+    "cli_exit": 0,
+    "expected_changes_present": true,
+    "item_types": [
+      "",
+      "agent_message",
+      "file_change"
+    ],
+    "elapsed_s": 10.246756540997012,
+    "events": [
+      {
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "/private/tmp/shed-native-pff9urc8/run/project/ModelBlocks.java",
+            "kind": "update"
+          }
+        ]
+      },
+      {
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "/private/tmp/shed-native-pff9urc8/run/project/ModelBlocks.java",
+            "kind": "update"
+          }
+        ]
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 25991,
+          "cached_input_tokens": 22528,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 190,
+          "reasoning_output_tokens": 0
+        },
+        "message": ""
+      }
+    ],
+    "environment": "disposable HOME/XDG/history; only copied auth; ignored user config; shell tools/hooks/plugins disabled",
+    "stderr": "",
+    "auth_source_content_unchanged": true,
+    "auth_source_mtime_unchanged": true
+  },
+  "exit": 1,
+  "log": "LIVE_READY\n{following=true, files=1, baseline=Since watch started, kind=watch, agent=Codex, ready=true, watching=true} active=/private/tmp/shed-native-pff9urc8/run/project/ModelBlocks.java loaded=true activity=null\njava.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyModelTour(AgentWorkflowDesktopProbe.java:128)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:231)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:341)\n",
+  "result": {
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out",
+    "events": [
+      {
+        "converge_ms": 2336.366917,
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 212.890125,
+        "phase": "5000_file_atomic_burst"
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 8.095542,
+        "first_ms": 3.507625,
+        "samples_ms": [
+          3.507625,
+          1.01025,
+          1.180958,
+          7.064041,
+          4.078958,
+          0.758417,
+          0.936292,
+          6.570584,
+          8.095542,
+          2.384667,
+          0.490667,
+          0.412291,
+          0.436708,
+          0.393625,
+          0.403834,
+          0.40175,
+          0.452458,
+          8.191458,
+          0.471125,
+          3.915625,
+          0.395334
+        ]
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "cycles": 24,
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "heap_before": 82590520,
+        "retained_watchers": 0,
+        "phase": "watch_start_stop_cycles",
+        "heap_after_diagnostic_gc": 17353496,
+        "cycles": 12,
+        "exact": true
+      },
+      {
+        "phase": "safe_configs_moves_tree_badges",
+        "changes": 6,
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "git_same_status_patch_refresh"
+      }
+    ],
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 120.17282729200087
+}

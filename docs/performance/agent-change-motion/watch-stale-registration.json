@@ -1,0 +1,99 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "7aa4d9d8c229c027aaf0587bb795d2538474c68d4ad04b5b34a615c50d0273e1",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-5ryswjvj",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "6c3d1fd208d0f537eb9b737ad4c108629592dd5daa9fa61dfc147190cceed3b9",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-5ryswjvj/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-5ryswjvj/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-5ryswjvj/run/config",
+    "-cp",
+    "/private/tmp/shed-native-5ryswjvj/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-5ryswjvj/run/live",
+    "/private/tmp/shed-native-5ryswjvj/run/project"
+  ],
+  "pid": 51446,
+  "exit": 2,
+  "error": "Workbench did not reach real Codex phase",
+  "log": "LIVE_READY\n{files=0, baseline=Since watch started, kind=watch, agent=Codex, ready=true, watching=true, following=false}\nroot=/private/tmp/shed-native-5ryswjvj/run/project\nbusy=false\ndirty=false\ngeneration=42\nrootsGeneration=1\nstate=Watching \u00b7 Codex \u00b7 4992 baseline files\noriginal=files=4992 gitignore=File[text=ignored-build/\n, digest=8adcab72a550b39c1048fabe00719cc2686a72174a68d3e8935ea772a3fe49cc, textual=true, identity=Identity[key=(dev=1000010,ino=168665553), created=2026-11-24T13:50:08Z]] old=true new=false\nlatest=files=4992 gitignore=File[text=ignored-build/\n, digest=8adcab72a550b39c1048fabe00719cc2686a72174a68d3e8935ea772a3fe49cc, textual=true, identity=Identity[key=(dev=1000010,ino=168665553), created=2026-11-24T13:50:08Z]] old=true new=false\nwatch.root=/private/tmp/shed-native-5ryswjvj/run/project\nwatch.directories=[/private/tmp/shed-native-5ryswjvj/run/project/qualification, /private/tmp/shed-native-5ryswjvj/run/project/.github/workflows, /private/tmp/shed-native-5ryswjvj/run/project/before-folder, /private/tmp/shed-native-5ryswjvj/run/project, /private/tmp/shed-native-5ryswjvj/run/project/.github]\nwatch.thread=BLOCKED\njava.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyMotion(AgentWorkflowDesktopProbe.java:99)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:224)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:338)\n",
+  "result": {
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out",
+    "events": [
+      {
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 170.551916,
+        "phase": "5000_file_atomic_burst",
+        "converge_ms": 2377.150833
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 0.965333,
+        "first_ms": 2.793208,
+        "samples_ms": [
+          2.793208,
+          1.130416,
+          0.965333,
+          0.798541,
+          0.773542,
+          0.7225,
+          0.781958,
+          0.804375,
+          0.759833,
+          0.731375,
+          0.468375,
+          0.480583,
+          0.551958,
+          0.486542,
+          0.36525,
+          0.437958,
+          0.350708,
+          0.417459,
+          0.393541,
+          0.469917,
+          0.363459
+        ]
+      },
+      {
+        "phase": "same_file_conflict_view_both_save_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "human_edit_during_delayed_follow",
+        "exact": true
+      },
+      {
+        "phase": "light_dark_narrow_density_focus_three_splits",
+        "exact": true
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "cycles": 24,
+        "exact": true
+      },
+      {
+        "phase": "custom_ui_editor_fonts_hit_testing",
+        "exact": true
+      },
+      {
+        "heap_before": 80181040,
+        "retained_watchers": 0,
+        "phase": "watch_start_stop_cycles",
+        "heap_after_diagnostic_gc": 17306080,
+        "cycles": 12,
+        "exact": true
+      }
+    ],
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 28.462481457998365
+}

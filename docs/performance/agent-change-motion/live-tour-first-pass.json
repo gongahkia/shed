@@ -1,0 +1,170 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "022319039bdcbff3206b07823d82f7f9a9798214bbbb99d68502ea2f46806b1e",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-80_stff4",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "67df6ada3a00ec5aa016e67b5028d597214aef211b55cec2a57d52bd80f94dca",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-80_stff4/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-80_stff4/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-80_stff4/run/config",
+    "-cp",
+    "/private/tmp/shed-native-80_stff4/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-80_stff4/run/live",
+    "/private/tmp/shed-native-80_stff4/run/project"
+  ],
+  "pid": 49029,
+  "live_codex": {
+    "exit": 0,
+    "cli_exit": 0,
+    "expected_changes_present": true,
+    "item_types": [
+      "",
+      "agent_message",
+      "file_change"
+    ],
+    "elapsed_s": 9.979932124999323,
+    "events": [
+      {
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "/private/tmp/shed-native-80_stff4/run/project/ModelBlocks.java",
+            "kind": "update"
+          }
+        ]
+      },
+      {
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "/private/tmp/shed-native-80_stff4/run/project/ModelBlocks.java",
+            "kind": "update"
+          }
+        ]
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 25965,
+          "cached_input_tokens": 22528,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 209,
+          "reasoning_output_tokens": 25
+        },
+        "message": ""
+      }
+    ],
+    "environment": "disposable HOME/XDG/history; only copied auth; ignored user config; shell tools/hooks/plugins disabled",
+    "stderr": "",
+    "auth_source_content_unchanged": true,
+    "auth_source_mtime_unchanged": true
+  },
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "live_window": true,
+    "events": [
+      {
+        "baseline_ms": 179.784209,
+        "exact": true,
+        "changes": 142,
+        "converge_ms": 2361.776875,
+        "phase": "5000_file_atomic_burst"
+      },
+      {
+        "first_ms": 2.615375,
+        "warm_p95_ms": 3.288875,
+        "phase": "5000_file_watch_typing",
+        "samples_ms": [
+          2.615375,
+          3.288875,
+          3.745375,
+          0.762167,
+          0.752792,
+          0.668541,
+          0.709041,
+          0.626083,
+          0.751833,
+          0.613917,
+          0.480667,
+          0.437459,
+          0.450708,
+          0.425417,
+          0.393834,
+          0.369667,
+          0.408417,
+          0.386959,
+          0.390125,
+          0.415625,
+          0.471666
+        ]
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "cycles": 24,
+        "phase": "animation_cycles_and_real_expiration",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 16969728,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0,
+        "heap_before": 42344512,
+        "exact": true
+      },
+      {
+        "changes": 6,
+        "phase": "safe_configs_moves_tree_badges",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "git_same_status_patch_refresh"
+      },
+      {
+        "phase": "actual_model_three_block_scroll_tour",
+        "caret_preserved": true,
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "manual_scroll_cancels_native_tour"
+      },
+      {
+        "phase": "save_and_attachment_cleanup",
+        "descendants": 0,
+        "exact": true
+      }
+    ],
+    "state": "PASS",
+    "capture": "owned Swing root pane"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 30.28883449999921
+}

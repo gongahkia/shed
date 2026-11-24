@@ -1,0 +1,98 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "7aa4d9d8c229c027aaf0587bb795d2538474c68d4ad04b5b34a615c50d0273e1",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-lp3t3z5v",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "c07075e40e5d856e758269c5acb5cb818603a1d2a1b9e034971d719af86f92a7",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-lp3t3z5v/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-lp3t3z5v/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-lp3t3z5v/run/config",
+    "-cp",
+    "/private/tmp/shed-native-lp3t3z5v/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-lp3t3z5v/run/live",
+    "/private/tmp/shed-native-lp3t3z5v/run/project"
+  ],
+  "pid": 52755,
+  "exit": 1,
+  "log": "LIVE_READY\n{kind=watch, baseline=Since watch started, files=0, following=false, watching=true, ready=true, agent=Codex}\nroot=/private/tmp/shed-native-lp3t3z5v/run/project\nbusy=false\ndirty=false\ngeneration=42\nrootsGeneration=1\nstate=Watching \u00b7 Codex \u00b7 4992 baseline files\noriginal=files=4992 gitignore=File[text=ignored-build/\n, digest=8adcab72a550b39c1048fabe00719cc2686a72174a68d3e8935ea772a3fe49cc, textual=true, identity=Identity[key=(dev=1000010,ino=168678363), created=2026-11-24T13:52:28Z]] old=true new=false\nlatest=files=4992 gitignore=File[text=ignored-build/\n, digest=8adcab72a550b39c1048fabe00719cc2686a72174a68d3e8935ea772a3fe49cc, textual=true, identity=Identity[key=(dev=1000010,ino=168678363), created=2026-11-24T13:52:28Z]] old=true new=false\nwatch.root=/private/tmp/shed-native-lp3t3z5v/run/project\nwatch.directories=[/private/tmp/shed-native-lp3t3z5v/run/project, /private/tmp/shed-native-lp3t3z5v/run/project/.github, /private/tmp/shed-native-lp3t3z5v/run/project/.github/workflows, /private/tmp/shed-native-lp3t3z5v/run/project/qualification, /private/tmp/shed-native-lp3t3z5v/run/project/before-folder]\nwatch.thread=BLOCKED [java.base/sun.nio.fs.PollingWatchService$PollingWatchKey.disable(PollingWatchService.java:312), java.base/sun.nio.fs.PollingWatchService.doPrivilegedRegister(PollingWatchService.java:183), java.base/sun.nio.fs.PollingWatchService$2.run(PollingWatchService.java:143), java.base/sun.nio.fs.PollingWatchService$2.run(PollingWatchService.java:140), java.base/java.security.AccessController.doPrivileged(AccessController.java:571), java.base/sun.nio.fs.PollingWatchService.register(PollingWatchService.java:139), java.base/sun.nio.fs.UnixPath.register(UnixPath.java:965), java.base/java.nio.file.Path.register(Path.java:896), shed.TestWatchService.register(TestWatchService.java:102), shed.TestWatchService$1.preVisitDirectory(TestWatchService.java:86), shed.TestWatchService$1.preVisitDirectory(TestWatchService.java:82), java.base/java.nio.file.Files.walkFileTree(Files.java:2805), shed.TestWatchService.registerTree(TestWatchService.java:82), shed.TestWatchService.watch(TestWatchService.java:127), java.base/java.lang.VirtualThread.run(VirtualThread.java:329)]\nprovider BLOCKED [java.base@21.0.13.1/sun.nio.fs.PollingWatchService$PollingWatchKey.cancel(PollingWatchService.java:321), java.base@21.0.13.1/sun.nio.fs.PollingWatchService$PollingWatchKey.poll(PollingWatchService.java:344), java.base@21.0.13.1/sun.nio.fs.PollingWatchService$PollingWatchKey$1.run(PollingWatchService.java:302), java.base@21.0.13.1/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572), java.base@21.0.13.1/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:358), java.base@21.0.13.1/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305), java.base@21.0.13.1/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144), java.base@21.0.13.1/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642), java.base@21.0.13.1/java.lang.Thread.runWith(Thread.java:1596), java.base@21.0.13.1/java.lang.Thread.run(Thread.java:1583)]\njava.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyMotion(AgentWorkflowDesktopProbe.java:99)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:224)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:339)\n",
+  "result": {
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out",
+    "state": "FAIL",
+    "events": [
+      {
+        "exact": true,
+        "changes": 142,
+        "converge_ms": 2359.419125,
+        "phase": "5000_file_atomic_burst",
+        "baseline_ms": 176.040458
+      },
+      {
+        "warm_p95_ms": 5.514417,
+        "phase": "5000_file_watch_typing",
+        "samples_ms": [
+          2.572292,
+          0.909167,
+          0.785083,
+          5.514417,
+          8.219333,
+          0.815584,
+          0.682542,
+          0.734541,
+          0.675583,
+          0.651209,
+          0.503708,
+          0.406583,
+          0.458417,
+          0.4745,
+          0.361209,
+          0.398458,
+          0.360792,
+          0.354041,
+          0.335625,
+          0.346834,
+          0.388667
+        ],
+        "first_ms": 2.572292
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "exact": true,
+        "cycles": 24
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "retained_watchers": 0,
+        "heap_before": 41267424,
+        "exact": true,
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 16933616,
+        "phase": "watch_start_stop_cycles"
+      }
+    ]
+  },
+  "fixture_removed": true,
+  "elapsed_s": 30.12890370799869
+}

@@ -1,0 +1,99 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "c80b598ac078db8d72f51ebfdd15c0da092b0dc57e2124feaa4daef068b6c29d",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-2z36xtn7",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "4d39e34537eca3d41ef51b8584f48c53b1fd9794d778b2e305ee0b721f749b40",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-2z36xtn7/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-2z36xtn7/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-2z36xtn7/run/config",
+    "-cp",
+    "/private/tmp/shed-native-2z36xtn7/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-2z36xtn7/run/live",
+    "/private/tmp/shed-native-2z36xtn7/run/project"
+  ],
+  "pid": 45120,
+  "exit": 2,
+  "error": "Workbench did not reach real Codex phase",
+  "log": "LIVE_READY\njava.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyMotion(AgentWorkflowDesktopProbe.java:99)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:220)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:324)\n",
+  "result": {
+    "state": "FAIL",
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out",
+    "events": [
+      {
+        "phase": "5000_file_atomic_burst",
+        "converge_ms": 2407.117334,
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 203.648125
+      },
+      {
+        "samples_ms": [
+          4.995584,
+          7.985417,
+          2.92975,
+          1.007084,
+          7.496791,
+          1.335083,
+          0.870167,
+          0.82825,
+          7.651084,
+          0.450666,
+          0.554,
+          6.400084,
+          0.594875,
+          0.57025,
+          0.476042,
+          0.433875,
+          0.43475,
+          0.442375,
+          0.451709,
+          0.404291,
+          0.427875
+        ],
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 7.651084,
+        "first_ms": 4.995584
+      },
+      {
+        "phase": "same_file_conflict_view_both_save_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "human_edit_during_delayed_follow",
+        "exact": true
+      },
+      {
+        "phase": "light_dark_narrow_density_focus_three_splits",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "animation_cycles_and_real_expiration",
+        "cycles": 24
+      },
+      {
+        "phase": "custom_ui_editor_fonts_hit_testing",
+        "exact": true
+      },
+      {
+        "cycles": 12,
+        "exact": true,
+        "heap_before": 42342144,
+        "retained_watchers": 0,
+        "phase": "watch_start_stop_cycles",
+        "heap_after_diagnostic_gc": 16897384
+      }
+    ]
+  },
+  "fixture_removed": true,
+  "elapsed_s": 30.224450500001694
+}

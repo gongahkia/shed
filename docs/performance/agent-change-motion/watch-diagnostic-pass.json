@@ -1,0 +1,115 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "7aa4d9d8c229c027aaf0587bb795d2538474c68d4ad04b5b34a615c50d0273e1",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-4e09n22_",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "6c3d1fd208d0f537eb9b737ad4c108629592dd5daa9fa61dfc147190cceed3b9",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-4e09n22_/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-4e09n22_/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-4e09n22_/run/config",
+    "-cp",
+    "/private/tmp/shed-native-4e09n22_/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-4e09n22_/run/live",
+    "/private/tmp/shed-native-4e09n22_/run/project"
+  ],
+  "pid": 50630,
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "events": [
+      {
+        "changes": 142,
+        "converge_ms": 2406.21875,
+        "phase": "5000_file_atomic_burst",
+        "baseline_ms": 207.530167,
+        "exact": true
+      },
+      {
+        "samples_ms": [
+          4.925,
+          6.403917,
+          1.091125,
+          1.1945,
+          6.271667,
+          2.15525,
+          3.414541,
+          1.193333,
+          1.072417,
+          0.988375,
+          0.612292,
+          0.54775,
+          0.589666,
+          0.887417,
+          0.54725,
+          0.472416,
+          0.485042,
+          0.444959,
+          0.527958,
+          0.471708,
+          0.490917
+        ],
+        "first_ms": 4.925,
+        "warm_p95_ms": 6.271667,
+        "phase": "5000_file_watch_typing"
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "exact": true,
+        "cycles": 24
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "heap_before": 50499536,
+        "exact": true,
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 16890984,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0
+      },
+      {
+        "phase": "safe_configs_moves_tree_badges",
+        "exact": true,
+        "changes": 6
+      },
+      {
+        "exact": true,
+        "phase": "git_same_status_patch_refresh"
+      },
+      {
+        "phase": "save_and_attachment_cleanup",
+        "descendants": 1,
+        "exact": true
+      }
+    ],
+    "state": "PASS",
+    "capture": "owned Swing root pane",
+    "live_window": true
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 19.40298483299921
+}

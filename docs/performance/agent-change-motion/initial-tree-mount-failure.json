@@ -1,0 +1,98 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "d156168a8bab20f9b86e3b1c5faea5affabebb45b7da25af053add60fd5e20d0",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-sb0gbomw",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "f1134d573e6bfacdaa5204a77c95e87c2cc5219a921c91e3937c3cd6a4d05ac8",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-sb0gbomw/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-sb0gbomw/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-sb0gbomw/run/config",
+    "-cp",
+    "/private/tmp/shed-native-sb0gbomw/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-sb0gbomw/run/live",
+    "/private/tmp/shed-native-sb0gbomw/run/project"
+  ],
+  "pid": 41986,
+  "exit": 1,
+  "log": "LIVE_READY\njava.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyMotion(AgentWorkflowDesktopProbe.java:99)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:217)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:321)\n",
+  "result": {
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out",
+    "events": [
+      {
+        "converge_ms": 2392.671958,
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 180.839,
+        "phase": "5000_file_atomic_burst"
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 4.492209,
+        "first_ms": 2.831125,
+        "samples_ms": [
+          2.831125,
+          0.959375,
+          4.492209,
+          4.801708,
+          0.816083,
+          0.743708,
+          0.830042,
+          0.651542,
+          0.635583,
+          0.544791,
+          0.456125,
+          0.442,
+          0.419792,
+          0.469208,
+          0.4085,
+          0.383541,
+          0.3815,
+          0.431208,
+          0.406917,
+          0.369458,
+          0.420292
+        ]
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "cycles": 24,
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "heap_before": 49333904,
+        "retained_watchers": 0,
+        "phase": "watch_start_stop_cycles",
+        "heap_after_diagnostic_gc": 16941040,
+        "cycles": 12,
+        "exact": true
+      }
+    ],
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 27.33746633299961
+}

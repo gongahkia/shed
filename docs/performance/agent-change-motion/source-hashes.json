@@ -1,0 +1,28 @@
+{
+  "implementation_head": "479da175517c9c33d0bd45f4cea08a3bbf7cf677",
+  "files": {
+    "scripts/test-agent-desktop.py": "60dd3d1aa460cde65c57206041f77eb9dd742d41ff142679714ec5f76b42be01",
+    "scripts/test_live_agent_tooling.py": "2f507748f0a3cf09df2e86b60be2bcd9e83b18694178ca243aea76c888daa281",
+    "scripts/test_native_fixture.py": "31ae9aa0222470a9dc678acd3a253bc2a54dc1cc42e5f15e7c0929343d29a1d9",
+    "src/benchmark/java/shed/AgentWorkflowDesktopProbe.java": "1875487bbe7300d39ee9d9ace89f6d7ee68863db8623defd8874d96e04686398",
+    "src/main/java/shed/AgentChangeTour.java": "6d50f23dae1a2a965b10b2fc3a9dee274c1f9a0ff546b50ee2d9537130eed2cc",
+    "src/main/java/shed/AgentEditPresentation.java": "f166b7823a595b65d5c86a79f1ed3adbf22855f7c3463ad75bffba7869eacdfd",
+    "src/main/java/shed/AgentWorkbenchPanel.java": "21b0456f40679fdffc8890f8caf701bb2df9bdcb06194fae425ccd535437eb1e",
+    "src/main/java/shed/ChangeDiffView.java": "658de132a318286f0f9a163a6822d193a672a248a84179f54fd8a5e6f0b8a699",
+    "src/main/java/shed/ChangePulse.java": "a7a554ff1633db89e4ebbbf4b274e0287b43ba0528b43633b236ff7edf2bef57",
+    "src/main/java/shed/EditorUiController.java": "cb9c67302db59d5ab61ba7e16ab328c76c1dd538f8ad9ac3654a8285314a4f31",
+    "src/main/java/shed/ExternalChangeSnapshot.java": "ace5ce210356a59fdb461b0c4b5a0a3a5897ecd7ef6506b35dd6f6bdc2eebf5f",
+    "src/main/java/shed/FileChangeMarks.java": "050fa72a893edf875e0482305d0146a61c70cf1281b1352ee34b70e5dcf56b14",
+    "src/main/java/shed/FileTreePanel.java": "799d46a9f6d89fdd8a02c63370f440fe2571abce1edbbad037c6cb13dda73bd9",
+    "src/main/java/shed/GitChangesToolPanel.java": "563802c625998e1a8f7ba9b0f784630a7950072aa83f476f29bac73db3f7a1c8",
+    "src/main/java/shed/LiveChangesPanel.java": "70eb045d6f51bc28e677580943b6bde27df567a3df74a316b04cad04df71d247",
+    "src/main/java/shed/RecoveryController.java": "d0994d41e2415f29c6eb7ba6b588161fd07bced8d23ce5d28e3b1b2e78531691",
+    "src/main/java/shed/TestWatchService.java": "e098f90b0d4470bb0f9b477b697fed834ee8f06ef46c9b0e14121012a774f7fa",
+    "src/main/java/shed/ToolWindowHost.java": "82e7dce3f695420f6ad5ab6a7086da2b5eae57819674be61e3aff3725005c02d",
+    "src/main/java/shed/TreeGitController.java": "1b5d2d7931dde0a936d32ce4171d852dfbe8879ff361ec6c01bcc14914d2c959",
+    "src/test/java/shed/AgentChangeTourTest.java": "665dc4a298699ebe66d40cc2c603976d8b6caf66d6ccbe54c9644ecb4797f026",
+    "src/test/java/shed/ExternalChangeSnapshotTest.java": "d016678d57437ebf4efb16fe0faa57d72b041cba70e5529554a3fbf9dff481bb",
+    "src/test/java/shed/TestWatchServiceTest.java": "a99708f79ca9e3b0f838a13428f7d7a6870095f774cca53687e4aac9adb79b4b",
+    "src/test/resources/shed/portable-fixture-tests.properties": "b2dff3aef89ee59604b52d7f120aae92e04fa78e0870e7c0a13468ed59040259"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "01b4e5d07370ed4622fd0954364f7b6b34c6abd182a04474fe19189fa6840233",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-6v3bdt99",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-6v3bdt99/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-6v3bdt99/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-6v3bdt99/run/config",
+    "-cp",
+    "/private/tmp/shed-native-6v3bdt99/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-6v3bdt99/run/live",
+    "/private/tmp/shed-native-6v3bdt99/run/project"
+  ],
+  "pid": 78454,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"paneId\": \"pane-2c3db8e5-7f1a-428d-8a81-853ee6627184\", \"documentLength\": 107, \"available\": true, \"windowId\": \"b19a2d02-139d-45d8-a63f-5a429546e459\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"f0b5b7b4-9c54-4fa4-9fd7-34995c6d2624\", \"projectId\": \"project-e6757e9d-ac16-410a-98be-611abacb1070\", \"schemaVersion\": 1, \"documentId\": \"buffer-5e90968e-aa71-4ed9-9703-46a6af87305e\", \"caretOffset\": 0, \"selectionStart\": 0, \"contextRevision\": 9, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"paneId\": \"pane-2c3db8e5-7f1a-428d-8a81-853ee6627184\", \"documentLength\": 107, \"available\": true, \"windowId\": \"b19a2d02-139d-45d8-a63f-5a429546e459\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"f0b5b7b4-9c54-4fa4-9fd7-34995c6d2624\", \"projectId\": \"project-e6757e9d-ac16-410a-98be-611abacb1070\", \"schemaVersion\": 1, \"documentId\": \"buffer-5e90968e-aa71-4ed9-9703-46a6af87305e\", \"caretOffset\": 0, \"selectionStart\": 0, \"contextRevision\": 9, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"paneId\": \"pane-2c3db8e5-7f1a-428d-8a81-853ee6627184\", \"documentLength\": 107, \"available\": true, \"windowId\": \"b19a2d02-139d-45d8-a63f-5a429546e459\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"f0b5b7b4-9c54-4fa4-9fd7-34995c6d2624\", \"projectId\": \"project-e6757e9d-ac16-410a-98be-611abacb1070\", \"schemaVersion\": 1, \"documentId\": \"buffer-5e90968e-aa71-4ed9-9703-46a6af87305e\", \"caretOffset\": 0, \"selectionStart\": 0, \"contextRevision\": 9, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"paneId\": \"pane-2c3db8e5-7f1a-428d-8a81-853ee6627184\", \"documentLength\": 107, \"available\": true, \"windowId\": \"b19a2d02-139d-45d8-a63f-5a429546e459\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"f0b5b7b4-9c54-4fa4-9fd7-34995c6d2624\", \"projectId\": \"project-e6757e9d-ac16-410a-98be-611abacb1070\", \"schemaVersion\": 1, \"documentId\": \"buffer-5e90968e-aa71-4ed9-9703-46a6af87305e\", \"caretOffset\": 0, \"selectionStart\": 0, \"contextRevision\": 9, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-73bdb38444d8e20585506302812d4ddc\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "state": "PASS",
+    "events": [
+      {
+        "exact": true,
+        "human_color": -13213771,
+        "agent_color": -14188196,
+        "phase": "review_apply_undo_redo"
+      },
+      {
+        "phase": "actual_window_typing",
+        "warm_p95_ms": 1.2505,
+        "first_ms": 0.81775,
+        "samples_ms": [
+          0.81775,
+          0.686125,
+          1.647833,
+          1.2505,
+          0.680417,
+          0.734917,
+          0.551708,
+          0.732083,
+          0.549125,
+          0.521417,
+          0.620834,
+          0.567084,
+          0.600709,
+          0.499833,
+          0.659125,
+          0.628875,
+          0.692166,
+          0.495167,
+          0.457959,
+          0.419125,
+          0.498542
+        ]
+      },
+      {
+        "message": "Saving\u2026",
+        "phase": "save_acknowledgement"
+      },
+      {
+        "exact": true,
+        "height": 318,
+        "phase": "scoped_feedback_progress_and_preview",
+        "width": 512
+      },
+      {
+        "descendants": 0,
+        "phase": "save_and_attachment_cleanup",
+        "exact": true
+      }
+    ],
+    "live_window": true,
+    "capture": "owned Swing root pane"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 17.501852082999903
+}

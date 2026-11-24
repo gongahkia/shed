@@ -29,3 +29,14 @@ The final cold-open run also exposed a fixture difference: it used Swing’s def
 ## 5. Scoped observation
 
 Existing cached diagnostics, aggregate job feedback, existing Markdown preview opening/state and bounded current-preview PNG capture use the same authenticated project grant. No shell/tool execution or desktop-capture endpoint is exposed. PNG encoding runs off the EDT; component painting remains EDT-owned. No renderer, document model, persistent worker, font default or user preference store is replaced.
+
+## Final integrated verification
+
+- `final-safe-tests.json`: 375 tests run: **369 passed, six opt-in measurement skips**, zero failures/errors. All reviewed portable classes except historical `ProjectFileOpenPrerequisiteTest` are selected explicitly. No unrestricted native suite was admitted.
+- `final-tooling.json`: **91 passes**, zero failures; disposable fixture removed.
+- `final-media.json`: packaged Mermaid/math/image smoke passed (14 events).
+- `final-live.json`: actual visible Swing workbench, separate authenticated Java CLI proposal client, review-button Apply, exact canonical Undo/Redo, deliberate completed disk save, named progress/cancellation, cached diagnostics/job feedback and current Markdown viewport capture passed. Generated Java compiled. Warm typing-to-completed-paint p95 **1.2505 ms**, first measured input **0.81775 ms** (20 warm samples and one first sample, small ASCII Java fixture). This is component paint completion, not physical-keyboard/scanout qualification.
+- `03-review.png`, `agent-workflow.gif`: actual owned-window review and pulse captures at correct display scale. `06-preview-viewport.png`: actual authenticated bounded preview capture.
+- Attachment cleanup succeeded, zero descendant processes remained and the disposable fixture was removed. No matched native-memory, Windows/Linux GUI, large-workspace snapshot or background-tool interference claim is made.
+
+Reproduce with `scripts/run-portable-tests.py`, the JDK/Maven/cache arguments and admitted test list recorded in the JSON. Live command: `scripts/test-agent-desktop.py --jdk <JDK> --jar target/shed-2.0.0.jar --output <new-directory> --replay-payload docs/performance/agent-editor-control/codex-generated-demo.java.txt`. Packaged media uses the existing guarded `scripts/test-packaged-markdown.py`. Python tooling uses `native_fixture.Fixture`. Toolchain details remain in `docs/performance/agent-tracka222c1/environment.json`. Homes, preferences and project files are disposable; the unsafe native-shell harness remains blocked.

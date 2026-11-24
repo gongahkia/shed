@@ -39,7 +39,7 @@ class EditorControlTest {
             documents=new EditorWorkspaceDocuments(()->List.copyOf(store.legacyBuffers()),roots::all,roots::active,root);
             pane=edt(()->{
                 roots.add(root); var b=store.load(root.resolve("One.java"));store.legacyBuffers().add(b);
-                var a=new JTextArea();a.setDocument(b.getDocument());a.setSize(700,500);
+                var a=new JTextArea();a.setFont(BundledEditorFont.atSize(16));a.setDocument(b.getDocument());a.setSize(700,500);
                 var p=new EditorPane(a,null,new JScrollPane(a),new SearchManager(a));p.setBuffer(b);interaction.watch(p);return p;
             });
             queries=new WorkspaceQueryService(root,new AgentPolicy(Set.of(AgentPolicy.Capability.READ,AgentPolicy.Capability.PROPOSE),

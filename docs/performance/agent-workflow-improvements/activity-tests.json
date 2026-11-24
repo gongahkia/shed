@@ -6,7 +6,7 @@
     "EditorControlTest",
     "ShedControlCliTest"
   ],
-  "fixture": "/private/tmp/shed-native-1wkhof7y",
+  "fixture": "/private/tmp/shed-native-6nl7yhhc",
   "native_benchmarks": "BLOCKED",
   "phase": "test",
   "dependency_copy": {
@@ -15,9 +15,9 @@
   },
   "command": [
     "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
-    "-Duser.home=/private/tmp/shed-native-1wkhof7y/run/home",
-    "-Djava.io.tmpdir=/private/tmp/shed-native-1wkhof7y/run/tmp",
-    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-1wkhof7y/run/config",
+    "-Duser.home=/private/tmp/shed-native-6nl7yhhc/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-6nl7yhhc/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-6nl7yhhc/run/config",
     "-Djava.awt.headless=true",
     "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
     "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
@@ -28,38 +28,38 @@
     "-B",
     "-o",
     "-s",
-    "/private/tmp/shed-native-1wkhof7y/run/config/settings.xml",
+    "/private/tmp/shed-native-6nl7yhhc/run/config/settings.xml",
     "-gs",
-    "/private/tmp/shed-native-1wkhof7y/run/config/settings.xml",
-    "-Dmaven.repo.local=/private/tmp/shed-native-1wkhof7y/run/dependencies",
-    "-Duser.home=/private/tmp/shed-native-1wkhof7y/run/home",
-    "-Djava.io.tmpdir=/private/tmp/shed-native-1wkhof7y/run/tmp",
-    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-1wkhof7y/run/config",
+    "/private/tmp/shed-native-6nl7yhhc/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-6nl7yhhc/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-6nl7yhhc/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-6nl7yhhc/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-6nl7yhhc/run/config",
     "-Djava.awt.headless=true",
     "-DforkCount=0",
     "-Dtest=AgentActivityStateTest,AgentEditPresentationTest,EditorControlTest,ShedControlCliTest",
     "test"
   ],
-  "exit": 1,
-  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 3 resources from assets to target/classes/assets\n[INFO] Copying 2 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 422 source files with javac [debug release 21] to target/classes\n[WARNING] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/ApplicationErrorReporter.java:[120,77] java.lang.ThreadDeath in java.lang has been deprecated and marked for removal\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/EditorUiController.java: Some input files use or override a deprecated API.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/EditorUiController.java: Recompile with -Xlint:deprecation for details.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java: /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed dependency.\n[INFO] Compiling 312 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.ShedControlCliTest\n[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 4.317 s <<< FAILURE! -- in shed.ShedControlCliTest\n[ERROR] shed.ShedControlCliTest.ordinaryCommandsUseExplicitAttachmentAndCaptureCurrentContext -- Time elapsed: 4.269 s <<< FAILURE!\norg.opentest4j.AssertionFailedError: {jsonrpc=2.0, id=ctl, error={code=-32000, data={outcome=unknown, code=OUTCOME_UNKNOWN}, message=Editor control request failed}} ==> expected: <0> but was: <65>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:156)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:598)\n\tat shed.ShedControlCliTest.ordinaryCommandsUseExplicitAttachmentAndCaptureCurrentContext(ShedControlCliTest.java:22)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\n[INFO] Running shed.EditorControlTest\n[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.284 s -- in shed.EditorControlTest\n[INFO] Running shed.AgentEditPresentationTest\n[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in shed.AgentEditPresentationTest\n[INFO] Running shed.AgentActivityStateTest\n[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.034 s -- in shed.AgentActivityStateTest\n[INFO] \n[INFO] Results:\n[INFO] \n[ERROR] Failures: \n[ERROR]   ShedControlCliTest.ordinaryCommandsUseExplicitAttachmentAndCaptureCurrentContext:22 {jsonrpc=2.0, id=ctl, error={code=-32000, data={outcome=unknown, code=OUTCOME_UNKNOWN}, message=Editor control request failed}} ==> expected: <0> but was: <65>\n[INFO] \n[ERROR] Tests run: 16, Failures: 1, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  16.553 s\n[INFO] Finished at: 2026-11-24T04:10:58Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project shed: There are test failures.\n[ERROR] \n[ERROR] Please refer to /Users/gongahkia/Desktop/coding/projects/shed/target/surefire-reports for the individual test results.\n[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.\n[ERROR] -> [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n",
-  "elapsed_s": 18.95196604100056,
+  "exit": 0,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 3 resources from assets to target/classes/assets\n[INFO] Copying 2 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Nothing to compile - all classes are up to date.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 312 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.ShedControlCliTest\n[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.816 s -- in shed.ShedControlCliTest\n[INFO] Running shed.EditorControlTest\n[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.140 s -- in shed.EditorControlTest\n[INFO] Running shed.AgentEditPresentationTest\n[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.036 s -- in shed.AgentEditPresentationTest\n[INFO] Running shed.AgentActivityStateTest\n[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s -- in shed.AgentActivityStateTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  6.578 s\n[INFO] Finished at: 2026-11-24T04:11:52Z\n[INFO] ------------------------------------------------------------------------\n",
+  "elapsed_s": 8.340630374999819,
   "fixture_removed": true,
   "metrics": [
     {
       "operation": "creation",
-      "ns": 1212708
+      "ns": 735000
     },
     {
       "operation": "guard",
-      "ns": 510083
+      "ns": 406250
     },
     {
       "operation": "guard",
-      "ns": 585541
+      "ns": 744458
     },
     {
       "operation": "cleanup",
-      "ns": 89876583
+      "ns": 86389333
     }
   ]
 }

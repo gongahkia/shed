@@ -1,0 +1,105 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "f2a8d284d3db3abc3f3910670377e237715ca41e371dd13447e847cf4d947bbb",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-moa61sb5",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-moa61sb5/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-moa61sb5/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-moa61sb5/run/config",
+    "-cp",
+    "/private/tmp/shed-native-moa61sb5/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-moa61sb5/run/live",
+    "/private/tmp/shed-native-moa61sb5/run/project"
+  ],
+  "pid": 50827,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"62945a63-5951-459d-9f6b-d235dbac5d79\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"41729f91-4e68-40de-8a12-c8d0693fd6e3\", \"projectId\": \"project-b4242877-2271-48c8-bfff-92812784d581\", \"schemaVersion\": 1, \"documentId\": \"buffer-ad6b538a-f34a-4e4d-be42-40f02fd3ff7f\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-97145e0f-e6b2-477f-ac9d-57da3032c27b\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 9, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"62945a63-5951-459d-9f6b-d235dbac5d79\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"41729f91-4e68-40de-8a12-c8d0693fd6e3\", \"projectId\": \"project-b4242877-2271-48c8-bfff-92812784d581\", \"schemaVersion\": 1, \"documentId\": \"buffer-ad6b538a-f34a-4e4d-be42-40f02fd3ff7f\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-97145e0f-e6b2-477f-ac9d-57da3032c27b\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 9, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"62945a63-5951-459d-9f6b-d235dbac5d79\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"41729f91-4e68-40de-8a12-c8d0693fd6e3\", \"projectId\": \"project-b4242877-2271-48c8-bfff-92812784d581\", \"schemaVersion\": 1, \"documentId\": \"buffer-ad6b538a-f34a-4e4d-be42-40f02fd3ff7f\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-97145e0f-e6b2-477f-ac9d-57da3032c27b\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 9, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"62945a63-5951-459d-9f6b-d235dbac5d79\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"41729f91-4e68-40de-8a12-c8d0693fd6e3\", \"projectId\": \"project-b4242877-2271-48c8-bfff-92812784d581\", \"schemaVersion\": 1, \"documentId\": \"buffer-ad6b538a-f34a-4e4d-be42-40f02fd3ff7f\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-97145e0f-e6b2-477f-ac9d-57da3032c27b\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 9, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-2ee6ca4f4fcb3c1a2c68045bae87b08a\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "state": "PASS",
+    "events": [
+      {
+        "human_color": -13213771,
+        "agent_color": -14188196,
+        "phase": "review_apply_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "actual_window_typing",
+        "warm_p95_ms": 0.794833,
+        "first_ms": 1.6145,
+        "samples_ms": [
+          1.6145,
+          0.775292,
+          0.809125,
+          0.708917,
+          0.658459,
+          0.591833,
+          0.598,
+          0.617666,
+          0.60725,
+          0.538,
+          0.55375,
+          0.794833,
+          0.561,
+          0.732916,
+          0.481167,
+          0.62225,
+          0.743542,
+          0.457458,
+          0.62075,
+          0.533417,
+          0.5625
+        ]
+      },
+      {
+        "phase": "save_acknowledgement",
+        "message": "Saving\u2026"
+      },
+      {
+        "phase": "save_and_attachment_cleanup",
+        "exact": true,
+        "descendants": 0
+      }
+    ],
+    "live_window": true,
+    "capture": "owned Swing root pane"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 18.34596608299944
+}

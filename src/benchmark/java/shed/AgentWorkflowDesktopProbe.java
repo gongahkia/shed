@@ -42,8 +42,7 @@ public final class AgentWorkflowDesktopProbe {
             check(editor.isShowing(),"Workbench is not showing");var root=editor.getRootPane();
             check(root.getWidth()>0&&root.getHeight()>0,"Workbench geometry unavailable");
             root.paintImmediately(root.getVisibleRect());
-            var image=new BufferedImage(root.getWidth(),root.getHeight(),BufferedImage.TYPE_INT_RGB);
-            var graphics=image.createGraphics();try{root.paint(graphics);}finally{graphics.dispose();}
+            var image=SwingComponentCapture.capture(root,0,0,root.getWidth(),root.getHeight(),16_000_000);
             ImageIO.write(image,"png",folder.resolve(name+".png").toFile());return null;
         });
     }
@@ -97,7 +96,8 @@ public final class AgentWorkflowDesktopProbe {
             Files.writeString(ready,MiniJson.stringify(Map.of("descriptor",server.descriptor().toString(),"credential",server.credential().toString())));
             capture("01-ready");System.out.println("LIVE_READY");System.out.flush();
             await(()->editor.getCurrentBuffer().getFile().getName().equals("Demo.java"),75);
-            capture("01-source-before-agent-activity");Files.writeString(folder.resolve("opened-captured"),"ok");
+            capture("01-source-before-agent-activity");
+Files.writeString(folder.resolve("opened-captured"),"ok");
             await(()->editor.writingArea.getClientProperty("shed.agentActivity")!=null,75);
             Color human=edt(()->editor.writingArea.getCaretColor());Color agent=edt(()->editor.getActivePane().agentPresentation().agentColor());
             check(!human.equals(agent),"Agent marker matches human caret color");

@@ -79,6 +79,7 @@ final class TestWatchService implements AutoCloseable {
     }
 
     private void registerTree(Path directory) throws IOException {
+        if (thread != null) retireMissingDirectories(directories);
         Files.walkFileTree(directory, Set.of(), MAX_DEPTH, new FileVisitor<>() {
             @Override public FileVisitResult preVisitDirectory(Path current, BasicFileAttributes attributes) throws IOException {
                 if (Files.isSymbolicLink(current)) return FileVisitResult.SKIP_SUBTREE;
@@ -102,6 +103,15 @@ final class TestWatchService implements AutoCloseable {
         WatchKey key = normalized.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE,
             StandardWatchEventKinds.ENTRY_MODIFY);
         directories.put(key, normalized);
+    }
+
+    static void retireMissingDirectories(Map<WatchKey,Path> registrations) {
+        // a provider may reuse a moved directory's file key while retaining its old watchable path
+        registrations.entrySet().removeIf(entry -> {
+            if (entry.getKey().isValid() && Files.isDirectory(entry.getValue(), LinkOption.NOFOLLOW_LINKS)) return false;
+            entry.getKey().cancel();
+            return true;
+        });
     }
 
     private void watch() {
@@ -150,6 +160,8 @@ final class TestWatchService implements AutoCloseable {
 
     @Override public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        // cancel owned keys before provider close acquires its registration-map lock
+        for (WatchKey key : directories.keySet()) key.cancel();
         try { watchService.close(); } catch (IOException ignored) { }
         if (thread != null) thread.interrupt();
         directories.clear();

@@ -34,4 +34,21 @@ class TestWatchServiceTest {
             assertFalse(TestWatchService.watches(root, root.resolve("node_modules/package/index.js")));
         }
     }
+    @Test
+    void movedDirectoryRegistrationRetiresItsOldWatchKey() throws Exception {
+        Path old=Files.createDirectory(root.resolve("before"));Path moved=root.resolve("after");
+        var cancelled=new java.util.concurrent.atomic.AtomicBoolean();
+        var key=new java.nio.file.WatchKey(){
+            public boolean isValid(){return !cancelled.get();}
+            public java.util.List<java.nio.file.WatchEvent<?>> pollEvents(){return java.util.List.of();}
+            public boolean reset(){return isValid();}
+            public void cancel(){cancelled.set(true);}
+            public java.nio.file.Watchable watchable(){return old;}
+        };
+        var registrations=new java.util.concurrent.ConcurrentHashMap<java.nio.file.WatchKey,Path>();registrations.put(key,old);
+        TestWatchService.retireMissingDirectories(registrations);assertFalse(cancelled.get());assertTrue(registrations.containsKey(key));
+        Files.move(old,moved);
+        TestWatchService.retireMissingDirectories(registrations);
+        assertTrue(cancelled.get());assertTrue(registrations.isEmpty());assertTrue(Files.isDirectory(moved));
+    }
 }

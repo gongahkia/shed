@@ -69,6 +69,22 @@ class ExternalChangeSnapshotTest {
         var added=new ExternalChangeSnapshot.Change("A","long.txt",null,"","line\n".repeat(25000),List.of(new WorkspaceTextEdits.Hunk(0,0,"","line\n".repeat(25000))));
         String patch=ChangeDiffView.format(added);assertTrue(patch.contains("Diff display truncated"));assertTrue(patch.length()<100100);
     }
+    @Test void safeConfigurationIsIncludedButPrivateHiddenPathsRemainExcluded() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("config"));Files.writeString(root.resolve(".gitignore"),"build/\n");Files.writeString(root.resolve(".prettierrc"),"{}\n");
+        Files.createDirectories(root.resolve(".github/workflows"));Files.writeString(root.resolve(".github/workflows/build.yml"),"name: Build\n");Files.writeString(root.resolve(".github/secrets.key"),"synthetic secret");
+        Files.createDirectories(root.resolve(".ssh"));Files.writeString(root.resolve(".ssh/config"),"private");Files.writeString(root.resolve(".npmrc"),"synthetic token");Files.writeString(root.resolve("auth.json"),"synthetic credential");
+        assertEquals(Set.of(".gitignore",".prettierrc",".github/workflows/build.yml"),ExternalChangeSnapshot.capture(root).keySet());
+    }
+    @Test void editedMovesUseIdentityAndSimilarityRemainsExplicitlyAdvisory() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("moves"));Files.createDirectories(root.resolve("old"));Files.createDirectories(root.resolve("new"));
+        String text="first stable line\nsecond stable line\nthird stable line\nfourth stable line\nfifth stable line\n";
+        Files.writeString(root.resolve("old/a.txt"),text);Files.writeString(root.resolve("old/b.txt"),text+"b\n");var base=ExternalChangeSnapshot.capture(root);
+        Files.move(root.resolve("old/a.txt"),root.resolve("new/a.txt"));Files.move(root.resolve("old/b.txt"),root.resolve("new/b.txt"));Files.writeString(root.resolve("new/a.txt"),text+"edited\n");
+        var changes=ExternalChangeSnapshot.compare(base,ExternalChangeSnapshot.capture(root));assertEquals(2,changes.size());assertTrue(changes.stream().allMatch(row->row.previous()!=null));assertTrue(ExternalChangeSnapshot.moveSummary(changes).contains("2 files"));
+        var a=new ExternalChangeSnapshot.File(text,"old",true);var b=new ExternalChangeSnapshot.File(text+"edited\n","new",true);
+        var inferred=ExternalChangeSnapshot.compare(Map.of("old.txt",a),Map.of("new.txt",b));assertEquals("R?",inferred.getFirst().kind());assertTrue(ChangeDiffView.format(inferred.getFirst()).contains("Possible move"));
+        var ambiguous=ExternalChangeSnapshot.compare(Map.of("a.txt",a,"b.txt",a),Map.of("c.txt",b));assertTrue(ambiguous.stream().noneMatch(row->row.kind().startsWith("R")));
+    }
     @Test void fileTreeRefreshRetainsSurvivorsAndRemovesDeletedNodes() throws Exception {
         Path root=Files.createDirectory(temporary.resolve("tree"));Path keep=Files.writeString(root.resolve("keep.txt"),"keep"),gone=Files.writeString(root.resolve("gone.txt"),"gone");
         var model=new FileTreeModel(root.toFile(),directory->new java.io.File[]{keep.toFile(),gone.toFile()});var survivor=model.rootNode().getChildAt(0);

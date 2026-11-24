@@ -10,7 +10,9 @@ final class ChangeDiffView extends JTextPane {
     static String format(ExternalChangeSnapshot.Change change){
         StringBuilder patch=new StringBuilder();
         patch.append(change.previous()==null?change.path():change.previous()+" → "+change.path()).append('\n');
-        if(change.hunks().isEmpty())patch.append(change.before().equals(change.after())?"Contents unchanged\n":change.after().isEmpty()?change.before():change.after());
+        if(change.kind().equals("R?"))patch.append("[Possible move: similar text, not confirmed filesystem identity]\n");
+        if(change.hunks().isEmpty()&&(change.after().startsWith("[Binary or unsupported")||change.before().startsWith("[Binary or unsupported")))patch.append("[Binary or unsupported encoding; textual comparison unavailable]\n");
+        else if(change.hunks().isEmpty())patch.append(change.before().equals(change.after())?"Contents unchanged\n":change.after().isEmpty()?change.before():change.after());
         for(var h:change.hunks()){
             int line=1+(int)change.before().substring(0,h.start()).chars().filter(c->c=='\n').count();
             patch.append("@@ line ").append(line).append(" @@\n");

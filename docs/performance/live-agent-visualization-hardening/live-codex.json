@@ -1,0 +1,180 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "517d7ac9c148bd0d57ec09baa47bbc8ad9e794284140954bedbeb3f1cae85167",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-waot03ym",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "d68570d03df969cacfed27b80f9b466049118a243d27eea5192d62aa509bc876",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-waot03ym/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-waot03ym/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-waot03ym/run/config",
+    "-cp",
+    "/private/tmp/shed-native-waot03ym/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-waot03ym/run/live",
+    "/private/tmp/shed-native-waot03ym/run/project"
+  ],
+  "pid": 16635,
+  "live_codex": {
+    "exit": 0,
+    "cli_exit": 0,
+    "expected_changes_present": true,
+    "item_types": [
+      "",
+      "agent_message",
+      "file_change"
+    ],
+    "elapsed_s": 11.382591249999678,
+    "events": [
+      {
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/AgentCreated.txt",
+            "kind": "add"
+          },
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/AgentDelete.txt",
+            "kind": "delete"
+          },
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/AgentOld.txt",
+            "kind": "update"
+          },
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/Demo.java",
+            "kind": "update"
+          }
+        ]
+      },
+      {
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/AgentCreated.txt",
+            "kind": "add"
+          },
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/AgentDelete.txt",
+            "kind": "delete"
+          },
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/AgentOld.txt",
+            "kind": "update"
+          },
+          {
+            "path": "/private/tmp/shed-native-waot03ym/run/project/Demo.java",
+            "kind": "update"
+          }
+        ]
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 23880,
+          "cached_input_tokens": 21504,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 187,
+          "reasoning_output_tokens": 0
+        },
+        "message": ""
+      }
+    ],
+    "environment": "disposable HOME/XDG/history; only copied auth; ignored user config; shell tools/hooks/plugins disabled",
+    "stderr": "",
+    "auth_source_content_unchanged": true,
+    "auth_source_mtime_unchanged": true
+  },
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "live_window": true,
+    "events": [
+      {
+        "exact": true,
+        "changes": 142,
+        "converge_ms": 2339.14825,
+        "phase": "5000_file_atomic_burst",
+        "baseline_ms": 209.489917
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "samples_ms": [
+          3.295167,
+          1.195958,
+          1.019917,
+          0.925375,
+          0.971042,
+          0.940916,
+          0.95075,
+          0.951792,
+          0.859167,
+          0.569833,
+          0.563416,
+          0.732209,
+          0.531125,
+          0.850833,
+          0.448667,
+          0.534625,
+          0.75625,
+          0.550916,
+          0.613875,
+          0.586084,
+          0.605458
+        ],
+        "first_ms": 3.295167,
+        "warm_p95_ms": 1.019917
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "exact": true,
+        "cycles": 24
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "heap_before": 79674800,
+        "exact": true,
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 17317216,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0
+      },
+      {
+        "exact": true,
+        "phase": "actual_codex_cli_external_edits"
+      },
+      {
+        "phase": "save_and_attachment_cleanup",
+        "descendants": 0,
+        "exact": true
+      }
+    ],
+    "state": "PASS",
+    "capture": "owned Swing root pane"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 31.28332720799881
+}

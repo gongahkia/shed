@@ -1,0 +1,169 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "856c97f6d91ae08d5b95adfcaf4988977f87261bae81e70eba6a61c84c254db1",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-ga8npn3n",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-ga8npn3n/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-ga8npn3n/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-ga8npn3n/run/config",
+    "-cp",
+    "/private/tmp/shed-native-ga8npn3n/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-ga8npn3n/run/live",
+    "/private/tmp/shed-native-ga8npn3n/run/project"
+  ],
+  "pid": 88227,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"226518f4-75b0-44fa-ac92-770b97f4305c\", \"available\": true, \"documentLength\": 107, \"paneId\": \"pane-27dc50ad-431a-4b93-9e64-67406fe95cd1\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-1b462733-2b59-4cda-afbd-a4835748dfeb\", \"schemaVersion\": 1, \"projectId\": \"project-1b5aa641-63fb-41fd-b830-abe390c2248b\", \"instanceId\": \"15226440-e922-4c74-8bd7-8d1efd1e52ac\", \"contextRevision\": 9, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"226518f4-75b0-44fa-ac92-770b97f4305c\", \"available\": true, \"documentLength\": 107, \"paneId\": \"pane-27dc50ad-431a-4b93-9e64-67406fe95cd1\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-1b462733-2b59-4cda-afbd-a4835748dfeb\", \"schemaVersion\": 1, \"projectId\": \"project-1b5aa641-63fb-41fd-b830-abe390c2248b\", \"instanceId\": \"15226440-e922-4c74-8bd7-8d1efd1e52ac\", \"contextRevision\": 9, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"226518f4-75b0-44fa-ac92-770b97f4305c\", \"available\": true, \"documentLength\": 107, \"paneId\": \"pane-27dc50ad-431a-4b93-9e64-67406fe95cd1\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-1b462733-2b59-4cda-afbd-a4835748dfeb\", \"schemaVersion\": 1, \"projectId\": \"project-1b5aa641-63fb-41fd-b830-abe390c2248b\", \"instanceId\": \"15226440-e922-4c74-8bd7-8d1efd1e52ac\", \"contextRevision\": 9, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"226518f4-75b0-44fa-ac92-770b97f4305c\", \"available\": true, \"documentLength\": 107, \"paneId\": \"pane-27dc50ad-431a-4b93-9e64-67406fe95cd1\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-1b462733-2b59-4cda-afbd-a4835748dfeb\", \"schemaVersion\": 1, \"projectId\": \"project-1b5aa641-63fb-41fd-b830-abe390c2248b\", \"instanceId\": \"15226440-e922-4c74-8bd7-8d1efd1e52ac\", \"contextRevision\": 9, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-90e9acd3eea11bfc42b125c47daa11b9\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 0,
+  "log": "LIVE_READY\nException in thread \"AWT-EventQueue-0\" java.util.ConcurrentModificationException\n\tat java.base/java.util.ArrayList$Itr.checkForComodification(ArrayList.java:1095)\n\tat java.base/java.util.ArrayList$Itr.next(ArrayList.java:1049)\n\tat shed.RecoveryController.checkForExternalChanges(RecoveryController.java:69)\n\tat shed.Texteditor.checkForExternalChanges(Texteditor.java:1452)\n\tat shed.Texteditor.lambda$new$8(Texteditor.java:652)\n\tat java.desktop/javax.swing.Timer.fireActionPerformed(Timer.java:311)\n\tat java.desktop/javax.swing.Timer$DoPostEvent.run(Timer.java:243)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:318)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)\n\tat java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)\nLIVE_PASS\n",
+  "result": {
+    "events": [
+      {
+        "agent_color": -14188196,
+        "human_color": -13213771,
+        "exact": true,
+        "phase": "review_apply_undo_redo"
+      },
+      {
+        "samples_ms": [
+          0.832125,
+          0.741917,
+          0.705083,
+          0.60125,
+          0.532292,
+          0.599084,
+          0.517917,
+          0.585125,
+          0.451083,
+          0.650583,
+          0.781166,
+          0.594125,
+          0.438584,
+          0.607875,
+          0.465458,
+          0.529583,
+          0.581792,
+          0.456875,
+          0.693333,
+          0.581791,
+          0.449666
+        ],
+        "first_ms": 0.832125,
+        "warm_p95_ms": 0.741917,
+        "phase": "actual_window_typing"
+      },
+      {
+        "message": "Saving\u2026",
+        "phase": "save_acknowledgement"
+      },
+      {
+        "phase": "existing_html_preview_endpoint",
+        "status": "EXCLUDED_FROM_VISUAL_ONLY"
+      },
+      {
+        "phase": "watch_active_typing",
+        "samples_ms": [
+          0.857333,
+          0.986042,
+          0.459167,
+          0.382875,
+          0.645292,
+          0.571917,
+          0.4555,
+          0.451375,
+          0.718,
+          0.494792,
+          0.466708,
+          0.491459,
+          0.422625,
+          0.454125,
+          0.403667,
+          0.44575,
+          0.636208,
+          0.436958,
+          0.378125,
+          0.411042
+        ],
+        "p95_ms": 0.857333
+      },
+      {
+        "pause_preserved": true,
+        "files": 4,
+        "exact": true,
+        "phase": "external_create_modify_delete_rename"
+      },
+      {
+        "exact": true,
+        "phase": "real_disposable_git_diff"
+      },
+      {
+        "changes": 142,
+        "converge_ms": 2629.494958,
+        "phase": "5000_file_atomic_burst",
+        "baseline_ms": 202.731375,
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "heap_before": 56799944,
+        "exact": true,
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 19135880,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0
+      },
+      {
+        "phase": "save_and_attachment_cleanup",
+        "descendants": 0,
+        "exact": true
+      }
+    ],
+    "state": "PASS",
+    "capture": "owned Swing root pane",
+    "live_window": true
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 31.085008207999635
+}

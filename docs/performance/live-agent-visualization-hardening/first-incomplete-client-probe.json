@@ -1,0 +1,54 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "8bf121b9d383fe065c1df933064a63a29c4c4424fbd80f8a501dcb31d24557ab",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-7pcfh1h3",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-7pcfh1h3/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-7pcfh1h3/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-7pcfh1h3/run/config",
+    "-cp",
+    "/private/tmp/shed-native-7pcfh1h3/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-7pcfh1h3/run/live",
+    "/private/tmp/shed-native-7pcfh1h3/run/project"
+  ],
+  "pid": 90236,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"selectionStart\": 0, \"paneId\": \"pane-8a53584c-46a5-4016-9b65-5fffd1c91058\", \"documentLength\": 107, \"available\": true, \"windowId\": \"6e3c04c6-12ee-4c03-a63d-ebd6a0dbcf86\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"d49f6b7c-161c-43ff-bea1-7410f5c7c054\", \"projectId\": \"project-5b072aaf-3af6-4749-a2eb-6d5774bfc5d1\", \"schemaVersion\": 1, \"documentId\": \"buffer-07b397c5-f28b-438d-ba21-30ddf3a07fa8\", \"caretOffset\": 0, \"contextRevision\": 9, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"selectionStart\": 0, \"paneId\": \"pane-8a53584c-46a5-4016-9b65-5fffd1c91058\", \"documentLength\": 107, \"available\": true, \"windowId\": \"6e3c04c6-12ee-4c03-a63d-ebd6a0dbcf86\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"d49f6b7c-161c-43ff-bea1-7410f5c7c054\", \"projectId\": \"project-5b072aaf-3af6-4749-a2eb-6d5774bfc5d1\", \"schemaVersion\": 1, \"documentId\": \"buffer-07b397c5-f28b-438d-ba21-30ddf3a07fa8\", \"caretOffset\": 0, \"contextRevision\": 9, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"selectionStart\": 0, \"paneId\": \"pane-8a53584c-46a5-4016-9b65-5fffd1c91058\", \"documentLength\": 107, \"available\": true, \"windowId\": \"6e3c04c6-12ee-4c03-a63d-ebd6a0dbcf86\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"d49f6b7c-161c-43ff-bea1-7410f5c7c054\", \"projectId\": \"project-5b072aaf-3af6-4749-a2eb-6d5774bfc5d1\", \"schemaVersion\": 1, \"documentId\": \"buffer-07b397c5-f28b-438d-ba21-30ddf3a07fa8\", \"caretOffset\": 0, \"contextRevision\": 9, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"selectionStart\": 0, \"paneId\": \"pane-8a53584c-46a5-4016-9b65-5fffd1c91058\", \"documentLength\": 107, \"available\": true, \"windowId\": \"6e3c04c6-12ee-4c03-a63d-ebd6a0dbcf86\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"d49f6b7c-161c-43ff-bea1-7410f5c7c054\", \"projectId\": \"project-5b072aaf-3af6-4749-a2eb-6d5774bfc5d1\", \"schemaVersion\": 1, \"documentId\": \"buffer-07b397c5-f28b-438d-ba21-30ddf3a07fa8\", \"caretOffset\": 0, \"contextRevision\": 9, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-96e81cd1c74101c75661c6c5d972bebd\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 2,
+  "error": "Workbench did not reach real Codex phase",
+  "fixture_removed": true,
+  "elapsed_s": 23.48844929199913
+}

@@ -1,0 +1,19 @@
+{
+  "source_head": "5022dd98b1e9750290146751c85a001c20da52e0",
+  "code_commits": [
+    "a3687d0b8",
+    "5022dd98b"
+  ],
+  "jar_sha256": "517d7ac9c148bd0d57ec09baa47bbc8ad9e794284140954bedbeb3f1cae85167",
+  "jar_bytes": 50740671,
+  "probe_sha256": "d68570d03df969cacfed27b80f9b466049118a243d27eea5192d62aa509bc876",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "captures": {
+    "14-real-codex-filesystem-session.png": "1d8acb3fed04e8dac25c47a308a33ec04effa8665f155f49bad7025f7bd42b05",
+    "11-light-comfortable-splits.png": "fc15d9eff5540ae5bf3cadab08a66001068a8dd74ce01763533d9a9190bbd520",
+    "10-same-file-conflict-both-versions.png": "9e08609568fa73753f8d3c6432447fee18b675897ec31d8853fc6af0bc9ed6eb",
+    "12-dark-narrow-splits.png": "dba2eb171de5d6b22793a15511b00e273bb4c35419ac0a476a3d6a6526aaa735",
+    "15-custom-fonts-and-live-diff.png": "53061e00100756dd6116e3938b4963b8048b8d97d832a6b952e22565ed3ef8de",
+    "13-focus-centered-live-changes.png": "6262e6465e5f1d45165c72ea095cc6354003dec852f09b0b854fed1b7d83ec0a"
+  }
+}

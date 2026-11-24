@@ -1,0 +1,62 @@
+{
+  "boundary": "source-reviewed non-native tests, not general process confinement",
+  "tests": [
+    "ExternalChangeSnapshotTest"
+  ],
+  "fixture": "/private/tmp/shed-native-28ldzi78",
+  "native_benchmarks": "BLOCKED",
+  "phase": "test",
+  "dependency_copy": {
+    "entries": 1808,
+    "bytes": 98080024
+  },
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-28ldzi78/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-28ldzi78/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-28ldzi78/run/config",
+    "-Djava.awt.headless=true",
+    "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed",
+    "-cp",
+    "/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/boot/plexus-classworlds-2.9.0.jar",
+    "org.codehaus.plexus.classworlds.launcher.Launcher",
+    "-B",
+    "-o",
+    "-s",
+    "/private/tmp/shed-native-28ldzi78/run/config/settings.xml",
+    "-gs",
+    "/private/tmp/shed-native-28ldzi78/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-28ldzi78/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-28ldzi78/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-28ldzi78/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-28ldzi78/run/config",
+    "-Djava.awt.headless=true",
+    "-DforkCount=0",
+    "-Dtest=ExternalChangeSnapshotTest",
+    "test"
+  ],
+  "exit": 1,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 27 resources from assets to target/classes/assets\n[INFO] Copying 2 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Nothing to compile - all classes are up to date.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 317 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.ExternalChangeSnapshotTest\n[ERROR] Tests run: 8, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 9.797 s <<< FAILURE! -- in shed.ExternalChangeSnapshotTest\n[ERROR] shed.ExternalChangeSnapshotTest.continuousWritesStillPublishBeforeTheWriterFinishes -- Time elapsed: 2.016 s <<< ERROR!\njava.util.concurrent.TimeoutException\n\tat java.base/java.util.concurrent.CompletableFuture.timedGet(CompletableFuture.java:1960)\n\tat java.base/java.util.concurrent.CompletableFuture.get(CompletableFuture.java:2095)\n\tat shed.ExternalChangeSnapshotTest.continuousWritesStillPublishBeforeTheWriterFinishes(ExternalChangeSnapshotTest.java:45)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\n[INFO] \n[INFO] Results:\n[INFO] \n[ERROR] Errors: \n[ERROR]   ExternalChangeSnapshotTest.continuousWritesStillPublishBeforeTheWriterFinishes:45 \u00bb Timeout\n[INFO] \n[ERROR] Tests run: 8, Failures: 0, Errors: 1, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  15.137 s\n[INFO] Finished at: 2026-11-24T07:46:17Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project shed: \n[ERROR] \n[ERROR] Please refer to /Users/gongahkia/Desktop/coding/projects/shed/target/surefire-reports for the individual test results.\n[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.\n[ERROR] -> [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n",
+  "elapsed_s": 17.177897708999808,
+  "fixture_removed": true,
+  "metrics": [
+    {
+      "operation": "creation",
+      "ns": 1097458
+    },
+    {
+      "operation": "guard",
+      "ns": 472166
+    },
+    {
+      "operation": "guard",
+      "ns": 1543792
+    },
+    {
+      "operation": "cleanup",
+      "ns": 86348292
+    }
+  ]
+}

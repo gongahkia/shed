@@ -1,0 +1,12 @@
+{
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "machine": "Mac15,12",
+  "physical_memory_bytes": 17179869184,
+  "load_average_at_recording": [
+    5.80322265625,
+    5.33740234375,
+    4.6201171875
+  ],
+  "notes": "Active desktop, not cold cache; bounded fixtures; JDK 21.0.13.1+2; Maven 3.9.11. No cross-host comparison or whole-process native-memory claim."
+}

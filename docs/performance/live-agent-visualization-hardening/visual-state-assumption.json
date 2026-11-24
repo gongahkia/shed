@@ -1,0 +1,49 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "8bf121b9d383fe065c1df933064a63a29c4c4424fbd80f8a501dcb31d24557ab",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-ufy7r_au",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-ufy7r_au/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-ufy7r_au/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-ufy7r_au/run/config",
+    "-cp",
+    "/private/tmp/shed-native-ufy7r_au/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-ufy7r_au/run/live",
+    "/private/tmp/shed-native-ufy7r_au/run/project"
+  ],
+  "pid": 93943,
+  "exit": 2,
+  "error": "Workbench did not reach real Codex phase",
+  "log": "LIVE_READY\njava.util.concurrent.ExecutionException: java.lang.AssertionError: Visual changes modified source\n\tat java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)\n\tat java.base/java.util.concurrent.FutureTask.get(FutureTask.java:205)\n\tat shed.AgentWorkflowDesktopProbe.edt(AgentWorkflowDesktopProbe.java:20)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:135)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:230)\nCaused by: java.lang.AssertionError: Visual changes modified source\n\tat shed.AgentWorkflowDesktopProbe.check(AgentWorkflowDesktopProbe.java:28)\n\tat shed.AgentWorkflowDesktopProbe.lambda$qualifyEdges$16(AgentWorkflowDesktopProbe.java:135)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:308)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:117)\n\tat java.desktop/java.awt.WaitDispatchSupport$2.run(WaitDispatchSupport.java:191)\n\tat java.desktop/java.awt.WaitDispatchSupport$4.run(WaitDispatchSupport.java:236)\n\tat java.desktop/java.awt.WaitDispatchSupport$4.run(WaitDispatchSupport.java:234)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:319)\n\tat java.desktop/java.awt.WaitDispatchSupport.enter(WaitDispatchSupport.java:234)\n\tat java.desktop/java.awt.Dialog.show(Dialog.java:1079)\n\tat java.desktop/javax.swing.JOptionPane.showOptionDialog(JOptionPane.java:881)\n\tat shed.RecoveryController.promptExternalConflictForModifiedBuffer(RecoveryController.java:149)\n\tat shed.RecoveryController.checkForExternalChanges(RecoveryController.java:106)\n\tat shed.RecoveryController.lambda$registerFileWatch$8(RecoveryController.java:545)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:318)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)\n\tat java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)\n",
+  "result": {
+    "error": "java.util.concurrent.ExecutionException: java.lang.AssertionError: Visual changes modified source",
+    "events": [
+      {
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 201.114209,
+        "phase": "5000_file_atomic_burst",
+        "converge_ms": 2343.375875
+      },
+      {
+        "phase": "same_file_conflict_view_both_save_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "human_edit_during_delayed_follow",
+        "exact": true
+      }
+    ],
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 8.412202791998425
+}

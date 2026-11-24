@@ -1,0 +1,109 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "4a6bdc33a8622ab4478f3e9550b89950f0eadcb880c19d3ee7bbc65bbeccf2ff",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-lg7jj32v",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-lg7jj32v/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-lg7jj32v/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-lg7jj32v/run/config",
+    "-cp",
+    "/private/tmp/shed-native-lg7jj32v/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-lg7jj32v/run/live",
+    "/private/tmp/shed-native-lg7jj32v/run/project"
+  ],
+  "pid": 1729,
+  "live_codex": {
+    "exit": 0,
+    "elapsed_s": 10.339955165996798,
+    "events": [
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 23896,
+          "cached_input_tokens": 19712,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 146,
+          "reasoning_output_tokens": 0
+        },
+        "message": ""
+      }
+    ],
+    "environment": "disposable HOME/XDG/history; only copied auth; ignored user config; shell tools/hooks/plugins disabled",
+    "stderr": "2026-11-24T08:06:46.822583Z ERROR codex_core::tools::router: error=code-mode host is disabled\n",
+    "auth_source_content_unchanged": true,
+    "auth_source_metadata_unchanged": true
+  },
+  "exit": 1,
+  "log": "LIVE_READY\njava.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:160)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:256)\n",
+  "result": {
+    "state": "FAIL",
+    "events": [
+      {
+        "converge_ms": 2315.535167,
+        "phase": "5000_file_atomic_burst",
+        "baseline_ms": 239.025542,
+        "exact": true,
+        "changes": 142
+      },
+      {
+        "samples_ms": [
+          3.225833,
+          5.153,
+          0.879291,
+          1.023708,
+          0.812167,
+          0.803417,
+          0.667208,
+          0.584917,
+          0.665667,
+          0.576667,
+          0.52825,
+          0.426375,
+          0.482625,
+          0.491375,
+          0.475709,
+          0.425084,
+          0.445333,
+          0.415,
+          0.44975,
+          0.382,
+          0.401792
+        ],
+        "first_ms": 3.225833,
+        "warm_p95_ms": 1.023708,
+        "phase": "5000_file_watch_typing"
+      },
+      {
+        "phase": "same_file_conflict_view_both_save_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "human_edit_during_delayed_follow",
+        "exact": true
+      },
+      {
+        "phase": "light_dark_narrow_density_focus_three_splits",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 17055080,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0,
+        "heap_before": 112623712
+      }
+    ],
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 42.12559875000079
+}

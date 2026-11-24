@@ -1,0 +1,55 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "8bf121b9d383fe065c1df933064a63a29c4c4424fbd80f8a501dcb31d24557ab",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-r1mxg17a",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-r1mxg17a/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-r1mxg17a/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-r1mxg17a/run/config",
+    "-cp",
+    "/private/tmp/shed-native-r1mxg17a/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-r1mxg17a/run/live",
+    "/private/tmp/shed-native-r1mxg17a/run/project"
+  ],
+  "pid": 91258,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"e9976e6e-fb26-4224-8a82-5a49d9e82196\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"8c3e34d9-9d5f-4934-aa01-b7bf1ee46828\", \"projectId\": \"project-1596df77-4fac-42fa-94a7-3639b818b1a7\", \"schemaVersion\": 1, \"documentId\": \"buffer-0c2be13a-15a5-4a86-8e75-739dfdcb4579\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-2679e67a-8c6f-4046-b1de-0b88cc2df7e6\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"e9976e6e-fb26-4224-8a82-5a49d9e82196\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"8c3e34d9-9d5f-4934-aa01-b7bf1ee46828\", \"projectId\": \"project-1596df77-4fac-42fa-94a7-3639b818b1a7\", \"schemaVersion\": 1, \"documentId\": \"buffer-0c2be13a-15a5-4a86-8e75-739dfdcb4579\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-2679e67a-8c6f-4046-b1de-0b88cc2df7e6\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"windowId\": \"e9976e6e-fb26-4224-8a82-5a49d9e82196\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"8c3e34d9-9d5f-4934-aa01-b7bf1ee46828\", \"projectId\": \"project-1596df77-4fac-42fa-94a7-3639b818b1a7\", \"schemaVersion\": 1, \"documentId\": \"buffer-0c2be13a-15a5-4a86-8e75-739dfdcb4579\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-2679e67a-8c6f-4046-b1de-0b88cc2df7e6\", \"documentLength\": 107, \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/Users/gongahkia/Desktop/coding/projects/shed/scripts/agent-demo-client.py\", line 118, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/Users/gongahkia/Desktop/coding/projects/shed/scripts/agent-demo-client.py\", line 112, in main\n    response = exchange('editor/edits/propose', params)\n  File \"/Users/gongahkia/Desktop/coding/projects/shed/scripts/agent-demo-client.py\", line 76, in exchange\n    raise RuntimeError('Bounded CLI operation failed: ' + result.stdout[:2000])\nRuntimeError: Bounded CLI operation failed: {\"jsonrpc\":\"2.0\",\"id\":\"live-agent\",\"error\":{\"code\":-32000,\"data\":{\"outcome\":\"rejected\",\"code\":\"CONTEXT_CHANGED\"},\"message\":\"Navigation request failed\"}}\n\n"
+    }
+  ],
+  "exit": 2,
+  "error": "Replayed external client failed",
+  "log": "LIVE_READY\n",
+  "fixture_removed": true,
+  "elapsed_s": 4.805721458000335
+}

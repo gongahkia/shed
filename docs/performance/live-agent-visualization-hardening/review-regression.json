@@ -1,0 +1,147 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "517d7ac9c148bd0d57ec09baa47bbc8ad9e794284140954bedbeb3f1cae85167",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-rqvv0bv7",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "d68570d03df969cacfed27b80f9b466049118a243d27eea5192d62aa509bc876",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-rqvv0bv7/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-rqvv0bv7/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-rqvv0bv7/run/config",
+    "-cp",
+    "/private/tmp/shed-native-rqvv0bv7/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-rqvv0bv7/run/live",
+    "/private/tmp/shed-native-rqvv0bv7/run/project"
+  ],
+  "pid": 19019,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"available\": true, \"documentLength\": 107, \"paneId\": \"pane-cf5711bc-b563-4b58-ada9-c3afff7373bf\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-c28f5db9-ce90-4c12-a973-40a927771f2a\", \"schemaVersion\": 1, \"projectId\": \"project-24032940-fa14-456e-9229-826ad001594c\", \"instanceId\": \"c596f18a-c86e-4735-8a6e-c306c4da6bac\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"eef4da44-6bb3-4886-ae1f-1fb387b5f5f4\", \"contextRevision\": 10, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"available\": true, \"documentLength\": 107, \"paneId\": \"pane-cf5711bc-b563-4b58-ada9-c3afff7373bf\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-c28f5db9-ce90-4c12-a973-40a927771f2a\", \"schemaVersion\": 1, \"projectId\": \"project-24032940-fa14-456e-9229-826ad001594c\", \"instanceId\": \"c596f18a-c86e-4735-8a6e-c306c4da6bac\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"eef4da44-6bb3-4886-ae1f-1fb387b5f5f4\", \"contextRevision\": 10, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"available\": true, \"documentLength\": 107, \"paneId\": \"pane-cf5711bc-b563-4b58-ada9-c3afff7373bf\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-c28f5db9-ce90-4c12-a973-40a927771f2a\", \"schemaVersion\": 1, \"projectId\": \"project-24032940-fa14-456e-9229-826ad001594c\", \"instanceId\": \"c596f18a-c86e-4735-8a6e-c306c4da6bac\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"eef4da44-6bb3-4886-ae1f-1fb387b5f5f4\", \"contextRevision\": 10, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"available\": true, \"documentLength\": 107, \"paneId\": \"pane-cf5711bc-b563-4b58-ada9-c3afff7373bf\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-c28f5db9-ce90-4c12-a973-40a927771f2a\", \"schemaVersion\": 1, \"projectId\": \"project-24032940-fa14-456e-9229-826ad001594c\", \"instanceId\": \"c596f18a-c86e-4735-8a6e-c306c4da6bac\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"eef4da44-6bb3-4886-ae1f-1fb387b5f5f4\", \"contextRevision\": 10, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-0074af55d92c97ca127bfa6b5df7d095\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "capture": "owned Swing root pane",
+    "live_window": true,
+    "events": [
+      {
+        "exact": true,
+        "phase": "review_apply_undo_redo",
+        "agent_color": -14188196,
+        "human_color": -13213771
+      },
+      {
+        "samples_ms": [
+          2.12875,
+          1.355792,
+          0.583417,
+          0.82875,
+          0.636916,
+          4.369125,
+          1.156916,
+          1.705375,
+          1.4875,
+          2.576208,
+          4.747459,
+          1.859708,
+          1.404208,
+          0.703959,
+          0.536209,
+          0.556584,
+          0.566375,
+          0.523459,
+          0.611208,
+          0.472833,
+          0.478083
+        ],
+        "first_ms": 2.12875,
+        "warm_p95_ms": 4.369125,
+        "phase": "actual_window_typing"
+      },
+      {
+        "phase": "save_acknowledgement",
+        "message": "Saving\u2026"
+      },
+      {
+        "phase": "existing_html_preview_endpoint",
+        "status": "EXCLUDED_FROM_VISUAL_ONLY"
+      },
+      {
+        "p95_ms": 11.443333,
+        "phase": "watch_active_typing",
+        "samples_ms": [
+          1.210292,
+          2.115584,
+          4.80725,
+          11.443333,
+          1.530458,
+          1.586084,
+          1.672167,
+          0.841875,
+          0.749542,
+          1.089416,
+          0.669917,
+          1.44175,
+          0.918708,
+          1.487834,
+          0.895291,
+          12.306125,
+          9.309833,
+          2.201791,
+          0.766834,
+          0.621
+        ]
+      },
+      {
+        "files": 4,
+        "exact": true,
+        "phase": "external_create_modify_delete_rename",
+        "pause_preserved": true
+      },
+      {
+        "phase": "real_disposable_git_diff",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "save_and_attachment_cleanup",
+        "descendants": 0
+      }
+    ],
+    "state": "PASS"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 27.855070417001116
+}

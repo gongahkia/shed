@@ -1,5 +1,7 @@
 # Track A2.2.1 — project-scoped file opening: prerequisite report
 
+> Historical result under the original stronger acquisition contract. The later [portable integration](PORTABLE_PROJECT_FILE_OPEN_INTEGRATION.md) explicitly revised that threat model, and [reviewed editor control](AGENT_EDITOR_CONTROL.md) implements the subsequently authorized external workflow. This does not invalidate the race reproduction or establish the original confinement guarantee.
+
 ## A–B. Verdict and delivered scope
 
 **NO-GO for authenticated agent file opening. Production file opening remains unavailable through the A1/A2.1/A2.2 control API.** This is a prerequisite review and defensive reproduction, not a completed file-opening implementation or conditional feature acceptance. No production Java, authorization behavior, listener, credentials, editor model, preferences or UI changed. A3 is not started.

@@ -1,5 +1,7 @@
 # A2.2.2c.1 — portable internal asynchronous file opening
 
+> Internal-tranche scope record. The subsequent [authenticated editor-control implementation](AGENT_EDITOR_CONTROL.md) now enables explicitly authorized external opening and reviewed proposals under this trusted-local contract. The original verification below is preserved.
+
 **GO for the tested internal headless/component scope.** Project file acquisition now works with the tested macOS Java 21 provider. It is connected to the existing background job service, pane request generations and typed EDT installation gate. External agent file opening remains disabled. Native workbench and other-platform acceptance remain open.
 
 ## Contract and implementation

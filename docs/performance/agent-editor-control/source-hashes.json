@@ -1,0 +1,13 @@
+{
+  "src/main/java/shed/WorkspaceStatusProtocol.java": "6f99a933862688e4cfee6b7b0118d65c99aab3a25c038c6d1729f832e3a233dc",
+  "src/main/java/shed/EditorNavigation.java": "4e72204260515c21458e6a2b51c0bb93d27006dc42a725b348e5177717646d1e",
+  "src/main/java/shed/EditorPane.java": "5d157477fbe63491be8d2894da578e5d33ee22a5d215d9faf6fa5d02ba8ab346",
+  "src/main/java/shed/WorkspaceBridgeClient.java": "1173ef4020173892a99d985177f1c64e95f230944437b17957499ff43d6f1701",
+  "src/main/java/shed/EditorControl.java": "649937ee0a4ebee0bc290aee9b5332d01388c78e1d2010f7a94bfb166ab1a36a",
+  "src/main/java/shed/WorkspaceBridgeServer.java": "c9481279e41cf8e83c9d6422898533d8cc68b385e5328b9f4b929a3c7320abd9",
+  "src/main/java/shed/Texteditor.java": "8860b2e1be0d2622ac2431315c9b88d7cb5d40303bad06c47c6d8f1a3e8ba07d",
+  "src/main/java/shed/WorkspaceRpc.java": "fc4ca2b6fba702f9bcb7875611f81113c2f040cb075a97e653e3ee5a9c04de8f",
+  "src/main/java/shed/EditorMetadata.java": "78479ce16b323c5a98ede8c74feacde6435f06242f27d1ece8216ff5c5a02606",
+  "src/main/java/shed/AgentWorkspaceController.java": "7a6d4661fac298c7058fce7f84333e9431b0aa6ee6ab36afa4ca3d4beaef0ce6",
+  "src/main/java/shed/AgentEditPresentation.java": "27a15ba66f8430342efca38f30cc170e25719569714fdb45693aed35a2443c60"
+}

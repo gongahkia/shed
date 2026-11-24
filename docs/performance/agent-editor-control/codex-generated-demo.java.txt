@@ -1,0 +1,16 @@
+public class Demo {
+    public static String greet(String name) {
+        return "Hello, " + normalizedName(name);
+    }
+
+    public static String farewell(String name) {
+        return "Goodbye, " + normalizedName(name);
+    }
+
+    private static String normalizedName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "friend";
+        }
+        return name.trim();
+    }
+}

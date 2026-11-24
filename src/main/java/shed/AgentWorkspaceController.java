@@ -192,6 +192,8 @@ final class AgentWorkspaceController implements AutoCloseable {
                 }
                 owner().showMessage(state.label());
             }
+            public java.util.Map<String,Object> observe(String operation){return EditorObservation.read(owner(),operation);}
+            public java.awt.image.BufferedImage capturePreview(){return EditorObservation.capture(owner());}
             public void review(String proposal) { owner().toolWindowHost.showAgentProposal(proposal); }
             public void clearActivity() { var live = editorOwner.get(); if (live != null) live.clearAgentActivity(); }
         };

@@ -1,0 +1,97 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "76ab849b24191148995fb7481b25fc20874c5c3e57726cd691789c09596ec6e6",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-x7c5a7_7",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-x7c5a7_7/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-x7c5a7_7/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-x7c5a7_7/run/config",
+    "-cp",
+    "/private/tmp/shed-native-x7c5a7_7/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-x7c5a7_7/run/live",
+    "/private/tmp/shed-native-x7c5a7_7/run/project"
+  ],
+  "pid": 76041,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"documentLength\": 107, \"paneId\": \"pane-b39f5f0b-fe51-4ffa-9ece-c7ec034bc5ae\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-0d1b0a05-1466-44c9-aeb9-cc434662fe7f\", \"schemaVersion\": 1, \"projectId\": \"project-471d4547-2214-4ffc-9618-db27ed35e1a0\", \"instanceId\": \"e3165098-abf0-49bf-8d51-9cf6fdd70121\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"887d57e3-e712-4dad-98a2-8fbc9ae709ba\", \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"documentLength\": 107, \"paneId\": \"pane-b39f5f0b-fe51-4ffa-9ece-c7ec034bc5ae\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-0d1b0a05-1466-44c9-aeb9-cc434662fe7f\", \"schemaVersion\": 1, \"projectId\": \"project-471d4547-2214-4ffc-9618-db27ed35e1a0\", \"instanceId\": \"e3165098-abf0-49bf-8d51-9cf6fdd70121\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"887d57e3-e712-4dad-98a2-8fbc9ae709ba\", \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"documentLength\": 107, \"paneId\": \"pane-b39f5f0b-fe51-4ffa-9ece-c7ec034bc5ae\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-0d1b0a05-1466-44c9-aeb9-cc434662fe7f\", \"schemaVersion\": 1, \"projectId\": \"project-471d4547-2214-4ffc-9618-db27ed35e1a0\", \"instanceId\": \"e3165098-abf0-49bf-8d51-9cf6fdd70121\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"887d57e3-e712-4dad-98a2-8fbc9ae709ba\", \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"documentLength\": 107, \"paneId\": \"pane-b39f5f0b-fe51-4ffa-9ece-c7ec034bc5ae\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-0d1b0a05-1466-44c9-aeb9-cc434662fe7f\", \"schemaVersion\": 1, \"projectId\": \"project-471d4547-2214-4ffc-9618-db27ed35e1a0\", \"instanceId\": \"e3165098-abf0-49bf-8d51-9cf6fdd70121\", \"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"887d57e3-e712-4dad-98a2-8fbc9ae709ba\", \"available\": true, \"contextRevision\": 10, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-c492484609dc2bb90a15cc0bbdc9cc18\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 1,
+  "log": "LIVE_READY\njava.lang.IllegalStateException: editor/preview/open: UNSUPPORTED\n\tat shed.AgentWorkflowDesktopProbe.control(AgentWorkflowDesktopProbe.java:53)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:159)\nCaused by: shed.WorkspaceApiException: Control request rejected\n\tat shed.ShedControlCli.result(ShedControlCli.java:124)\n\tat shed.AgentWorkflowDesktopProbe.control(AgentWorkflowDesktopProbe.java:52)\n\t... 1 more\n",
+  "result": {
+    "state": "FAIL",
+    "events": [
+      {
+        "exact": true,
+        "phase": "review_apply_undo_redo",
+        "agent_color": -14188196,
+        "human_color": -13213771
+      },
+      {
+        "samples_ms": [
+          0.909416,
+          0.611333,
+          0.520042,
+          0.540292,
+          0.461625,
+          0.449291,
+          0.491125,
+          0.406041,
+          0.423834,
+          0.490542,
+          0.4345,
+          0.541208,
+          0.442167,
+          0.404791,
+          0.447417,
+          0.382083,
+          0.459958,
+          0.368,
+          0.569333,
+          0.450458,
+          0.379791
+        ],
+        "first_ms": 0.909416,
+        "warm_p95_ms": 0.569333,
+        "phase": "actual_window_typing"
+      },
+      {
+        "phase": "save_acknowledgement",
+        "message": "Saving\u2026"
+      }
+    ],
+    "error": "java.lang.IllegalStateException: editor/preview/open: UNSUPPORTED"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 8.838180041999294
+}

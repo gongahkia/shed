@@ -15,7 +15,7 @@ class EditorControlTest {
     static <T> T edt(Callable<T> action) throws Exception {
         var task = new FutureTask<T>(action); SwingUtilities.invokeAndWait(task); return task.get(5,TimeUnit.SECONDS);
     }
-    static final class Fixture implements EditorControl.Host, AutoCloseable {
+    static class Fixture implements EditorControl.Host, AutoCloseable {
         final Path root, storage;
         final ApplicationStatus application = new ApplicationStatus(true);
         final WorkspaceRoots roots = new WorkspaceRoots();

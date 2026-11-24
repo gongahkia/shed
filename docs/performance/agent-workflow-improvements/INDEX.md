@@ -25,3 +25,7 @@ The final cold-open run also exposed a fixture difference: it used Swing’s def
 ## 4. Project proposals
 
 `project-tests.json`: 29 passing tests. A single human-reviewed proposal changes open text, creates, renames and deletes disposable files; review Undo restores the exact cohort. Protected/escaping paths and stale human revisions are rejected. Existing review UI and transaction/recovery ownership are reused.
+
+## 5. Scoped observation
+
+Existing cached diagnostics, aggregate job feedback, existing Markdown preview opening/state and bounded current-preview PNG capture use the same authenticated project grant. No shell/tool execution or desktop-capture endpoint is exposed. PNG encoding runs off the EDT; component painting remains EDT-owned. No renderer, document model, persistent worker, font default or user preference store is replaced.

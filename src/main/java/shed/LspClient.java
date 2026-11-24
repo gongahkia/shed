@@ -1605,6 +1605,11 @@ public class LspClient {
         return response != null && response.get("error") == null;
     }
 
+    List<Diagnostic> cachedDiagnostics(String uri, int maximum) {
+        if(maximum<1||maximum>32)throw new IllegalArgumentException("Diagnostic limit");
+        var entries=diagnostics.get(uri);return entries==null?List.of():List.copyOf(entries.subList(0,Math.min(maximum,entries.size())));
+    }
+
     public List<Diagnostic> getDiagnostics(String uri) {
         drainNotifications();
         List<Diagnostic> entries = diagnostics.get(uri);

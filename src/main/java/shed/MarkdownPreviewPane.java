@@ -44,6 +44,9 @@ final class MarkdownPreviewPane extends JPanel {
     private final java.awt.event.AdjustmentListener sourceScrollListener;
     private String html = "";
     private boolean disposed;
+    private long renderedRevision=-1;
+    boolean currentForAgent(){return !disposed && renderedRevision==source.documentRevision() && !renderTimer.isRunning();}
+    javax.swing.JComponent viewportForAgent(){return scrollPane.getViewport();}
     private boolean syncQueued;
     private boolean syncToCaret;
     private int deferredScrollSyncs;
@@ -152,6 +155,7 @@ final class MarkdownPreviewPane extends JPanel {
         title.setText("Markdown Preview — " + source.getDisplayName());
         html = MarkdownPreviewRenderer.render(source.getFullContent(), source.getDisplayName(), font, background, foreground, assets, source.getFile());
         preview.setText(html);
+        renderedRevision=source.documentRevision();
         if (isScrollSyncEnabled()) {
             queueSourceSync(false);
         } else {

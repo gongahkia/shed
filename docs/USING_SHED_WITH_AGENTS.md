@@ -72,3 +72,20 @@ The changes file is a JSON array, at most eight files and 8,192 replacement UTF-
 ```
 
 These operations create one proposal in the existing multi-document review panel. They do not apply remotely. The human inspects each file and accepts through existing checked transactions and recovery. Applying text to an open buffer leaves it dirty; applying changes to closed files and create/rename/delete operations deliberately changes disk through that existing review action. Review Undo restores the transaction, subject to the existing conflict checks. No remote save or arbitrary tool execution is exposed. Paths outside the approved project, nested independently configured roots, protected README files, excluded environment files, stale versions and conflicting targets are rejected. The trusted-local path contract is not a sandbox against hostile same-user filesystem races.
+
+## Feedback and rendered-file observation
+
+```sh
+shed ctl diagnostics
+shed ctl feedback
+shed ctl open notes.md
+shed ctl preview
+shed ctl preview-state
+shed ctl preview-capture --output /tmp/shed-preview.png
+```
+
+Diagnostics return at most 32 cached entries for the active source (256 message units each), with zero-based LSP UTF-16 line/column coordinates. They do not start a server or consume its pending message queue. `freshness: unverified` is intentional: the existing cache does not bind every entry to an exact source revision. The response's document revision identifies the observation context, not guaranteed diagnostic freshness. Feedback returns aggregate existing application job counts, without commands, environment, output, unrelated filenames or execution permissions.
+
+Agent-opened previews reuse Shed's existing Markdown preview and disable remote image fetching for the newly opened preview without changing saved preferences. A pre-existing human-opened preview retains its existing policy. Observation is limited to Markdown sources of at most 4,096 UTF-16 units. Mermaid, math and local image support remain those of the existing preview renderer; this does not add inline source rendering.
+
+Capture reads only the current source's existing, showing, revision-current preview viewport. It crops up to 256×160 logical units at the actual display scale, at most 262,144 pixels and 20,000 PNG bytes. A more complex viewport can exceed the byte budget and is rejected. The CLI creates a new requested output file and refuses to overwrite an existing file. No desktop, other application, source tab, picker or arbitrary window can be selected for capture. Captures are visual observations, not authoritative source text. Known physical-font glyph coverage, first-use Unicode layout and stock HTML-preview EDT latency limitations remain open. Readiness/timeout/context errors are reported; do not retry a potentially applied presentation operation blindly.

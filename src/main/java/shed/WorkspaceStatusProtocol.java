@@ -114,6 +114,11 @@ final class WorkspaceStatusProtocol {
             base.remove("operation"); Object outcome = base.remove("outcome");
             base.put("capabilities", List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE));
             switch (method) {
+                case "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture" -> {
+                    var observation=MiniJson.asObject(base.remove("observation"));
+                    if(!"observed".equals(outcome)||observation==null||MiniJson.stringify(observation).length()>29000
+                        || !Set.of("diagnostics","feedback","preview","capture").contains(observation.get("kind")))return false;
+                }
                 case "editor/file/open" -> { if (!"applied".equals(outcome)) return false; }
                 case "editor/agent/activity" -> { if (!"shown".equals(outcome)) return false; }
                 case "editor/agent/progress", "editor/agent/state", "editor/agent/cancel" -> {

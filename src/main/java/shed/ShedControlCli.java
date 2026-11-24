@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--output").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -59,6 +59,10 @@ final class ShedControlCli {
                         params.put("requestId",id==null?UUID.randomUUID().toString():id);String session=options.remove("--session-id");if(session!=null)params.put("sessionId",session);
                         method="editor/project/propose";
                     }
+                    case "diagnostics", "feedback", "preview", "preview-state", "preview-capture" -> {
+                        if(path!=null)throw new IllegalArgumentException();
+                        method=switch(command){case "diagnostics"->"editor/diagnostics";case "feedback"->"editor/feedback";case "preview"->"editor/preview/open";case "preview-state"->"editor/preview/state";default->"editor/preview/capture";};
+                    }
                     case "progress" -> {
                         if(path!=null)throw new IllegalArgumentException();
                         params.put("sessionId",required(options,"--session-id"));params.put("agent",required(options,"--agent"));params.put("phase",required(options,"--phase"));
@@ -84,9 +88,16 @@ final class ShedControlCli {
                     }
                     default -> throw new IllegalArgumentException();
                 }
+                String captureOutput=command.equals("preview-capture")?required(options,"--output"):null;
                 if(!options.isEmpty())throw new IllegalArgumentException();
                 mutationSent=EditorControl.mutation(method);
-                return emit(client.exchange(request(method,params)),out);
+                String response=client.exchange(request(method,params));
+                if(captureOutput!=null){
+                    var observation=MiniJson.asObject(result(response).get("observation"));byte[] png=Base64.getDecoder().decode((String)observation.get("data"));
+                    if(png.length>20000)throw new IllegalArgumentException();Files.write(Path.of(captureOutput),png,StandardOpenOption.CREATE_NEW);
+                    var clean=new LinkedHashMap<>(observation);clean.remove("data");out.println(MiniJson.stringify(clean));return 0;
+                }
+                return emit(response,out);
             }
         } catch(WorkspaceApiException failure) {
             boolean unknown=mutationSent && Set.of(WorkspaceApiException.Code.TIMEOUT,WorkspaceApiException.Code.SESSION_INVALID,WorkspaceApiException.Code.SESSION_EXPIRED,WorkspaceApiException.Code.OUTCOME_UNKNOWN).contains(failure.code());

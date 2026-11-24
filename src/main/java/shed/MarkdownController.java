@@ -112,7 +112,9 @@ final class MarkdownController {
         };
     }
 
-    String openPreview() {
+    String openPreview() { return openPreview(true); }
+    String openPreviewForAgent() { return openPreview(false); }
+    private String openPreview(boolean allowRemoteImages) {
         EditorPane sourcePane = editor.getActivePane();
         FileBuffer buffer = editor.getCurrentBuffer();
         if (sourcePane == null || buffer == null || buffer.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
@@ -139,7 +141,7 @@ final class MarkdownController {
             editor.configManager::getNormalColor, editor.configManager::getEditorForeground,
             href -> editor.showMessage(openPreviewLink(buffer, href)),
             () -> editor.activateEditorPane(previewPane), editor.configManager::getMarkdownPreviewScrollSync,
-            editor.configManager::getMarkdownPreviewRemoteImages, sourcePane, editor);
+            () -> allowRemoteImages && editor.configManager.getMarkdownPreviewRemoteImages(), sourcePane, editor);
         previewPane.setMarkdownPreviewComponent(preview);
         previews.put(buffer, new PreviewBinding(sourcePane, previewPane, preview));
         editor.renderWindowLayout();
@@ -150,6 +152,10 @@ final class MarkdownController {
     void closePreviewForSource(EditorPane sourcePane) {
         PreviewBinding binding = previewForSource(sourcePane);
         if (binding != null && editor.editorPanes.contains(binding.previewPane)) editor.closePane(binding.previewPane);
+    }
+
+    MarkdownPreviewPane previewForAgent(EditorPane sourcePane) {
+        var binding=previewForSource(sourcePane);return binding==null?null:binding.preview();
     }
 
     boolean hasPreviewForSource(EditorPane sourcePane) {

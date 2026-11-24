@@ -46,6 +46,12 @@ public final class AgentWorkflowDesktopProbe {
             ImageIO.write(image,"png",folder.resolve(name+".png").toFile());return null;
         });
     }
+    private static Map<String,Object> control(WorkspaceBridgeClient client,String method,Map<String,Object> extra) throws Exception {
+        var context=ShedControlCli.result(client.exchange(client.navigationContextRequest()));
+        var params=ShedControlCli.context(context);params.putAll(extra);
+        try{return ShedControlCli.result(client.exchange(ShedControlCli.request(method,params)));}
+        catch(WorkspaceApiException failure){throw new IllegalStateException(method+": "+failure.code(),failure);}
+    }
     private static long[] inputMetric() throws Exception {
         synchronized(editor.perfService){
             var field=PerfService.class.getDeclaredField("metrics");field.setAccessible(true);
@@ -143,6 +149,21 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
             await(()->!editor.getCurrentBuffer().isModified(),5);
             check(Files.readString(project.resolve("Demo.java")).equals(expected),"Saved bytes differ");
             capture("05-saved");
+            Files.writeString(project.resolve("Preview.md"),"# Agent preview\n\nA bounded preview in the real Shed workbench.\n");
+            edt(()->{editor.writingArea.requestFocusInWindow();return null;});
+            try(var client=WorkspaceBridgeClient.control(server.descriptor(),server.credential())) {
+                control(client,"editor/diagnostics",Map.of());control(client,"editor/feedback",Map.of());
+                control(client,"editor/agent/progress",Map.of("sessionId","live-progress","agent","Codex","phase","thinking","completed",1L,"total",2L,"start",0L,"end",5L));
+                control(client,"editor/agent/cancel",Map.of("sessionId","live-progress"));
+                control(client,"editor/file/open",Map.of("path","Preview.md"));
+                control(client,"editor/preview/open",Map.of());
+                await(()->{var p=editor.markdownController.previewForAgent(editor.getActivePane());return p!=null&&p.currentForAgent()&&p.isShowing();},5);
+                var observed=control(client,"editor/preview/capture",Map.of());
+                var data=MiniJson.asObject(observed.get("observation"));
+                Files.write(folder.resolve("06-preview-viewport.png"),Base64.getDecoder().decode((String)data.get("data")));
+                events.add(Map.of("phase","scoped_feedback_progress_and_preview","exact",true,"width",data.get("width"),"height",data.get("height")));
+                capture("06-preview-workbench");
+            }
             animation();
             edt(()->{editor.handleAgentCommand("api stop");return null;});
             long stop=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);

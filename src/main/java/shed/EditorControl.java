@@ -14,9 +14,9 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture");
     static boolean mutation(String method) {
-        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state").contains(method);
+        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
     static final int MAX_READ = 2048, MAX_REPLACEMENT = 8192, MAX_DOCUMENT = 1024 * 1024;
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
@@ -26,6 +26,8 @@ final class EditorControl implements AutoCloseable {
                                      BooleanSupplier current, Consumer<ProjectDocumentInstall.Result> completed);
         void activity(int start, int end);
         default void progress(AgentActivityState.State state, int start, int end) { if (state.terminal()) clearActivity(); else activity(start,end); }
+        default Map<String,Object> observe(String operation){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
+        default java.awt.image.BufferedImage capturePreview(){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         void review(String proposal);
         void clearActivity();
     }
@@ -63,6 +65,7 @@ final class EditorControl implements AutoCloseable {
             case "editor/file/open" -> Set.of("path");
             case "editor/source/read" -> Set.of("offset", "limit");
             case "editor/edits/propose" -> Set.of("start", "end", "text", "requestId");
+            case "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture" -> Set.of();
             case "editor/project/read" -> Set.of("path", "offset", "limit");
             case "editor/project/propose" -> Set.of("changes", "requestId");
             case "editor/agent/progress" -> Set.of("start", "end", "sessionId", "agent", "phase", "completed", "total");
@@ -84,6 +87,20 @@ final class EditorControl implements AutoCloseable {
             Services current = services.get();
             if (current == null) throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
             if (method.equals("editor/file/open")) return open(lease, params, before, current);
+            if (method.equals("editor/diagnostics")||method.equals("editor/feedback")||method.startsWith("editor/preview/")) {
+                Map<String,Object> observation;
+                if(method.endsWith("capture")) {
+                    var image=ui(lease,()->{requireState(lease,before);return owner().capturePreview();});
+                    try {
+                        var bytes=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(image,"png",bytes);
+                        if(bytes.size()>20000)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+                        observation=Map.of("kind","capture","format","png","width",image.getWidth(),"height",image.getHeight(),"data",java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+                    } catch(java.io.IOException invalid){throw fail(WorkspaceApiException.Code.IO_ERROR);} finally {image.flush();}
+                    check(lease,before);
+                } else observation=ui(lease,()->{requireState(lease,before);return owner().observe(method);});
+                var after=ui(lease,()->owner().state());grant.authorize(after.metadata());
+                var reply=result(method,after,"observed");reply.put("observation",observation);return reply;
+            }
             if (method.startsWith("editor/project/")) return project(lease,method,params,before,current);
             if (method.equals("editor/agent/state") || method.equals("editor/agent/cancel")) {
                 if (method.endsWith("cancel")) {

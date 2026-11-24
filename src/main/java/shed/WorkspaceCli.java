@@ -16,9 +16,10 @@ public final class WorkspaceCli {
     public static final int MAX_FRAME_BYTES = WorkspaceFrames.MAX_REQUEST_BYTES;
     private WorkspaceCli() { }
 
-    public static boolean handles(String[] args) { return args != null && args.length > 0 && "--workspace-api".equals(args[0]); }
+    public static boolean handles(String[] args) { return args != null && args.length > 0 && ("--workspace-api".equals(args[0]) || "ctl".equals(args[0])); }
 
     public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {
+        if (args != null && args.length > 0 && "ctl".equals(args[0])) return ShedControlCli.run(args,input,output,errors);
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true);
         PrintWriter diagnostics = new PrintWriter(new OutputStreamWriter(errors, StandardCharsets.UTF_8), true);
         boolean status = false, metadata = false, navigation = false, control = false;

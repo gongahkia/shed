@@ -10,13 +10,14 @@ final class ShedControlCli {
     private ShedControlCli() { }
     static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {
         var out = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true);
+        boolean mutationSent = false;
         try {
             var options = new LinkedHashMap<String,String>(); String command = null, path = null;
             for (int i=1;i<args.length;i++) {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -46,6 +47,18 @@ final class ShedControlCli {
                         if(path!=null)throw new IllegalArgumentException();
                         params.put("start",number(options,"--start",0));params.put("end",number(options,"--end",0));method="editor/agent/activity";
                     }
+                    case "read-file" -> {
+                        if(path==null)throw new IllegalArgumentException();params.put("path",path);
+                        params.put("offset",number(options,"--offset",0));params.put("limit",number(options,"--limit",EditorControl.MAX_READ));method="editor/project/read";
+                    }
+                    case "propose-files" -> {
+                        if(path!=null)throw new IllegalArgumentException();String file=required(options,"--changes-file");
+                        byte[] bytes=file.equals("-")?input.readNBytes(30001):boundedFile(Path.of(file),30000);
+                        if(bytes.length>30000)throw new IllegalArgumentException();
+                        params.put("changes",MiniJson.parseStrict(WorkspaceFrames.decode(bytes)));String id=options.remove("--request-id");
+                        params.put("requestId",id==null?UUID.randomUUID().toString():id);String session=options.remove("--session-id");if(session!=null)params.put("sessionId",session);
+                        method="editor/project/propose";
+                    }
                     case "progress" -> {
                         if(path!=null)throw new IllegalArgumentException();
                         params.put("sessionId",required(options,"--session-id"));params.put("agent",required(options,"--agent"));params.put("phase",required(options,"--phase"));
@@ -72,14 +85,16 @@ final class ShedControlCli {
                     default -> throw new IllegalArgumentException();
                 }
                 if(!options.isEmpty())throw new IllegalArgumentException();
+                mutationSent=EditorControl.mutation(method);
                 return emit(client.exchange(request(method,params)),out);
             }
         } catch(WorkspaceApiException failure) {
-            out.println(WorkspaceRpc.error("ctl",-32000,"Control request failed",Map.of("code",failure.code().name())));return 65;
+            boolean unknown=mutationSent && Set.of(WorkspaceApiException.Code.TIMEOUT,WorkspaceApiException.Code.SESSION_INVALID,WorkspaceApiException.Code.SESSION_EXPIRED,WorkspaceApiException.Code.OUTCOME_UNKNOWN).contains(failure.code());
+            out.println(WorkspaceRpc.error("ctl",-32000,"Control request failed",Map.of("code",unknown?"OUTCOME_UNKNOWN":failure.code().name(),"outcome",unknown?"unknown":"rejected")));return unknown?79:65;
         } catch(IllegalArgumentException invalid) {
             out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|activity|propose|replace [options]",Map.of("code","INVALID_REQUEST")));return 64;
         } catch(IOException failure) {
-            out.println(WorkspaceRpc.error("ctl",-32000,"Control connection or input unavailable",Map.of("code","TRANSPORT_ERROR")));return 74;
+            out.println(WorkspaceRpc.error("ctl",-32000,"Control connection or input unavailable",Map.of("code",mutationSent?"OUTCOME_UNKNOWN":"TRANSPORT_ERROR","outcome",mutationSent?"unknown":"rejected")));return mutationSent?79:74;
         }
     }
     static byte[] boundedFile(Path path,int maximum) throws IOException {

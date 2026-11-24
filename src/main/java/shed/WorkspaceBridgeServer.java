@@ -273,7 +273,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     private static boolean navigationMutation(String request) {
         String method = requestMethod(request);
         return EditorNavigation.MUTATIONS.contains(method)
-            || EditorControl.OPERATIONS.contains(method) && !method.equals("editor/source/read");
+            || EditorControl.mutation(method);
     }
     private static boolean navigationMayHaveApplied(String response) {
         var value = MiniJson.asObject(MiniJson.parseStrict(response));

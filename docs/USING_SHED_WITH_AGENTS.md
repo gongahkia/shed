@@ -50,3 +50,25 @@ shed ctl cancel --session-id turn-1
 Phases are `reading`, `thinking`, `proposing`, `complete`, `cancelled`, and `failed`. A total of zero means indeterminate progress. One display session is active per attachment; another session is rejected until the current one finishes or is cancelled. A finished session ID cannot resume. Names are display labels, not authenticated agent identities. Updates reuse the status line and distinct source marker; progress pulses expire after 30 seconds without another update and stop on source edits, hidden/disposed views, completion, cancellation, or attachment revocation. Reduced-motion preferences remain authoritative.
 
 Pass the same `--session-id` with edit proposals to make cancellation meaningful: finished/cancelled sessions cannot submit new chunks. Cancellation is cooperative; it does not terminate an external agent process or retract an already durable proposal. Reject an outstanding proposal in the review panel. `:agent api stop` revokes the entire attachment. Legacy one-shot proposals without a session remain available.
+
+## Reviewed project changes
+
+`read-file` observes a project-relative file without switching the human's tab. It returns a bounded `file` object containing `content`, opaque `version`, `offset`, `nextOffset`, `length`, `truncated`, and `source`. Keep the version from the source you actually inspected.
+
+```sh
+shed ctl read-file src/Other.java
+shed ctl propose-files --changes-file /tmp/reviewed-changes.json --request-id task-42
+```
+
+The changes file is a JSON array, at most eight files and 8,192 replacement UTF-16 units total:
+
+```json
+[
+  {"kind":"text","path":"src/Other.java","version":"VERSION_FROM_READ","text":"desired full source"},
+  {"kind":"create","path":"src/New.java","text":"class New {}\n"},
+  {"kind":"rename","path":"old.txt","version":"VERSION_FROM_READ","destination":"new.txt"},
+  {"kind":"delete","path":"obsolete.txt","version":"VERSION_FROM_READ"}
+]
+```
+
+These operations create one proposal in the existing multi-document review panel. They do not apply remotely. The human inspects each file and accepts through existing checked transactions and recovery. Applying text to an open buffer leaves it dirty; applying changes to closed files and create/rename/delete operations deliberately changes disk through that existing review action. Review Undo restores the transaction, subject to the existing conflict checks. No remote save or arbitrary tool execution is exposed. Paths outside the approved project, nested independently configured roots, protected README files, excluded environment files, stale versions and conflicting targets are rejected. The trusted-local path contract is not a sandbox against hostile same-user filesystem races.

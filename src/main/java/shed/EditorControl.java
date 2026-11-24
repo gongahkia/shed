@@ -14,7 +14,10 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose");
+    static boolean mutation(String method) {
+        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state").contains(method);
+    }
     static final int MAX_READ = 2048, MAX_REPLACEMENT = 8192, MAX_DOCUMENT = 1024 * 1024;
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
         "documentRevision", "contextRevision", "caretOffset", "selectionStart", "selectionEnd");
@@ -60,12 +63,14 @@ final class EditorControl implements AutoCloseable {
             case "editor/file/open" -> Set.of("path");
             case "editor/source/read" -> Set.of("offset", "limit");
             case "editor/edits/propose" -> Set.of("start", "end", "text", "requestId");
+            case "editor/project/read" -> Set.of("path", "offset", "limit");
+            case "editor/project/propose" -> Set.of("changes", "requestId");
             case "editor/agent/progress" -> Set.of("start", "end", "sessionId", "agent", "phase", "completed", "total");
             case "editor/agent/state" -> Set.of();
             case "editor/agent/cancel" -> Set.of("sessionId");
             default -> Set.of("start", "end");
         });
-        if (method.equals("editor/edits/propose") && params.containsKey("sessionId")) fields.add("sessionId");
+        if (Set.of("editor/edits/propose","editor/project/propose").contains(method) && params.containsKey("sessionId")) fields.add("sessionId");
         if (!params.keySet().equals(fields)) throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
         if (!Long.valueOf(1).equals(params.get("schemaVersion"))) throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
         if (!grant.projectId.equals(text(params, "projectId", 64))) throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
@@ -79,6 +84,7 @@ final class EditorControl implements AutoCloseable {
             Services current = services.get();
             if (current == null) throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
             if (method.equals("editor/file/open")) return open(lease, params, before, current);
+            if (method.startsWith("editor/project/")) return project(lease,method,params,before,current);
             if (method.equals("editor/agent/state") || method.equals("editor/agent/cancel")) {
                 if (method.endsWith("cancel")) {
                     var state = activity.cancel(text(params,"sessionId",64));
@@ -129,6 +135,37 @@ final class EditorControl implements AutoCloseable {
             var result = result(method, before, "proposed"); result.put("proposalId", proposal); result.put("reviewRequired", true);
             return result;
         } finally { active.compareAndSet(lease, null); }
+    }
+
+    private Map<String,Object> project(Lease lease,String method,Map<String,Object> params,EditorNavigation.State before,Services current) {
+        if(method.equals("editor/project/read")) {
+            String name=EditorProjectChanges.path(params,"path");authorizePath(name,before,current.workspace(),AgentPolicy.Capability.READ);
+            int offset=offset(params,"offset"),limit=offset(params,"limit");
+            if(limit<1||limit>MAX_READ)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+            var source=current.workspace().snapshot(current.workspace().workspaceId(),name);
+            if(!source.complete()||source.content().length()>MAX_DOCUMENT)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+            if(offset>source.content().length()||!GraphemeBoundary.isBoundary(source.content(),offset))throw fail(WorkspaceApiException.Code.INVALID_OFFSET);
+            int end=Math.min(source.content().length(),offset+limit);while(end>offset&&!GraphemeBoundary.isBoundary(source.content(),end))end--;
+            if(end==offset&&offset<source.content().length())throw fail(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+            check(lease,before);var reply=result(method,before,"read");
+            reply.put("file",Map.of("path",name,"version",source.version(),"content",source.content().substring(offset,end),"offset",offset,
+                "nextOffset",end,"length",source.content().length(),"truncated",end<source.content().length(),"source",source.source().name()));return reply;
+        }
+        var changes=EditorProjectChanges.parse(params.get("changes"));
+        if(params.containsKey("sessionId"))activity.requireActive(text(params,"sessionId",64));
+        for(var change:changes){
+            authorizePath(change.document(),before,current.workspace(),AgentPolicy.Capability.PROPOSE);
+            if(change.destination()!=null)authorizePath(change.destination(),before,current.workspace(),AgentPolicy.Capability.PROPOSE);
+        }
+        check(lease,before);lease.require();
+        var proposed=current.proposals().propose(text(params,"requestId",64),"project changes","review",changes);
+        String id=(String)proposed.get("id");
+        try {ui(lease,()->{owner().review(id);return null;});}catch(RuntimeException uncertain){throw fail(WorkspaceApiException.Code.OUTCOME_UNKNOWN);}
+        var reply=result(method,before,"proposed");reply.put("proposalId",id);reply.put("reviewRequired",true);return reply;
+    }
+    private void authorizePath(String name,EditorNavigation.State before,WorkspaceQueryService workspace,AgentPolicy.Capability capability){
+        Path target=WorkspacePaths.resolve(root.path(),name);workspace.policy().checkPath(root.path().relativize(target),capability);
+        for(Path configured:before.metadata().roots())if(!configured.equals(root.path())&&target.startsWith(configured))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
     }
 
     private Map<String, Object> open(Lease lease, Map<String, Object> params, EditorNavigation.State before, Services current) {

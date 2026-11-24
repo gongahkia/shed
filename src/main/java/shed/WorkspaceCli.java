@@ -85,7 +85,7 @@ public final class WorkspaceCli {
             String query = request == null ? client.navigationContextRequest() : request;
             var envelope = MiniJson.asObject(MiniJson.parseStrict(query));
             mutation = envelope != null && envelope.get("method") instanceof String method && (EditorNavigation.MUTATIONS.contains(method)
-                || EditorControl.OPERATIONS.contains(method) && !method.equals("editor/source/read"));
+                || EditorControl.mutation(method));
             response = client.exchange(query);
         } catch (WorkspaceApiException failure) { return navigationFailure(output, "navigation", failure.code().name(), failure.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN
             || mutation && Set.of(WorkspaceApiException.Code.TIMEOUT, WorkspaceApiException.Code.SESSION_INVALID, WorkspaceApiException.Code.SESSION_EXPIRED).contains(failure.code())); }

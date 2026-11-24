@@ -119,9 +119,18 @@ final class WorkspaceStatusProtocol {
                 case "editor/agent/progress", "editor/agent/state", "editor/agent/cancel" -> {
                     if (!"activity".equals(outcome) || !validActivity(base.remove("activity"))) return false;
                 }
-                case "editor/edits/propose" -> {
+                case "editor/edits/propose", "editor/project/propose" -> {
                     if (!"proposed".equals(outcome) || !(base.remove("proposalId") instanceof String id)
                             || !id.matches("proposal-[a-f0-9]{32}") || !Boolean.TRUE.equals(base.remove("reviewRequired"))) return false;
+                }
+                case "editor/project/read" -> {
+                    var file=MiniJson.asObject(base.remove("file"));
+                    if(!"read".equals(outcome) || file==null || !file.keySet().equals(Set.of("path","version","content","offset","nextOffset","length","truncated","source"))
+                        || !(file.get("path") instanceof String path) || path.length()>4096 || !(file.get("version") instanceof String version) || version.length()>512
+                        || !(file.get("content") instanceof String content) || content.length()>EditorControl.MAX_READ
+                        || !(file.get("offset") instanceof Long start) || !(file.get("nextOffset") instanceof Long end) || !(file.get("length") instanceof Long length)
+                        || start<0 || end!=start+content.length() || length<end || length>EditorControl.MAX_DOCUMENT
+                        || !Boolean.valueOf(end<length).equals(file.get("truncated")) || !Set.of("EDITOR","DISK").contains(file.get("source")))return false;
                 }
                 case "editor/source/read" -> {
                     if (!"read".equals(outcome) || !(base.remove("content") instanceof String content) || content.length() > EditorControl.MAX_READ

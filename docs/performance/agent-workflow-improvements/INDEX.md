@@ -21,3 +21,7 @@ Named display sessions, bounded counts and phases, sticky completion/cancellatio
 `activity-cold-failure.json` preserves a failed cold component run and its EDT stack: hidden range repaint requested model-to-view geometry and entered `CFontManager.loadNativeFonts`. The correction avoids text geometry for hidden source views; tests retain the original Unicode fixture and deadlines. No retry or assertion relaxation was added. `activity-tests.json` records the corrected regression run, including a hidden component whose geometry method throws if called.
 
 The final cold-open run also exposed a fixture difference: it used Swing’s default logical font rather than Shed’s bundled physical editor font. The fixture now selects bundled JetBrains Mono before attaching its source document, matching the actual application. Original Unicode source, request deadlines and exact-result assertions are unchanged. `activity-cold-open-failure.json` preserves that failed run. The earlier activity commit was made before its failed final result was noticed; the follow-up fixture/evidence commit records the correction explicitly.
+
+## 4. Project proposals
+
+`project-tests.json`: 29 passing tests. A single human-reviewed proposal changes open text, creates, renames and deletes disposable files; review Undo restores the exact cohort. Protected/escaping paths and stale human revisions are rejected. Existing review UI and transaction/recovery ownership are reused.

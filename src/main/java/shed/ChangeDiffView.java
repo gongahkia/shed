@@ -15,16 +15,24 @@ final class ChangeDiffView extends JTextPane {
             patch.append("@@ line ").append(line).append(" @@\n");
             String prefix=change.before().substring(0,h.start());var context=prefix.split("\n",-1);
             for(int i=Math.max(0,context.length-4);i<context.length-1;i++)patch.append(' ').append(context[i]).append('\n');
-            int rowStart=change.before().lastIndexOf('\n',Math.max(-1,h.start()-1))+1;
-            int rowEnd;if(h.end()>0&&change.before().charAt(h.end()-1)=='\n')rowEnd=h.end();else {int newline=change.before().indexOf('\n',h.end());rowEnd=newline<0?change.before().length():newline+1;}
-            if(h.start()==h.end()&&(h.start()==0||change.before().charAt(h.start()-1)=='\n')&&h.replacement().endsWith("\n"))rowEnd=h.end();
-            String lead=change.before().substring(rowStart,h.start()),tail=change.before().substring(h.end(),rowEnd);
-            append(patch,'-',lead+h.before()+tail);append(patch,'+',lead+h.replacement()+tail);
-            String suffix=change.before().substring(rowEnd);int end=0;
+            var display=change.display(h);
+            append(patch,'-',display.before());append(patch,'+',display.after());
+            String suffix=change.before().substring(display.end());int end=0;
             for(int i=0;i<3&&end<suffix.length();i++){int n=suffix.indexOf('\n',end);int stop=n<0?suffix.length():n+1;patch.append(' ').append(suffix,end,stop);end=stop;}
             if(patch.length()>100000)break;
         }
         showPatch(patch.toString(),font);
+    }
+    void refreshAppearance(Font font){
+        setFont(font);Color background=UIManager.getColor("TextArea.background"),foreground=UIManager.getColor("TextArea.foreground");
+        if(background!=null)setBackground(background);if(foreground!=null)setForeground(foreground);
+        var document=getStyledDocument();var base=new SimpleAttributeSet();StyleConstants.setForeground(base,getForeground());StyleConstants.setBackground(base,getBackground());
+        document.setCharacterAttributes(0,document.getLength(),base,false);
+        int offset=0;for(String line:getText().split("\n",-1)){
+            Color color=line.startsWith("+")?UIManager.getColor("shed.success"):line.startsWith("-")?UIManager.getColor("shed.error"):null;
+            if(color!=null){var attributes=new SimpleAttributeSet();StyleConstants.setForeground(attributes,AccessibilitySupport.readableText(color,getBackground()));StyleConstants.setBackground(attributes,new Color((color.getRed()+getBackground().getRed()*7)/8,(color.getGreen()+getBackground().getGreen()*7)/8,(color.getBlue()+getBackground().getBlue()*7)/8));document.setCharacterAttributes(offset,Math.min(line.length()+1,document.getLength()-offset),attributes,false);}
+            offset+=line.length()+1;if(offset>=document.getLength())break;
+        }
     }
     static int nextHunk(String text,int caret,int direction){
         int index=direction>0?text.indexOf("\n@@",Math.max(0,caret)):text.lastIndexOf("\n@@",Math.max(-1,caret-2));

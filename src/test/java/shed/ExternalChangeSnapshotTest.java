@@ -49,6 +49,8 @@ class ExternalChangeSnapshotTest {
             view.showChange(insertion,BundledEditorFont.atSize(16));assertTrue(view.getText().contains("+added\n"));assertFalse(view.getText().contains("-keep"));assertFalse(view.getText().contains("+keep"));
             String headers="file\n@@ first @@\n-text\n@@ second @@\n+text";int first=ChangeDiffView.nextHunk(headers,0,1),second=ChangeDiffView.nextHunk(headers,first,1);
             assertEquals(headers.indexOf("@@ first"),first);assertEquals(headers.indexOf("@@ second"),second);assertEquals(first,ChangeDiffView.nextHunk(headers,second,-1));assertEquals(-1,ChangeDiffView.nextHunk(headers,second,1));
+            var word=new ExternalChangeSnapshot.Change("M","word.txt",null,"value\n","public value\n",WorkspaceTextEdits.diff("value\n","public value\n"));assertEquals(1,word.added());assertEquals(1,word.removed());assertEquals(1,insertion.added());assertEquals(0,insertion.removed());
+            String displayed=view.getText();view.select(1,4);view.refreshAppearance(BundledEditorFont.atSize(16));assertEquals(displayed,view.getText());assertEquals(1,view.getSelectionStart());assertEquals(4,view.getSelectionEnd());
             var image=new java.awt.image.BufferedImage(700,400,java.awt.image.BufferedImage.TYPE_INT_RGB);var graphics=image.createGraphics();view.paint(graphics);graphics.dispose();assertEquals("old value\n",source.before());return null;
         });
     }

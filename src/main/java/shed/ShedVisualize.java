@@ -23,7 +23,7 @@ final class ShedVisualize {
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name","").startsWith("Windows")?"java.exe":"java").toString();
         var command=new ArrayList<String>(List.of(javaExecutable,"-Djava.awt.headless=false","-Duser.home="+System.getProperty("user.home"),"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir")));
         String prefs=System.getProperty("java.util.prefs.userRoot");if(prefs!=null)command.add("-Djava.util.prefs.userRoot="+prefs);
-        command.addAll(List.of("-cp",System.getProperty("java.class.path"),"shed.Texteditor","--visualize-window",root.toString(),agent,directory.toString()));
+        command.addAll(List.of("-cp",absoluteClassPath(System.getProperty("java.class.path"),Path.of(System.getProperty("user.dir"))),"shed.Texteditor","--visualize-window",root.toString(),agent,directory.toString()));
         Process child=new ProcessBuilder(command).directory(root.toFile()).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();boolean success=false;
         try{
             long until=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(45);
@@ -38,6 +38,11 @@ final class ShedVisualize {
             if(!success){child.destroy();if(!child.waitFor(2,java.util.concurrent.TimeUnit.SECONDS))child.destroyForcibly();}
             try{Files.deleteIfExists(directory);}catch(java.io.IOException busy){/* child may still be retiring its owned readiness record */}
         }
+    }
+    static String absoluteClassPath(String classPath,Path directory){
+        var entries=java.util.Arrays.stream(classPath.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator),-1))
+            .map(entry->directory.resolve(entry).toAbsolutePath().normalize().toString()).toList();
+        return String.join(java.io.File.pathSeparator,entries);
     }
     private static void window(String[] args)throws Exception {
         if(args.length!=4)throw new IllegalArgumentException("Invalid visualization launch");
@@ -57,7 +62,11 @@ final class ShedVisualize {
                 var watch=editor.toolWindowHost.watchAgentChanges("state",args[2]);
                 if(attachment==null||!Boolean.TRUE.equals(watch.get("ready")))return;
                 var result=Map.of("schemaVersion",1,"ready",true,"project",project.toString(),"descriptor",attachment.descriptor().toString(),"credential",attachment.credential().toString(),"pid",ProcessHandle.current().pid(),"agent",args[2]);
-                timer.stop();Thread.ofVirtual().name("shed-visualize-ready").start(()->{try{PrivateWorkspaceFiles.create(directory,"ready.json",MiniJson.stringify(result).getBytes(StandardCharsets.UTF_8));}catch(java.io.IOException failure){System.getLogger("shed.visualize").log(System.Logger.Level.WARNING,"Visualization readiness could not be published");}});
+                timer.stop();Thread.ofVirtual().name("shed-visualize-ready").start(()->{
+                    byte[] bytes=MiniJson.stringify(result).getBytes(StandardCharsets.UTF_8);Path pending=null;
+                    try{pending=PrivateWorkspaceFiles.create(directory,"ready-pending.json",bytes);Files.move(pending,directory.resolve("ready.json"),StandardCopyOption.ATOMIC_MOVE);}
+                    catch(java.io.IOException failure){if(pending!=null)try{PrivateWorkspaceFiles.deleteIfMatching(pending,bytes);}catch(java.io.IOException cleanup){failure.addSuppressed(cleanup);}System.getLogger("shed.visualize").log(System.Logger.Level.WARNING,"Visualization readiness could not be published");}
+                });
             });timer.start();editor.addWindowListener(new java.awt.event.WindowAdapter(){public void windowClosed(java.awt.event.WindowEvent e){timer.stop();}});
         });
     }

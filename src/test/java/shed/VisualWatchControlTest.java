@@ -6,6 +6,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 class VisualWatchControlTest {
     @TempDir Path temporary;
+    @Test void launcherResolvesClasspathBeforeChangingTheChildWorkingDirectory(){
+        String separator=java.io.File.pathSeparator;
+        String value=ShedVisualize.absoluteClassPath("target/shed.jar"+separator+"lib jars/*"+separator,temporary);
+        String[] entries=value.split(java.util.regex.Pattern.quote(separator),-1);
+        assertEquals(temporary.resolve("target/shed.jar").toAbsolutePath().toString(),entries[0]);
+        assertEquals(temporary.resolve("lib jars/*").toAbsolutePath().toString(),entries[1]);assertEquals(temporary.toAbsolutePath().toString(),entries[2]);
+    }
     @Test void watchIsAuthenticatedAndProjectScopedWithoutAnOpenDocument() throws Exception {
         try(var f=new EditorControlTest.Fixture(temporary){
             public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(roots.active(),roots.generation());}

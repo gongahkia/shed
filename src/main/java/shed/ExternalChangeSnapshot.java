@@ -11,11 +11,18 @@ final class ExternalChangeSnapshot {
     static final int MAX_FILES=4096, MAX_FILE=65536, MAX_TOTAL=16*1024*1024;
     record File(String text,String digest,boolean textual) { }
     record Change(String kind,String path,String previous,String before,String after,List<WorkspaceTextEdits.Hunk> hunks) {
-        int added(){return hunks.stream().mapToInt(h->lines(h.replacement())).sum();}
-        int removed(){return hunks.stream().mapToInt(h->lines(h.before())).sum();}
+        int added(){return hunks.stream().mapToInt(h->lines(display(h).after())).sum();}
+        int removed(){return hunks.stream().mapToInt(h->lines(display(h).before())).sum();}
+        Display display(WorkspaceTextEdits.Hunk h){
+            int start=before.lastIndexOf('\n',Math.max(-1,h.start()-1))+1,end;
+            if(h.end()>0&&before.charAt(h.end()-1)=='\n')end=h.end();else {int newline=before.indexOf('\n',h.end());end=newline<0?before.length():newline+1;}
+            if(h.start()==h.end()&&(h.start()==0||before.charAt(h.start()-1)=='\n')&&h.replacement().endsWith("\n"))end=h.end();
+            return new Display(start,end,before.substring(start,end),before.substring(start,h.start())+h.replacement()+before.substring(h.end(),end));
+        }
         private static int lines(String text){return text.isEmpty()?0:(int)text.chars().filter(c->c=='\n').count()+(text.endsWith("\n")?0:1);}
         @Override public String toString(){return kind+"  "+path+(hunks.isEmpty()&&before.isEmpty()&&after.isEmpty()?"":"  +"+added()+" −"+removed());}
     }
+    record Display(int start,int end,String before,String after){}
     static Map<String,File> capture(Path root) throws IOException {return capture(root,List.of());}
     static Map<String,File> capture(Path root,List<Path> excludedRoots) throws IOException {
         var result=new TreeMap<String,File>();long[] bytes={0};long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(5);

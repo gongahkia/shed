@@ -6,7 +6,8 @@ import javax.swing.text.*;
 /** Bounded, themed unified diff shared by watched changes and existing Git patches. */
 final class ChangeDiffView extends JTextPane {
     ChangeDiffView(){setEditable(false);setName("agent.liveDiff");AccessibilitySupport.describe(this,"Live file diff","Added and removed source lines. Select a file, then navigate between changes.");}
-    void showChange(ExternalChangeSnapshot.Change change,Font font){
+    void showChange(ExternalChangeSnapshot.Change change,Font font){showPatch(format(change),font);}
+    static String format(ExternalChangeSnapshot.Change change){
         StringBuilder patch=new StringBuilder();
         patch.append(change.previous()==null?change.path():change.previous()+" → "+change.path()).append('\n');
         if(change.hunks().isEmpty())patch.append(change.before().equals(change.after())?"Contents unchanged\n":change.after().isEmpty()?change.before():change.after());
@@ -21,7 +22,7 @@ final class ChangeDiffView extends JTextPane {
             for(int i=0;i<3&&end<suffix.length();i++){int n=suffix.indexOf('\n',end);int stop=n<0?suffix.length():n+1;patch.append(' ').append(suffix,end,stop);end=stop;}
             if(patch.length()>100000)break;
         }
-        showPatch(patch.toString(),font);
+        return bounded(patch.toString());
     }
     void refreshAppearance(Font font){
         setFont(font);Color background=UIManager.getColor("TextArea.background"),foreground=UIManager.getColor("TextArea.foreground");
@@ -30,7 +31,7 @@ final class ChangeDiffView extends JTextPane {
         document.setCharacterAttributes(0,document.getLength(),base,false);
         int offset=0;for(String line:getText().split("\n",-1)){
             Color color=line.startsWith("+")?UIManager.getColor("shed.success"):line.startsWith("-")?UIManager.getColor("shed.error"):null;
-            if(color!=null){var attributes=new SimpleAttributeSet();StyleConstants.setForeground(attributes,AccessibilitySupport.readableText(color,getBackground()));StyleConstants.setBackground(attributes,new Color((color.getRed()+getBackground().getRed()*7)/8,(color.getGreen()+getBackground().getGreen()*7)/8,(color.getBlue()+getBackground().getBlue()*7)/8));document.setCharacterAttributes(offset,Math.min(line.length()+1,document.getLength()-offset),attributes,false);}
+            if(color!=null){var attributes=lineAttributes(color);document.setCharacterAttributes(offset,Math.min(line.length()+1,document.getLength()-offset),attributes,false);}
             offset+=line.length()+1;if(offset>=document.getLength())break;
         }
     }
@@ -39,15 +40,24 @@ final class ChangeDiffView extends JTextPane {
         return index<0?-1:index+1;
     }
     private static void append(StringBuilder out,char sign,String text){if(text.isEmpty())return;String[] lines=text.split("\n",-1);int count=lines.length-(text.endsWith("\n")?1:0);for(int i=0;i<count;i++){out.append(sign).append(lines[i]).append('\n');}}
+    private SimpleAttributeSet lineAttributes(Color color){
+        Color background=getBackground(),tint=new Color((color.getRed()+background.getRed()*7)/8,(color.getGreen()+background.getGreen()*7)/8,(color.getBlue()+background.getBlue()*7)/8);
+        var attributes=new SimpleAttributeSet();StyleConstants.setForeground(attributes,AccessibilitySupport.readableText(color,tint));StyleConstants.setBackground(attributes,tint);return attributes;
+    }
+    private static String bounded(String text){
+        if(text.length()<=100000)return text;
+        int end=100000;if(Character.isHighSurrogate(text.charAt(end-1)))end--;
+        return text.substring(0,end)+"\n[Diff display truncated; source is unchanged.]";
+    }
     void showPatch(String text,Font font){
         setFont(font);setText("");var document=getStyledDocument();Color background=UIManager.getColor("TextArea.background"),foreground=UIManager.getColor("TextArea.foreground");
         if(background!=null)setBackground(background);if(foreground!=null)setForeground(foreground);
-        text=text.substring(0,Math.min(100000,text.length()));
+        text=bounded(text);
         String previous="";int previousOffset=0;
         for(String line:text.split("\n",-1)){
             var attributes=new SimpleAttributeSet();char first=line.isEmpty()?' ':line.charAt(0);
             Color color=first=='+'?UIManager.getColor("shed.success"):first=='-'?UIManager.getColor("shed.error"):null;
-            if(color!=null){StyleConstants.setForeground(attributes,AccessibilitySupport.readableText(color,getBackground()));StyleConstants.setBackground(attributes,new Color((color.getRed()+getBackground().getRed()*7)/8,(color.getGreen()+getBackground().getGreen()*7)/8,(color.getBlue()+getBackground().getBlue()*7)/8));}
+            if(color!=null)attributes=lineAttributes(color);
             if(line.startsWith("@@"))StyleConstants.setBold(attributes,true);
             try{int offset=document.getLength();document.insertString(offset,line+"\n",attributes);
                 if(line.startsWith("+")&&previous.startsWith("-")&&!line.startsWith("+++")&&!previous.startsWith("---")){

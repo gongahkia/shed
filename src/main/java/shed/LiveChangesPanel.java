@@ -4,7 +4,6 @@ import java.awt.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.*;
 
 /** Passive visualization of external writes. Human buffers are never overwritten by this surface. */
@@ -18,11 +17,10 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
     private final JToggleButton follow=new JToggleButton("Follow",true);
     private final JComboBox<String> baseline=new JComboBox<>(new String[]{"Since watch started","Git changes"});
     private final JTextField agent=new JTextField("Agent",10);
-    private final AtomicBoolean queued=new AtomicBoolean();
     private final java.util.concurrent.atomic.AtomicReference<Path> observedEvent=new java.util.concurrent.atomic.AtomicReference<>();
     private List<Path> excludedRoots=List.of();
     private String watcherName="Agent";
-    private Path root;private long rootsGeneration,generation;
+    private Path root;private long rootsGeneration,generation,selectionGeneration;private int diffJob=-1;
     private Map<String,ExternalChangeSnapshot.File> original=Map.of(),latest=Map.of();
     private TestWatchService watcher;private boolean closed,busy,dirty;private String selectedPath;
     LiveChangesPanel(Texteditor editor){
@@ -64,7 +62,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         Path active=editor.workspaceController.activeRoot();if(active==null){state.setText("Open a project before watching.");return;}stop();agent.setText(name);watcherName=name;root=active;excludedRoots=editor.workspaceRoots.all().stream().filter(p->!p.equals(active)&&p.startsWith(active)).toList();rootsGeneration=editor.workspaceRoots.generation();long expected=++generation;
         var excluded=excludedRoots;busy=true;state.setText("Capturing the watch baseline…");
         editor.asyncJobService.submit("Start project visualization",token->{
-            var watch=TestWatchService.start(active,p->{if(ExternalChangeSnapshot.allowed(active,p))changed(p);});token.onCancel(watch::close);
+            var watch=TestWatchService.start(active,p->ExternalChangeSnapshot.allowed(active,p)&&excluded.stream().noneMatch(p::startsWith),p->changed(p,expected));token.onCancel(watch::close);
             try{return new Started(watch,ExternalChangeSnapshot.capture(active,excluded));}catch(Exception failure){watch.close();throw failure;}
         },(job,result,error)->{
             if(closed||expected!=generation){if(result!=null)result.watcher().close();return;}busy=false;
@@ -74,7 +72,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         });
     }
     private record Started(TestWatchService watcher,Map<String,ExternalChangeSnapshot.File> files) { }
-    private void changed(Path path){observedEvent.set(path);if(queued.compareAndSet(false,true))SwingUtilities.invokeLater(()->{queued.set(false);if(!closed){dirty=true;requestRefresh();}});}
+    private void changed(Path path,long expected){SwingUtilities.invokeLater(()->{if(closed||expected!=generation)return;observedEvent.set(path);dirty=true;requestRefresh();});}
     private boolean current(){return !closed&&root!=null&&root.equals(editor.workspaceController.activeRoot())&&rootsGeneration==editor.workspaceRoots.generation();}
     private void requestRefresh(){
         if(!current()){if(root!=null)stop();return;}if(busy){dirty=true;return;}if(watcher==null)return;
@@ -84,7 +82,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
             var now=ExternalChangeSnapshot.capture(capturedRoot,excluded);return new Update(now,ExternalChangeSnapshot.compare(capturedBaseline,now),null);
         },(job,result,error)->{
             if(closed||expected!=generation)return;busy=false;if(git!=(baseline.getSelectedIndex()==1)){requestRefresh();return;}if(!current()){stop();return;}
-            if(error!=null||result==null){state.setText("Refresh failed; previous changes retained. "+(error==null?job.getStatus():error.getMessage()));return;}
+            if(error!=null||result==null){state.setText("Refresh failed; previous changes retained. "+(error==null?job.getStatus():error.getMessage()));if(dirty)requestRefresh();return;}
             if(git){boolean paused=follow.isSelected()&&humanBusy();if(paused)follow.setSelected(false);latest=result.now();if(follow.isSelected()&&event!=null&&event.startsWith(root))selectedPath=root.relativize(event).toString();showGit(result.git());if(paused)state.setText("Follow paused · continue editing, or enable Follow to resume");}else{
                 String changed=result.now().entrySet().stream().filter(e->!Objects.equals(latest.get(e.getKey()),e.getValue())).map(Map.Entry::getKey).sorted().findFirst().orElse(null);
                 if(event!=null&&event.startsWith(root)){
@@ -117,24 +115,39 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         if(!rows.isEmpty())files.setSelectedIndex(selected);else diff.showPatch(snapshot.detail(),editor.resolveEditorFont());
     }
     private void showSelection(boolean unused){
-        var change=files.getSelectedValue();if(change==null)return;selectedPath=change.path();
-        if(baseline.getSelectedIndex()==0){diff.showChange(change,editor.resolveEditorFont());return;}
+        var change=files.getSelectedValue();if(change==null){selectionGeneration++;return;}selectedPath=change.path();if(follow.isSelected())files.ensureIndexIsVisible(files.getSelectedIndex());
+        if(baseline.getSelectedIndex()==0){showSnapshot(change);return;}
         int index=files.getSelectedIndex();if(index>=gitRows.size())return;
         var file=latest.get(change.path());
         if(file!=null&&(gitRows.get(index).indexStatus().contains("Untracked")||gitRows.get(index).worktreeStatus().contains("Untracked"))){
-            diff.showChange(new ExternalChangeSnapshot.Change("A",change.path(),null,"",file.text(),file.textual()?List.of(new WorkspaceTextEdits.Hunk(0,0,"",file.text())):List.of()),editor.resolveEditorFont());return;
-        }long expected=generation;var row=gitRows.get(index);var selectedSnapshot=gitSnapshot;
+            showSnapshot(new ExternalChangeSnapshot.Change("A",change.path(),null,"",file.text(),file.textual()?List.of(new WorkspaceTextEdits.Hunk(0,0,"",file.text())):List.of()));return;
+        }diff.showPatch("Loading diff for "+change.path()+"…",editor.resolveEditorFont());long expected=generation;var row=gitRows.get(index);var selectedSnapshot=gitSnapshot;
         editor.asyncJobService.submit("Read visual Git diff",token->editor.treeGitController.loadGitChangesWorkbenchDiff(selectedSnapshot,row),(job,result,error)->{
             if(!closed&&generation==expected&&Objects.equals(selectedPath,change.path())&&baseline.getSelectedIndex()==1)diff.showPatch(error==null&&result!=null?result.content():"Git diff unavailable",editor.resolveEditorFont());
         });
     }
+    private void showSnapshot(ExternalChangeSnapshot.Change change){
+        long expected=generation,selection=++selectionGeneration;int mode=baseline.getSelectedIndex();
+        if(diffJob>=0)editor.asyncJobService.cancel(diffJob);
+        diff.showPatch("Loading diff for "+change.path()+"…",editor.resolveEditorFont());
+        diffJob=editor.asyncJobService.submit("Format visual diff",token->ChangeDiffView.format(change),(job,result,error)->{
+            if(closed||expected!=generation||selection!=selectionGeneration||mode!=baseline.getSelectedIndex()||!Objects.equals(selectedPath,change.path()))return;
+            diffJob=-1;
+            diff.showPatch(error==null&&result!=null?result:"Diff unavailable; refresh changes to try again.",editor.resolveEditorFont());
+        });
+    }
     private void openSelection(boolean automatic){
         var change=files.getSelectedValue();if(change==null||change.kind().equals("D")||!current())return;
-        if(automatic&&(latest.get(change.path())==null||!latest.get(change.path()).textual()))return;
+        if(automatic&&(latest.get(change.path())==null||!latest.get(change.path()).textual()||latest.get(change.path()).text().length()>65536))return;
         if(automatic&&(editor.getCurrentBuffer()!=null&&editor.getCurrentBuffer().isModified()||System.nanoTime()-editor.inputController.lastKeyPressNanos()<1_500_000_000L)){
             follow.setSelected(false);state.setText("Follow paused · continue editing, or enable Follow to resume");return;}
         long expected=generation;Path target=root.resolve(change.path());
-        editor.openFileAsync(target.toFile(),error->{
+        var pane=editor.getActivePane();var before=editor.getCurrentBuffer();long revision=before==null?-1:before.documentRevision(),input=editor.inputController.lastKeyPressNanos();
+        int dot=editor.writingArea.getCaret().getDot(),mark=editor.writingArea.getCaret().getMark();
+        java.util.function.BooleanSupplier valid=()->!closed&&expected==generation&&current()&&Objects.equals(selectedPath,change.path())&&pane==editor.getActivePane()
+            &&(!automatic||follow.isSelected()&&!humanBusy()&&before==editor.getCurrentBuffer()&&(before==null||revision==before.documentRevision())
+                &&input==editor.inputController.lastKeyPressNanos()&&dot==editor.writingArea.getCaret().getDot()&&mark==editor.writingArea.getCaret().getMark());
+        java.util.function.Consumer<java.io.IOException> complete=error->{
             if(error!=null||closed||expected!=generation||!current())return;
             var buffer=editor.getCurrentBuffer();if(buffer==null||buffer.getFile()==null||!buffer.getFile().toPath().toAbsolutePath().normalize().equals(target)||buffer.isModified())return;
             if(!buffer.getContent().equals(change.after())||change.hunks().isEmpty())return;
@@ -142,10 +155,12 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
             for(var h:change.hunks()){if(ranges.size()==32)break;int start=h.start()+shift;ranges.add(new AgentEditPresentation.Range(start,start+h.replacement().length()));shift+=h.replacement().length()-h.before().length();}
             var presentation=editor.getActivePane().agentPresentation();presentation.showApplied(ranges);presentation.setAgentName(watcherName+" change");
             if(presentation.available()&&!ranges.isEmpty())try{var rectangle=editor.writingArea.modelToView2D(ranges.getFirst().start());if(rectangle!=null)editor.writingArea.scrollRectToVisible(rectangle.getBounds());}catch(javax.swing.text.BadLocationException unavailable){editor.showMessage("Change revealed in the diff; source location unavailable");}
-        });
+        };
+        if(automatic)editor.paneBufferController.openFileCheckedAsync(target.toFile(),valid,b->!b.isModified(),b->true,()->{},complete);
+        else editor.openFileAsync(target.toFile(),complete);
     }
     private void hunk(int direction){String text=diff.getText();int caret=diff.getCaretPosition();int next=ChangeDiffView.nextHunk(text,caret,direction);if(next>=0)diff.setCaretPosition(next);}
-    void stop(){generation++;if(watcher!=null)watcher.close();watcher=null;observedEvent.set(null);busy=false;dirty=false;original=Map.of();latest=Map.of();rows.clear();gitRows=List.of();root=null;state.setText("Watch stopped. Start a new watch to capture a new baseline.");}
+    void stop(){generation++;selectionGeneration++;if(diffJob>=0)editor.asyncJobService.cancel(diffJob);diffJob=-1;if(watcher!=null)watcher.close();watcher=null;observedEvent.set(null);busy=false;dirty=false;original=Map.of();latest=Map.of();rows.clear();gitRows=List.of();root=null;state.setText("Watch stopped. Start a new watch to capture a new baseline.");}
     @Override public JPanel component(){return panel;}
     @Override public void refresh(){if(root!=null&&!current())stop();}
     @Override public void refreshAppearance(){diff.refreshAppearance(editor.resolveEditorFont());files.setFont(editor.resolveUiFont());}

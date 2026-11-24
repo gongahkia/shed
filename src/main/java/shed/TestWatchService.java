@@ -18,12 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /** Explicit, bounded local workspace watcher for continuous Test Explorer runs. */
 final class TestWatchService implements AutoCloseable {
     private static final int MAX_DEPTH = 32;
     private static final int MAX_DIRECTORIES = 4_096;
     private static final long DEBOUNCE_MILLIS = 300;
+    private static final long MAX_BATCH_MILLIS = 1000;
     private static final Set<String> IGNORED_DIRECTORIES = Set.of(
         ".git", ".gradle", ".idea", ".vscode", ".venv", "venv", "env", "node_modules", "target", "build", "out",
         ".shed-devcontainer-test-reports"
@@ -31,12 +33,13 @@ final class TestWatchService implements AutoCloseable {
 
     private final Path root;
     private final Consumer<Path> listener;
+    private final Predicate<Path> includes;
     private final WatchService watchService;
     private final Map<WatchKey, Path> directories = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
     private Thread thread;
 
-    private TestWatchService(Path root, Consumer<Path> listener) throws IOException {
+    private TestWatchService(Path root, Predicate<Path> includes, Consumer<Path> listener) throws IOException {
         if (root == null || listener == null) throw new IOException("test watch root and listener are required");
         Path normalized = root.toAbsolutePath().normalize();
         if (Files.isSymbolicLink(normalized) || !Files.isDirectory(normalized, LinkOption.NOFOLLOW_LINKS)) {
@@ -44,6 +47,7 @@ final class TestWatchService implements AutoCloseable {
         }
         this.root = normalized;
         this.listener = listener;
+        this.includes = java.util.Objects.requireNonNull(includes);
         this.watchService = FileSystems.getDefault().newWatchService();
         try {
             registerTree(normalized);
@@ -54,7 +58,11 @@ final class TestWatchService implements AutoCloseable {
     }
 
     static TestWatchService start(Path root, Consumer<Path> listener) throws IOException {
-        TestWatchService service = new TestWatchService(root, listener);
+        return start(root, path -> true, listener);
+    }
+
+    static TestWatchService start(Path root, Predicate<Path> includes, Consumer<Path> listener) throws IOException {
+        TestWatchService service = new TestWatchService(root, includes, listener);
         service.thread = Thread.ofVirtual().name("shed-test-watch-", 0).start(service::watch);
         return service;
     }
@@ -74,7 +82,7 @@ final class TestWatchService implements AutoCloseable {
         Files.walkFileTree(directory, Set.of(), MAX_DEPTH, new FileVisitor<>() {
             @Override public FileVisitResult preVisitDirectory(Path current, BasicFileAttributes attributes) throws IOException {
                 if (Files.isSymbolicLink(current)) return FileVisitResult.SKIP_SUBTREE;
-                if (!watches(root, current)) return FileVisitResult.SKIP_SUBTREE;
+                if (!watches(root, current) || !includes.test(current)) return FileVisitResult.SKIP_SUBTREE;
                 register(current);
                 return FileVisitResult.CONTINUE;
             }
@@ -98,7 +106,7 @@ final class TestWatchService implements AutoCloseable {
 
     private void watch() {
         Path changed = null;
-        long deadline = 0;
+        long deadline = 0, first = 0;
         try {
             while (!closed.get()) {
                 WatchKey key = watchService.poll(100, TimeUnit.MILLISECONDS);
@@ -107,18 +115,20 @@ final class TestWatchService implements AutoCloseable {
                     if (parent != null) {
                         for (WatchEvent<?> event : key.pollEvents()) {
                             if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
+                                if (changed == null) first = System.nanoTime();
                                 changed = root;
-                                deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DEBOUNCE_MILLIS);
+                                deadline = Math.min(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DEBOUNCE_MILLIS), first + TimeUnit.MILLISECONDS.toNanos(MAX_BATCH_MILLIS));
                                 continue;
                             }
                             if (!(event.context() instanceof Path relative)) continue;
                             Path candidate = parent.resolve(relative).toAbsolutePath().normalize();
-                            if (!watches(root, candidate)) continue;
+                            if (!watches(root, candidate) || !includes.test(candidate)) continue;
                             if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS)) {
                                 try { registerTree(candidate); } catch (IOException ignored) { }
                             }
+                            if (changed == null) first = System.nanoTime();
                             changed = candidate;
-                            deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DEBOUNCE_MILLIS);
+                            deadline = Math.min(System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DEBOUNCE_MILLIS), first + TimeUnit.MILLISECONDS.toNanos(MAX_BATCH_MILLIS));
                         }
                     }
                     if (!key.reset()) directories.remove(key);
@@ -134,7 +144,7 @@ final class TestWatchService implements AutoCloseable {
         } catch (java.nio.file.ClosedWatchServiceException ignored) {
             // close() owns normal watcher shutdown
         } finally {
-            closed.set(true);
+            close();
         }
     }
 

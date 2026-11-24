@@ -29,6 +29,46 @@ class ExternalChangeSnapshotTest {
             Files.writeString(root.resolve("external.txt"),"external");assertNotNull(changed.get(5,TimeUnit.SECONDS));assertTrue(watch.watching());watch.close();assertFalse(watch.watching());
         }
     }
+    @Test void hiddenTemporaryTailDoesNotMaskTheSourceWrite() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("atomic"));var changed=new CompletableFuture<Path>();
+        try(var watch=TestWatchService.start(root,path->ExternalChangeSnapshot.allowed(root,path),changed::complete)){
+            Files.writeString(root.resolve("source.txt"),"final source\n");
+            Path hidden=Files.writeString(root.resolve(".save.tmp"),"temporary");Files.delete(hidden);
+            assertEquals(root.resolve("source.txt"),changed.get(3,TimeUnit.SECONDS));
+        }
+    }
+    @Test void continuousWritesStillPublishBeforeTheWriterFinishes() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("stream")),source=Files.writeString(root.resolve("source.txt"),"start");
+        var changed=new CompletableFuture<Path>();var writer=Executors.newSingleThreadScheduledExecutor();
+        try(var watch=TestWatchService.start(root,changed::complete)){
+            var writes=writer.scheduleAtFixedRate(()->{try{Files.writeString(source,"stream "+System.nanoTime());}catch(java.io.IOException e){changed.completeExceptionally(e);}},0,20,TimeUnit.MILLISECONDS);
+            // macOS WatchService adds its own polling interval before this service sees events.
+            assertNotNull(changed.get(6,TimeUnit.SECONDS));assertFalse(writes.isDone());
+        }finally{writer.shutdownNow();assertTrue(writer.awaitTermination(3,TimeUnit.SECONDS));}
+    }
+    @Test void atomicReplacementAndBulkChangesConvergeToExactFinalContents() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("bulk"));Files.writeString(root.resolve("source.txt"),"old\n");var base=ExternalChangeSnapshot.capture(root);
+        var observed=new CompletableFuture<Path>();
+        try(var watcher=TestWatchService.start(root,p->ExternalChangeSnapshot.allowed(root,p),observed::complete)){
+            for(int i=0;i<40;i++){Path pending=Files.writeString(root.resolve(".save.tmp"),"version "+i+"\n");Files.move(pending,root.resolve("source.txt"),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
+            for(int i=0;i<200;i++)Files.writeString(root.resolve("new-"+i+".txt"),"created "+i+"\n");
+            assertNotNull(observed.get(5,TimeUnit.SECONDS));var now=ExternalChangeSnapshot.capture(root);assertEquals("version 39\n",now.get("source.txt").text());
+            assertEquals(201,ExternalChangeSnapshot.compare(base,now).size());assertFalse(now.containsKey(".save.tmp"));
+        }
+    }
+    @Test void sourceLargerThanOldLimitAndThousandsOfFilesRemainBounded() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("large-project"));
+        for(int i=0;i<5000;i++)Files.writeString(root.resolve("file-"+i+".txt"),"line "+i+"\n");
+        String text="source line\n".repeat(20000);Files.writeString(root.resolve("large.txt"),text);
+        var base=ExternalChangeSnapshot.capture(root);assertEquals(5001,base.size());assertTrue(base.get("large.txt").textual());
+        Files.writeString(root.resolve("large.txt"),text+"new last line\n");
+        var changes=ExternalChangeSnapshot.compare(base,ExternalChangeSnapshot.capture(root));assertEquals(1,changes.size());assertEquals(1,changes.getFirst().added());
+        String patch=ChangeDiffView.format(changes.getFirst());assertTrue(patch.contains("+new last line"));
+    }
+    @Test void oversizeDiffClearlyReportsTruncation(){
+        var added=new ExternalChangeSnapshot.Change("A","long.txt",null,"","line\n".repeat(25000),List.of(new WorkspaceTextEdits.Hunk(0,0,"","line\n".repeat(25000))));
+        String patch=ChangeDiffView.format(added);assertTrue(patch.contains("Diff display truncated"));assertTrue(patch.length()<100100);
+    }
     @Test void fileTreeRefreshRetainsSurvivorsAndRemovesDeletedNodes() throws Exception {
         Path root=Files.createDirectory(temporary.resolve("tree"));Path keep=Files.writeString(root.resolve("keep.txt"),"keep"),gone=Files.writeString(root.resolve("gone.txt"),"gone");
         var model=new FileTreeModel(root.toFile(),directory->new java.io.File[]{keep.toFile(),gone.toFile()});var survivor=model.rootNode().getChildAt(0);
@@ -40,6 +80,20 @@ class ExternalChangeSnapshotTest {
         var before=Map.of("one.txt",new ExternalChangeSnapshot.File("before","a",true));var after=Map.of("one.txt",new ExternalChangeSnapshot.File("after","b",true));
         try{Thread.currentThread().interrupt();assertThrows(CancellationException.class,()->ExternalChangeSnapshot.compare(before,after));}
         finally{Thread.interrupted();}
+    }
+    @Test void diffTextContrastUsesItsActualTintedLineBackground() throws Exception {
+        EditorControlTest.edt(()->{
+            var keys=List.of("TextArea.background","TextArea.foreground","shed.success","shed.error");var old=new HashMap<String,Object>();keys.forEach(key->old.put(key,javax.swing.UIManager.get(key)));
+            try{
+                for(int background:new int[]{0xf9f9fb,0x282a36}){
+                    javax.swing.UIManager.put("TextArea.background",new java.awt.Color(background));javax.swing.UIManager.put("TextArea.foreground",background==0x282a36?java.awt.Color.WHITE:java.awt.Color.BLACK);
+                    javax.swing.UIManager.put("shed.success",new java.awt.Color(0x27815c));javax.swing.UIManager.put("shed.error",new java.awt.Color(0xd63e54));
+                    var view=new ChangeDiffView();view.showPatch("-removed\n+added",BundledEditorFont.atSize(16));
+                    for(int offset:new int[]{0,9}){var attributes=view.getStyledDocument().getCharacterElement(offset).getAttributes();assertTrue(AccessibilitySupport.meetsTextContrast(javax.swing.text.StyleConstants.getForeground(attributes),javax.swing.text.StyleConstants.getBackground(attributes)),"Diff line foreground loses contrast against its tint");}
+                }
+            }finally{keys.forEach(key->javax.swing.UIManager.put(key,old.get(key)));}
+            return null;
+        });
     }
     @Test void unifiedDiffPaintIsPresentationOnly() throws Exception {
         EditorControlTest.edt(()->{

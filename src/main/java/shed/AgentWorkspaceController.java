@@ -27,6 +27,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     AgentWorkspaceController(Texteditor editor) { this.editor = editor; }
 
     void ownSession(AgentSessionService session) { sessions.own(session); }
+    WorkspaceBridgeServer visualAttachment(){return active!=null&&active.controlEnabled()&&active.running()?active:null;}
     void applicationReady() { applicationReady = true; if (applicationStatus != null) applicationStatus.ready(); }
 
     String handle(String argument) {
@@ -40,6 +41,8 @@ final class AgentWorkspaceController implements AutoCloseable {
                 yield "Describe your request in the Assistant panel.";
             }
             case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
+            case "watch" -> { editor.toolWindowHost.watchAgentChanges("start","Agent");yield "Watching external edits in Live changes."; }
+            case "watch stop" -> {editor.toolWindowHost.watchAgentChanges("stop","Agent");yield "Watch stopped.";}
             case "proposals" -> { if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentReview(); yield "Review proposals in the Agents panel."; }
             case "status", "api", "api status" -> status;
             case "api start" -> start(false, false);
@@ -192,6 +195,8 @@ final class AgentWorkspaceController implements AutoCloseable {
                 }
                 owner().showMessage(state.label());
             }
+            public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(owner().workspaceController.activeRoot(),owner().workspaceRoots.generation());}
+            public java.util.Map<String,Object> watch(String action,String agent){return owner().toolWindowHost.watchAgentChanges(action,agent);}
             public java.util.Map<String,Object> observe(String operation){return EditorObservation.read(owner(),operation);}
             public java.awt.image.BufferedImage capturePreview(){return EditorObservation.capture(owner());}
             public void review(String proposal) { owner().toolWindowHost.showAgentProposal(proposal); }

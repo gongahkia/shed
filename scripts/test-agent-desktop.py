@@ -20,8 +20,12 @@ def main():
     parser.add_argument('--jdk', required=True, type=Path)
     parser.add_argument('--jar', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--visual-only', action='store_true', help='Qualify live external-edit visualization separately from the existing HTML-preview endpoint')
+    parser.add_argument('--git-fixture', action='store_true', help='Direct fixed /usr/bin/git in a disposable repository, no shell or personal config')
+    parser.add_argument('--launch-only', action='store_true', help='Fixed direct Java launch-and-return acceptance; no shell')
     parser.add_argument('--replay-payload', type=Path, help='Replay a bounded previously generated proposal through the same external CLI')
     args = parser.parse_args()
+    if args.launch_only and args.replay_payload: parser.error("Launch-only cannot replay edits")
     jdk, jar = args.jdk.resolve(strict=True), args.jar.resolve(strict=True)
     output = args.output.absolute()
     if output.exists() or output.resolve() != output or output.is_symlink():
@@ -48,10 +52,22 @@ def main():
         (project / 'Demo.java').write_text('public class Demo {\n    public static String greet(String name) {\n        return "Hello, " + name;\n    }\n}\n')
         (f.run_root / 'no-executables').mkdir(mode=0o700)
         env = dict(f.env, PATH=str(f.run_root / 'no-executables'), SHED_PORTABLE_FIXTURE_ROOT=str(f.root))
+        if args.git_fixture:
+            git = Path('/usr/bin/git')
+            if not git.is_file(): raise UnsafeFixture('Fixed system Git unavailable')
+            (f.run_root / 'no-executables/git').symlink_to(git)
+            (f.run_root / 'empty-hooks').mkdir(mode=0o700)
+            (f.run_root / 'empty-git-config').write_text('')
+            env.update(GIT_CONFIG_GLOBAL=str(f.run_root / 'empty-git-config'), GIT_CONFIG_SYSTEM=str(f.run_root / 'empty-git-config'), GIT_CONFIG_NOSYSTEM='1', GIT_TERMINAL_PROMPT='0', GIT_PAGER='', GIT_CONFIG_COUNT='3', GIT_CONFIG_KEY_0='core.hooksPath', GIT_CONFIG_VALUE_0=str(f.run_root / 'empty-hooks'), GIT_CONFIG_KEY_1='core.fsmonitor', GIT_CONFIG_VALUE_1='false', GIT_CONFIG_KEY_2='commit.gpgsign', GIT_CONFIG_VALUE_2='false', SHED_VISUAL_GIT_FIXTURE='1')
+            for arguments in [['init','--quiet'], ['add','--','Welcome.txt','Demo.java'], ['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Fixture baseline']]:
+                completed=subprocess.run([str(git),*arguments],cwd=project,env=env,stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=10)
+                if completed.returncode: raise UnsafeFixture('Disposable Git setup failed: '+completed.stderr[:1000])
+            report['git_fixture']='fixed system git; empty owned config/hooks; terminal prompts and signing disabled'
+        if args.visual_only: env['SHED_LIVE_VISUAL_ONLY']='1'
         props = ['-Duser.home=' + env['HOME'], '-Djava.io.tmpdir=' + env['TMPDIR'],
                  '-Djava.util.prefs.userRoot=' + str(f.run_root / 'config')]
         compile_command = [str(jdk / 'bin/javac'), *['-J' + p for p in props], '-proc:none', '-encoding', 'UTF-8',
-                           '-cp', str(jar), '-d', str(classes), str(ROOT / 'src/benchmark/java/shed/AgentWorkflowDesktopProbe.java')]
+                           '-cp', str(jar), '-d', str(classes), str(ROOT / ('src/benchmark/java/shed/ShedVisualizeLaunchProbe.java' if args.launch_only else 'src/benchmark/java/shed/AgentWorkflowDesktopProbe.java'))]
         compiled = subprocess.run(compile_command, env=env, cwd=f.run_root, stdin=subprocess.DEVNULL,
                                   capture_output=True, text=True, timeout=30)
         report.update(compile_exit=compiled.returncode, compile_output=compiled.stdout + compiled.stderr)
@@ -62,7 +78,7 @@ def main():
                                        'java': str(jdk / 'bin/java'), 'environment': env}))
         session.chmod(0o600)
         command = [str(jdk / 'bin/java'), '-Djava.awt.headless=false', *props, '-cp', str(classes) + ':' + str(jar),
-                   'shed.AgentWorkflowDesktopProbe', str(work), str(project)]
+                   'shed.ShedVisualizeLaunchProbe' if args.launch_only else 'shed.AgentWorkflowDesktopProbe', str(work), str(project)]
         report['command'] = command
         with (work / 'stdout.log').open('w') as log:
             process = subprocess.Popen(command, env=env, cwd=project, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
@@ -93,6 +109,21 @@ def main():
                         while not (work / 'opened-captured').exists() and process.poll() is None and time.monotonic() < captured:
                             time.sleep(0.025)
                 report['client_results'] = client_results
+            if args.replay_payload:
+                deadline = time.monotonic() + 25
+                while not (work / 'watch-ready').exists() and process.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.025)
+                if (work / 'watch-ready').exists():
+                    (project / 'Demo.java').write_text((project / 'Demo.java').read_text() + '// External CLI write observed by Shed\n')
+                    (project / 'Fresh.java').write_text('class Fresh {}\n')
+                    (project / 'DeleteMe.txt').unlink()
+                    (project / 'RenameMe.txt').rename(project / 'Renamed.txt')
+                    deadline = time.monotonic() + 12
+                    while not (work / 'watch-paused').exists() and process.poll() is None and time.monotonic() < deadline:
+                        time.sleep(0.025)
+                    if (work / 'watch-paused').exists():
+                        (project / 'Fresh.java').write_text('class Fresh { int second; }\n')
+                        (work / 'writer-finished').write_text('done')
             process.wait(timeout=160)
         report['exit'] = process.returncode
         report['log'] = (work / 'stdout.log').read_text()[:524288]

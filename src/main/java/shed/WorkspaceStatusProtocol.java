@@ -107,6 +107,12 @@ final class WorkspaceStatusProtocol {
         }
 
         boolean acceptsControl(String method, Map<String, Object> value) {
+            if(method.equals("editor/watch")){
+                var observation=value==null?null:MiniJson.asObject(value.get("observation"));
+                return EditorControl.SCOPE.equals(scope())&&value!=null&&value.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","operation","observation"))
+                    &&Long.valueOf(1).equals(value.get("schemaVersion"))&&target.instanceId().equals(value.get("instanceId"))&&target.windowId().equals(value.get("windowId"))&&target.projectId().equals(value.get("projectId"))&&method.equals(value.get("operation"))
+                    &&observation!=null&&"watch".equals(observation.get("kind"))&&MiniJson.stringify(observation).length()<2048;
+            }
             if (!EditorControl.SCOPE.equals(scope()) || value == null || !EditorControl.OPERATIONS.contains(method)
                     || !method.equals(value.get("operation"))
                     || !List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE).equals(value.get("capabilities"))) return false;
@@ -114,10 +120,10 @@ final class WorkspaceStatusProtocol {
             base.remove("operation"); Object outcome = base.remove("outcome");
             base.put("capabilities", List.of("status", "editor-metadata", "editor-navigation", EditorControl.SCOPE));
             switch (method) {
-                case "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture" -> {
+                case "editor/watch", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture" -> {
                     var observation=MiniJson.asObject(base.remove("observation"));
                     if(!"observed".equals(outcome)||observation==null||MiniJson.stringify(observation).length()>29000
-                        || !Set.of("diagnostics","feedback","preview","capture").contains(observation.get("kind")))return false;
+                        || !Set.of("watch","diagnostics","feedback","preview","capture").contains(observation.get("kind")))return false;
                 }
                 case "editor/file/open" -> { if (!"applied".equals(outcome)) return false; }
                 case "editor/agent/activity" -> { if (!"shown".equals(outcome)) return false; }

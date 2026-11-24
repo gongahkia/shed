@@ -32,6 +32,20 @@ final class FileTreeModel extends DefaultTreeModel {
         nodeStructureChanged(node);
     }
 
+    java.util.List<File> loadedDirectories(){
+        var result=new java.util.ArrayList<File>();var nodes=rootNode().breadthFirstEnumeration();
+        while(nodes.hasMoreElements()&&result.size()<128){var node=(Node)nodes.nextElement();if(node.childrenLoaded)result.add(node.file());}return java.util.List.copyOf(result);
+    }
+    void refreshListings(java.util.Map<File,File[]> listings){refreshListing(rootNode(),listings);}
+    private void refreshListing(Node node,java.util.Map<File,File[]> listings){
+        File[] listed=listings.get(node.file());if(listed==null)return;
+        var previous=new java.util.LinkedHashMap<File,Node>();for(int i=0;i<node.getChildCount();i++){var child=(Node)node.getChildAt(i);previous.put(child.file(),child);}
+        boolean changed=listed.length!=node.getChildCount();
+        if(!changed)for(int i=0;i<listed.length;i++)if(!listed[i].getAbsoluteFile().equals(((Node)node.getChildAt(i)).file())){changed=true;break;}
+        if(changed){node.removeAllChildren();for(File file:listed){Node old=previous.get(file.getAbsoluteFile());node.add(old!=null&&old.getAllowsChildren()==file.isDirectory()?old:new Node(file));}nodeStructureChanged(node);}
+        for(int i=0;i<node.getChildCount();i++)refreshListing((Node)node.getChildAt(i),listings);
+    }
+
     static final class Node extends DefaultMutableTreeNode {
         private final File file;
         private boolean childrenLoaded;

@@ -123,6 +123,10 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         showTab(Tab.AGENT);
     }
 
+    java.util.Map<String,Object> watchAgentChanges(String action,String name){
+        if(!(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents))throw WorkspaceApiException.invalidRequest("Agents unavailable");
+        var result=agents.watch(action,name);if(!action.equals("state"))showTab(Tab.AGENT);return result;
+    }
     void showAgentProposal(String proposal) {
         if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview(proposal);
         showTab(Tab.AGENT);

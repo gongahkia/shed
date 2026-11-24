@@ -35,6 +35,12 @@ final class ShedControlCli {
                     if(path!=null || !options.isEmpty()) throw new IllegalArgumentException();
                     return emit(client.exchange(client.navigationContextRequest()),out);
                 }
+                if(Set.of("watch","watch-state","watch-stop","follow","pause").contains(command)){
+                    if(path!=null)throw new IllegalArgumentException();String name=options.remove("--agent");if(!options.isEmpty())throw new IllegalArgumentException();
+                    String action=switch(command){case "watch"->"start";case "watch-state"->"state";case "watch-stop"->"stop";default->command;};
+                    mutationSent=!command.equals("watch-state");
+                    return emit(client.exchange(request("editor/watch",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"action",action,"agent",name==null?"Agent":name))),out);
+                }
                 Map<String,Object> context=result(client.exchange(client.navigationContextRequest()));
                 var params=context(context); String method;
                 switch(command) {
@@ -58,6 +64,11 @@ final class ShedControlCli {
                         params.put("changes",MiniJson.parseStrict(WorkspaceFrames.decode(bytes)));String id=options.remove("--request-id");
                         params.put("requestId",id==null?UUID.randomUUID().toString():id);String session=options.remove("--session-id");if(session!=null)params.put("sessionId",session);
                         method="editor/project/propose";
+                    }
+                    case "watch", "watch-state", "watch-stop", "follow", "pause" -> {
+                        if(path!=null)throw new IllegalArgumentException();
+                        String action=switch(command){case "watch"->"start";case "watch-state"->"state";case "watch-stop"->"stop";default->command;};
+                        String name=options.remove("--agent");params.put("action",action);params.put("agent",name==null?"Agent":name);method="editor/watch";
                     }
                     case "diagnostics", "feedback", "preview", "preview-state", "preview-capture" -> {
                         if(path!=null)throw new IllegalArgumentException();

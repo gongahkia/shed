@@ -155,6 +155,7 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
                 control(client,"editor/diagnostics",Map.of());control(client,"editor/feedback",Map.of());
                 control(client,"editor/agent/progress",Map.of("sessionId","live-progress","agent","Codex","phase","thinking","completed",1L,"total",2L,"start",0L,"end",5L));
                 control(client,"editor/agent/cancel",Map.of("sessionId","live-progress"));
+                if(!"1".equals(System.getenv("SHED_LIVE_VISUAL_ONLY"))){
                 control(client,"editor/file/open",Map.of("path","Preview.md"));
                 control(client,"editor/preview/open",Map.of());
                 await(()->{var p=editor.markdownController.previewForAgent(editor.getActivePane());return p!=null&&p.currentForAgent()&&p.isShowing();},5);
@@ -163,7 +164,43 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
                 Files.write(folder.resolve("06-preview-viewport.png"),Base64.getDecoder().decode((String)data.get("data")));
                 events.add(Map.of("phase","scoped_feedback_progress_and_preview","exact",true,"width",data.get("width"),"height",data.get("height")));
                 capture("06-preview-workbench");
+                }else events.add(Map.of("phase","existing_html_preview_endpoint","status","EXCLUDED_FROM_VISUAL_ONLY"));
             }
+            Files.writeString(project.resolve("DeleteMe.txt"),"delete fixture\n");Files.writeString(project.resolve("RenameMe.txt"),"rename fixture\n");
+            edt(()->{editor.toolWindowHost.watchAgentChanges("start","Codex");return null;});
+            await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),10);
+            Files.writeString(folder.resolve("watch-ready"),"ready");
+            await(()->((Number)editor.toolWindowHost.watchAgentChanges("state","Codex").get("files")).intValue()==4,10);
+            capture("07-live-external-changes");
+            await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("Demo.java"),5);
+            var watchedLatencies=new ArrayList<Double>();
+            for(int i=0;i<20;i++){
+                long count=inputMetric()[0];
+                edt(()->{editor.setMode(EditorMode.INSERT);editor.writingArea.requestFocusInWindow();editor.writingArea.setCaretPosition(0);
+                    editor.editorUiController.noteEditorKey(new java.awt.event.KeyEvent(editor.writingArea,java.awt.event.KeyEvent.KEY_TYPED,System.currentTimeMillis(),0,java.awt.event.KeyEvent.VK_UNDEFINED,'x'));
+                    editor.writingArea.getActionMap().get(javax.swing.text.DefaultEditorKit.defaultKeyTypedAction).actionPerformed(new java.awt.event.ActionEvent(editor.writingArea,0,"x"));return null;});
+                long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(inputMetric()[0]<=count){if(System.nanoTime()>until)throw new AssertionError("Watch-active paint unavailable");Thread.sleep(5);}
+                watchedLatencies.add(inputMetric()[1]/1e6);edt(()->{editor.getActivePane().surface().undo();return null;});
+            }
+            var ordered=new ArrayList<>(watchedLatencies);Collections.sort(ordered);double watchedP95=ordered.get(18);check(watchedP95<=16,"Watch-active typing exceeded 16ms");
+            events.add(Map.of("phase","watch_active_typing","p95_ms",watchedP95,"samples_ms",watchedLatencies));
+            edt(()->{editor.toolWindowHost.watchAgentChanges("pause","Codex");return null;});
+            edt(()->{check(!Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("following")),"Manual pause failed");editor.toolWindowHost.watchAgentChanges("follow","Codex");editor.getCurrentBuffer().getDocument().insertString(0,"// Human draft\n",null);return null;});
+            var paused=edt(()->editor.getCurrentBuffer());Files.writeString(folder.resolve("watch-paused"),"ready");
+            long observed=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(!Files.exists(folder.resolve("writer-finished"))){if(System.nanoTime()>observed)throw new AssertionError("External writer did not finish");Thread.sleep(25);}
+            await(()->!Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("following")),5);
+            edt(()->{check(editor.getCurrentBuffer()==paused,"Paused following stole the active document");check(!Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("following")),"Pause state lost");check(editor.getCurrentBuffer().getContent().startsWith("// Human draft"),"Human draft lost");editor.getActivePane().surface().undo();return null;});
+            events.add(Map.of("phase","external_create_modify_delete_rename","exact",true,"files",4,"pause_preserved",true));
+            if("1".equals(System.getenv("SHED_VISUAL_GIT_FIXTURE"))){
+                edt(()->{var choice=find(editor.getRootPane(),JComboBox.class,"agent.changeBaseline");check(choice!=null,"Baseline selector absent");choice.setSelectedIndex(1);return null;});
+                await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),10);
+                edt(()->{var list=find(editor.getRootPane(),JList.class,"agent.changedFiles");check(list!=null,"Changed files absent");for(int i=0;i<list.getModel().getSize();i++)if(list.getModel().getElementAt(i) instanceof ExternalChangeSnapshot.Change change&&change.path().equals("Demo.java")){list.setSelectedIndex(i);return null;}throw new AssertionError("Tracked fixture missing from Git changes");});
+                await(()->{var view=find(editor.getRootPane(),JTextPane.class,"agent.liveDiff");return view!=null&&view.getText().contains("diff --git");},10);
+                capture("09-git-working-tree-diff");events.add(Map.of("phase","real_disposable_git_diff","exact",true));
+            }
+            edt(()->{editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});
+            edt(()->{editor.toolWindowHost.showAgentAction(AgentAction.ASK);return null;});
+            capture("08-provider-logo-and-icons");
             animation();
             edt(()->{editor.handleAgentCommand("api stop");return null;});
             long stop=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);

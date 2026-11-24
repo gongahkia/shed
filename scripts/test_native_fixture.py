@@ -295,6 +295,8 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'AgentActivityStateTest',
             'EditorProjectChangesTest',
             'EditorObservationTest',
+            'ExternalChangeSnapshotTest',
+            'VisualWatchControlTest',
             'AgentEditPresentationTest',
             'AgentReviewPanelTest',
             'WorkspaceProposalServiceTest',

@@ -130,6 +130,11 @@ final class EditorMetadata implements AutoCloseable {
                 Map.entry("coordinateUnit", "utf-16"), Map.entry("available", true), Map.entry("valid", true));
     }
 
+    void authorizeProject(Path activeRoot,long generation){
+        requireLive();if(generation!=approval.generation()){close();throw failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);}
+        if(!root.equals(activeRoot))throw failure(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
+        if(!rootKey.equals(rootKey(root))||!root.equals(canonical(approval.root()))){close();throw failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);}
+    }
     void authorize(Context context) {
         validateCoordinates(context.length(), context.revision(), context.caret(), context.start(), context.end());
         if (context.generation() != approval.generation()) { close(); throw failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED); }

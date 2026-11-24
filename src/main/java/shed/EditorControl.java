@@ -14,7 +14,7 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch");
     static boolean mutation(String method) {
         return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
@@ -26,11 +26,14 @@ final class EditorControl implements AutoCloseable {
                                      BooleanSupplier current, Consumer<ProjectDocumentInstall.Result> completed);
         void activity(int start, int end);
         default void progress(AgentActivityState.State state, int start, int end) { if (state.terminal()) clearActivity(); else activity(start,end); }
+        default WatchRoot watchRoot(){var s=state().metadata();return new WatchRoot(s.activeRoot(),s.generation());}
+        default Map<String,Object> watch(String action,String agent){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default Map<String,Object> observe(String operation){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default java.awt.image.BufferedImage capturePreview(){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         void review(String proposal);
         void clearActivity();
     }
+    record WatchRoot(Path root,long generation){}
     private record Services(WorkspaceQueryService workspace, WorkspaceProposalService proposals) { }
     private final AgentActivityState activity = new AgentActivityState();
     private final EditorMetadata grant;
@@ -60,11 +63,13 @@ final class EditorControl implements AutoCloseable {
     Map<String, Object> dispatch(String method, Map<String, Object> params, BooleanSupplier connection) {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Control dispatch belongs off the EDT");
         if (!OPERATIONS.contains(method)) throw fail(WorkspaceApiException.Code.UNSUPPORTED);
+        if(method.equals("editor/watch"))return watch(params,connection);
         var fields = new java.util.HashSet<>(CONTEXT);
         fields.addAll(switch (method) {
             case "editor/file/open" -> Set.of("path");
             case "editor/source/read" -> Set.of("offset", "limit");
             case "editor/edits/propose" -> Set.of("start", "end", "text", "requestId");
+            case "editor/watch" -> Set.of("action","agent");
             case "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture" -> Set.of();
             case "editor/project/read" -> Set.of("path", "offset", "limit");
             case "editor/project/propose" -> Set.of("changes", "requestId");
@@ -154,6 +159,19 @@ final class EditorControl implements AutoCloseable {
         } finally { active.compareAndSet(lease, null); }
     }
 
+    private Map<String,Object> watch(Map<String,Object> params,BooleanSupplier connection){
+        if(!params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","action","agent")))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        if(!Long.valueOf(1).equals(params.get("schemaVersion")))throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
+        grant.requireIdentity(text(params,"instanceId",64),text(params,"windowId",64));
+        if(!grant.projectId.equals(text(params,"projectId",64)))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
+        var lease=new Lease(connection);if(!active.compareAndSet(null,lease))throw fail(WorkspaceApiException.Code.BUSY);
+        try(lease){
+            var before=ui(lease,()->owner().watchRoot());grant.authorizeProject(before.root(),before.generation());
+            var observation=ui(lease,()->{if(!before.equals(owner().watchRoot()))throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);return owner().watch(text(params,"action",16),text(params,"agent",40));});
+            var after=ui(lease,()->owner().watchRoot());grant.authorizeProject(after.root(),after.generation());
+            return Map.of("schemaVersion",1,"instanceId",params.get("instanceId"),"windowId",params.get("windowId"),"projectId",grant.projectId,"operation","editor/watch","observation",observation);
+        }finally{active.compareAndSet(lease,null);}
+    }
     private Map<String,Object> project(Lease lease,String method,Map<String,Object> params,EditorNavigation.State before,Services current) {
         if(method.equals("editor/project/read")) {
             String name=EditorProjectChanges.path(params,"path");authorizePath(name,before,current.workspace(),AgentPolicy.Capability.READ);

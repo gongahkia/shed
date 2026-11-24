@@ -14,6 +14,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     private final JTabbedPane tabs = new JTabbedPane(), conversations = new JTabbedPane();
     private final List<AgentSessionPanel> sessions = new ArrayList<>();
     private final AgentReviewPanel review;
+    private LiveChangesPanel liveChanges;
     private final Supplier<AgentSessionPanel> factory;
     private final Supplier<Font> uiFont;
     private final Runnable dismissCompletion;
@@ -31,6 +32,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         }, editor.asyncJobService, editor::resolveUiFont, editor::resolveEditorFont, editor::stopAiCompletionRequests);
         review.onNavigate(location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent change")));
         review.onApplied(editor::agentEditsApplied);
+        liveChanges=new LiveChangesPanel(editor);tabs.addTab("Live changes",liveChanges.component());
     }
 
     AgentWorkbenchPanel(Supplier<AgentSessionPanel> factory, Function<AgentSessionPanel, AgentReviewPanel.Scope> reviewScope,
@@ -42,6 +44,8 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         add.setToolTipText("Create an independent conversation. Connect explicitly to start its OpenCode process.");
         remove.setToolTipText("Close this conversation and cancel its running action. Other conversations continue.");
         stopAll.setToolTipText("Stop all Assistant connections, command requests and pending inline suggestions.");
+        add.setIcon(WorkbenchIcons.ADD);remove.setIcon(WorkbenchIcons.CLOSE);stopAll.setIcon(WorkbenchIcons.STOP);
+        for(var button:List.of(add,remove,stopAll)){button.getAccessibleContext().setAccessibleName(button.getText());button.setText(null);}
         add.addActionListener(e -> newConversation()); remove.addActionListener(e -> closeConversation()); stopAll.addActionListener(e -> stopAll());
         var actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 6, 0)); actions.add(add); actions.add(remove); actions.add(stopAll);
         var scroll = new JScrollPane(actions, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); scroll.setBorder(BorderFactory.createEmptyBorder());
@@ -81,7 +85,13 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     @Override public JPanel component() { return panel; }
     @Override public void focus() {
         if (tabs.getSelectedIndex() == 1) review.focus();
+        else if(tabs.getSelectedIndex()==2 && liveChanges!=null)liveChanges.focus();
         else { var session = current(); if (session != null) session.focus(); }
+    }
+    java.util.Map<String,Object> watch(String action,String name) {
+        if(liveChanges==null)throw WorkspaceApiException.invalidRequest("Live changes unavailable");
+        if(!action.equals("state"))tabs.setSelectedIndex(2);
+        return liveChanges.command(action,name);
     }
     void showReview() { workspaceReview = false; reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
     void showReview(String proposal) { workspaceReview = true; reviewOwner = null; tabs.setSelectedIndex(1); review.showProposal(proposal); }
@@ -89,13 +99,15 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     @Override public void refresh() {
         if (closed) return;
         if (tabs.getSelectedIndex() == 0) { var current = current(); if (current != null) current.refresh(); }
+        else if(tabs.getSelectedIndex()==2 && liveChanges!=null)liveChanges.refresh();
         else review.refresh();
     }
     @Override public void refreshAppearance() {
         tabs.setFont(uiFont.get()); conversations.setFont(uiFont.get());
         for (JButton button : List.of(add, remove, stopAll)) { button.setFont(uiFont.get()); WorkbenchStyle.quiet(button); button.setPreferredSize(null);
             var size = button.getPreferredSize(); button.setPreferredSize(new java.awt.Dimension(size.width, Math.max(size.height, WorkbenchStyle.px(40)))); }
+        if(liveChanges!=null)liveChanges.refreshAppearance();
         sessions.forEach(AgentSessionPanel::refreshAppearance); review.refreshAppearance();
     }
-    @Override public void close() { if (closed) return; closed = true; review.close(); sessions.forEach(AgentSessionPanel::close); }
+    @Override public void close() { if (closed) return; closed = true; if(liveChanges!=null)liveChanges.close();review.close(); sessions.forEach(AgentSessionPanel::close); }
 }

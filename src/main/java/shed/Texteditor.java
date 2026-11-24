@@ -3695,8 +3695,13 @@ public class Texteditor extends JFrame implements KeyListener {
         inputController.keyReleased(e);
     }
 
+    WorkspaceBridgeServer visualAttachment(){return agentWorkspaceController.visualAttachment();}
+
     // Main method
     public static void main(String[] args) {
+        if(ShedVisualize.handles(args)){
+            try{ShedVisualize.run(args);}catch(Exception failure){System.err.println(MiniJson.stringify(java.util.Map.of("error","Visualization launch failed","detail",java.util.Objects.toString(failure.getMessage(),"Unavailable"))));System.exit(1);}return;
+        }
         if (WorkspaceCli.handles(args)) {
             System.setProperty("java.awt.headless", "true");
             int status = WorkspaceCli.run(args, System.in, System.out, System.err);

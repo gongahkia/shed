@@ -37,11 +37,13 @@ final class FileTreePanel extends JPanel {
     private final Consumer<java.io.File> openFile;
     private final Runnable onActivate;
     private Font iconFont;
+    private final Function<java.io.File,java.io.File[]> childLoader;
+    private boolean refreshingExternal;
 
     FileTreePanel(Texteditor editor, java.io.File root, Function<java.io.File, java.io.File[]> children, Consumer<java.io.File> openFile,
                   Runnable onActivate) {
         super(new BorderLayout());
-        this.editor = editor;
+        this.editor = editor;this.childLoader=children;
         this.model = new FileTreeModel(root, children);
         this.openFile = openFile == null ? file -> { } : openFile;
         this.onActivate = onActivate == null ? () -> { } : onActivate;
@@ -94,6 +96,24 @@ final class FileTreePanel extends JPanel {
     @Override public void updateUI() {
         super.updateUI();
         if (tree != null) configureAppearance();
+    }
+
+    void refreshExternalChanges(){
+        if(refreshingExternal||!isDisplayable())return;refreshingExternal=true;
+        var directories=model.loadedDirectories();var expanded=new java.util.ArrayList<TreePath>();
+        var paths=tree.getExpandedDescendants(new TreePath(model.rootNode().getPath()));if(paths!=null)while(paths.hasMoreElements())expanded.add(paths.nextElement());
+        TreePath selected=tree.getSelectionPath();
+        editor.asyncJobService.submit("Refresh observed file tree",token->{
+            var listings=new java.util.HashMap<java.io.File,java.io.File[]>();for(var dir:directories){if(token.isCancelled())break;var values=childLoader.apply(dir);listings.put(dir,values==null?new java.io.File[0]:values);}return listings;
+        },(job,listings,error)->{
+            refreshingExternal=false;if(!isDisplayable()||error!=null||listings==null)return;model.refreshListings(listings);for(var path:expanded)if(currentPath(path))tree.expandPath(path);if(selected!=null&&currentPath(selected))tree.setSelectionPath(selected);else tree.clearSelection();
+        });
+    }
+
+    private boolean currentPath(TreePath path){
+        Object[] parts=path.getPath();if(parts.length==0||parts[0]!=model.rootNode())return false;
+        for(int i=1;i<parts.length;i++)if(!(parts[i-1] instanceof javax.swing.tree.TreeNode parent)||parent.getIndex((javax.swing.tree.TreeNode)parts[i])<0)return false;
+        return true;
     }
 
     void refreshAppearance() {

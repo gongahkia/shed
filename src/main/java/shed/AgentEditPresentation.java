@@ -107,7 +107,7 @@ final class AgentEditPresentation implements AutoCloseable {
     void clear() {
         checkEdt(); timer.stop(); repaintRanges();
         if (highlighter != null) for (Object tag : tags) highlighter.removeHighlight(tag);
-        tags.clear(); ranges = List.of(); highlighter = null; ticks = 0;
+        tags.clear(); ranges = List.of(); highlighter = null; ticks = 0; agentName = "Agent";
         area.putClientProperty("shed.agentActivity", null);
     }
     @Override public void close() {

@@ -76,10 +76,10 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
     private boolean current(){return !closed&&root!=null&&root.equals(editor.workspaceController.activeRoot())&&rootsGeneration==editor.workspaceRoots.generation();}
     private void requestRefresh(){
         if(!current()){if(root!=null)stop();return;}if(busy){dirty=true;return;}if(watcher==null)return;
-        busy=true;dirty=false;long expected=generation;Path capturedRoot=root;var excluded=excludedRoots;boolean git=baseline.getSelectedIndex()==1;String selected=files.getSelectedValue()==null?selectedPath:files.getSelectedValue().path();
+        busy=true;dirty=false;long expected=generation;Path capturedRoot=root;var excluded=excludedRoots;var capturedBaseline=original;boolean git=baseline.getSelectedIndex()==1;String selected=files.getSelectedValue()==null?selectedPath:files.getSelectedValue().path();
         editor.asyncJobService.submit("Observe project changes",token->{
             if(git)return new Update(ExternalChangeSnapshot.capture(capturedRoot,excluded),null,editor.treeGitController.loadGitChangesWorkbench());
-            var now=ExternalChangeSnapshot.capture(capturedRoot,excluded);return new Update(now,ExternalChangeSnapshot.compare(original,now),null);
+            var now=ExternalChangeSnapshot.capture(capturedRoot,excluded);return new Update(now,ExternalChangeSnapshot.compare(capturedBaseline,now),null);
         },(job,result,error)->{
             if(closed||expected!=generation)return;busy=false;if(git!=(baseline.getSelectedIndex()==1)){requestRefresh();return;}if(!current()){stop();return;}
             if(error!=null||result==null){state.setText("Refresh failed; previous changes retained. "+(error==null?job.getStatus():error.getMessage()));return;}

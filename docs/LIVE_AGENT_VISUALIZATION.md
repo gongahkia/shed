@@ -53,3 +53,5 @@ The icons come from LobeHub's MIT-licensed `@lobehub/icons-static-png` 2.12.0. E
 ## Verification
 
 See [the evidence index](performance/live-agent-visualization/INDEX.md) for safe tests, fixed direct-Java launcher acceptance, real filesystem writers, disposable Git diffs, screenshots and qualifications. Native-shell confinement, whole-IDE native memory, remaining Unicode glyph/layout problems and Windows/Linux GUI qualification are not resolved by this feature.
+
+External writes are not synthesized into the human Undo stack. Review/revert those writes through the diff/Git workflow; ordinary human editing retains the existing Undo/Redo behavior. Large or binary entries are not automatically opened by Follow. Diff computation also has a five-second between-file budget and checks interruption; if that budget is exceeded, the last view remains available with an error instead of continuously processing an oversized changeset.

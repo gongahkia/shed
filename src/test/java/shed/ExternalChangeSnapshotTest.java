@@ -36,6 +36,11 @@ class ExternalChangeSnapshotTest {
         model.refreshListings(Map.of(root.toFile(),new java.io.File[]{keep.toFile(),added.toFile()}));assertSame(survivor,model.rootNode().getChildAt(0));
         assertEquals("added.txt",model.rootNode().getChildAt(1).toString());assertEquals(2,model.rootNode().getChildCount());assertEquals("keep",Files.readString(keep));
     }
+    @Test void cancelledDiffDoesNotContinueProcessingSnapshots(){
+        var before=Map.of("one.txt",new ExternalChangeSnapshot.File("before","a",true));var after=Map.of("one.txt",new ExternalChangeSnapshot.File("after","b",true));
+        try{Thread.currentThread().interrupt();assertThrows(CancellationException.class,()->ExternalChangeSnapshot.compare(before,after));}
+        finally{Thread.interrupted();}
+    }
     @Test void unifiedDiffPaintIsPresentationOnly() throws Exception {
         EditorControlTest.edt(()->{
             var view=new ChangeDiffView();view.setSize(700,400);var source=new ExternalChangeSnapshot.Change("M","Example.java",null,"old value\n","new value\n",WorkspaceTextEdits.diff("old value\n","new value\n"));

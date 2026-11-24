@@ -42,9 +42,10 @@ final class ExternalChangeSnapshot {
         return !name.endsWith(".env")&&!name.contains(".env.")&&!name.endsWith(".pem")&&!name.endsWith(".key");
     }
     static List<Change> compare(Map<String,File> base,Map<String,File> now){
+        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
         var rows=new ArrayList<Change>();var names=new TreeSet<String>();names.addAll(base.keySet());names.addAll(now.keySet());
         var deleted=new HashSet<String>();
-        for(String name:names){var left=base.get(name);var right=now.get(name);if(left!=null&&right!=null&&left.digest().equals(right.digest()))continue;
+        for(String name:names){if(Thread.currentThread().isInterrupted())throw new java.util.concurrent.CancellationException("Watch diff cancelled");if(System.nanoTime()>deadline)throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED,"Diff computation limit reached; choose a smaller project");var left=base.get(name);var right=now.get(name);if(left!=null&&right!=null&&left.digest().equals(right.digest()))continue;
             if(left==null){String previous=null;
                 var matches=base.entrySet().stream().filter(e->!now.containsKey(e.getKey())&&e.getValue().digest().equals(right.digest())).toList();
                 long destinations=now.entrySet().stream().filter(e->!base.containsKey(e.getKey())&&e.getValue().digest().equals(right.digest())).count();

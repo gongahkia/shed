@@ -55,6 +55,20 @@ final class ProjectDocumentInstall {
 
     private ProjectDocumentInstall() { }
 
+    /** Shared source/context checks for the workbench and real component fixtures. */
+    static boolean matches(LegacyDocumentStore.PreparedProjectFile prepared, EditorPane target,
+                           EditorNavigation.State expected, EditorNavigation.State current) {
+        if (prepared == null || target == null || expected == null || target.isDisposed()
+                || target.isHiddenByFocusMode() || target.getBuffer() == null || target.getBuffer().isLargeFile()
+                || target.getTerminalPane() != null
+                || target.getAlternateComponent() != null || target.isMarkdownPreview()) return false;
+        FileBuffer loaded = prepared.buffer();
+        return loaded.hasFilePath() && !loaded.isLargeFile()
+            && Objects.equals(expected.metadata().activeRoot(), prepared.root().path())
+            && loaded.getFile().toPath().toAbsolutePath().normalize().startsWith(prepared.root().path())
+            && expected.equals(current);
+    }
+
     /** Execute on the EDT. The precondition must be bounded and side-effect-free. */
     static Result commit(Ticket ticket, BooleanSupplier currentAndAuthorized, Runnable install) {
         if (!SwingUtilities.isEventDispatchThread())

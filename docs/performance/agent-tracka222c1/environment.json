@@ -1,0 +1,13 @@
+{
+  "head": "7c808e85231c061eb58ca17a7d951c03a4431e82",
+  "initial_git_status": "clean",
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "jdk": "Temurin 21.0.13.1+2 macOS aarch64",
+  "jdk_archive_sha256": "48067f2b7c958ed104a9d8a5749be7d25220b0a356b4d2d1bcfaab3e16ad0b14",
+  "maven": "3.9.11",
+  "maven_archive_sha512": "bcfe4fe305c962ace56ac7b5fc7a08b87d5abd8b7e89027ab251069faebee516b0ded8961445d6d91ec1985dfe30f8153268843c89aa392733d1a3ec956c9978",
+  "readme_before_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "toolchain_location": "temporary scratch only; no global installation",
+  "native_benchmarks": "not run"
+}

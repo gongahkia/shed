@@ -493,24 +493,36 @@ final class PaneBufferController {
             ProjectDocumentInstall.Ticket ticket, LegacyDocumentStore.PreparedProjectFile prepared,
             EditorPane targetPane, EditorNavigation.State expected,
             java.util.function.BooleanSupplier stillAuthorized) {
-        return ProjectDocumentInstall.commit(ticket, () -> {
-            if (prepared == null || targetPane == null || expected == null || stillAuthorized == null
-                    || editor.closingDown || targetPane.isDisposed()
-                    || !editor.editorPanes.contains(targetPane) || targetPane != editor.getActivePane()
-                    || targetPane.getBuffer() == null || targetPane.getTerminalPane() != null
-                    || targetPane.getAlternateComponent() != null || targetPane.isMarkdownPreview()) return false;
-            FileBuffer loaded = prepared.buffer();
-            if (!loaded.hasFilePath() || loaded.isLargeFile()) return false;
-            if (!java.util.Objects.equals(expected.metadata().activeRoot(), prepared.root().path())) return false;
-            if (!loaded.getFile().toPath().toAbsolutePath().normalize().startsWith(prepared.root().path())) return false;
-            if (!expected.equals(editor.captureEditorNavigation())) return false;
-            return stillAuthorized.getAsBoolean();
-        }, () -> {
+        return ProjectDocumentInstall.commit(ticket,
+            () -> canInstallPreparedProjectFile(prepared, targetPane, expected, stillAuthorized), () -> {
             FileBuffer buffer = prepared.buffer();
             // The normal controller reuses a live dirty buffer for the same path.
             // Do not call applyProjectConfigurationForFile before this gate.
             installLoadedBuffer(buffer.getFile(), buffer, null, targetPane);
         });
+    }
+
+    private boolean canInstallPreparedProjectFile(LegacyDocumentStore.PreparedProjectFile prepared,
+            EditorPane target, EditorNavigation.State expected, java.util.function.BooleanSupplier authorized) {
+        return authorized != null && !editor.closingDown && target != null && !target.isDisposed()
+            && editor.editorPanes.contains(target) && target == editor.getActivePane()
+            && ProjectDocumentInstall.matches(prepared, target, expected, editor.captureEditorNavigation())
+            && authorized.getAsBoolean();
+    }
+
+    /** Internal source-only open. No project configuration/trust dialog or alternate surface. */
+    ProjectFileOpen.Request openProjectFileAsync(ProjectBoundFileAcquisition.RootPin root, String relativeName,
+            EditorPane target, EditorNavigation.State expected, java.util.function.BooleanSupplier authorized,
+            java.util.function.Consumer<ProjectDocumentInstall.Result> completion) {
+        return ProjectFileOpen.start(editor.asyncJobService, editor.documentStore, openRequests, target, root, relativeName,
+            prepared -> canInstallPreparedProjectFile(prepared, target, expected, authorized)
+                && !prepared.buffer().getFilePath().toLowerCase(java.util.Locale.ROOT).endsWith(".ipynb"),
+            prepared -> {
+                editor.cancelLspDefinition();
+                editor.recordJumpPosition();
+                persistCurrentBufferState();
+                installLoadedBuffer(prepared.buffer().getFile(), prepared.buffer(), null, target);
+            }, completion);
     }
 
     private void openFileAsync(File file, java.util.function.BooleanSupplier current,
@@ -592,13 +604,7 @@ final class PaneBufferController {
     }
 
     private void installLoadedBuffer(File file, FileBuffer buffer, String projectConfigMessage, EditorPane pane) {
-        FileBuffer alreadyOpen = findBufferByPath(file);
-        if (alreadyOpen != null) buffer = alreadyOpen;
-        if (alreadyOpen == null && shouldReplaceSingleUntitledBuffer()) {
-            editor.releaseClosedBufferResources(editor.buffers.set(0, buffer));
-        } else if (alreadyOpen == null) {
-            editor.buffers.add(buffer);
-        }
+        buffer = registerLoadedBuffer(editor.documentStore, file, buffer, editor::releaseClosedBufferResources);
         restoreBufferIntoPane(pane, buffer);
         editor.showAlternateSurfaceIfAvailable(pane, buffer);
         editor.addToRecentFiles(file.getAbsolutePath());
@@ -611,6 +617,17 @@ final class PaneBufferController {
         } else if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
             editor.showMessage(projectConfigMessage);
         }
+    }
+
+    static FileBuffer registerLoadedBuffer(LegacyDocumentStore store, File file, FileBuffer loaded,
+                                           java.util.function.Consumer<FileBuffer> release) {
+        List<FileBuffer> buffers = store.legacyBuffers();
+        for (FileBuffer existing : buffers) {
+            if (existing.hasFilePath() && file.getAbsolutePath().equals(existing.getFilePath())) return existing;
+        }
+        if (replaceableUntitled(buffers)) release.accept(buffers.set(0, loaded));
+        else buffers.add(loaded);
+        return loaded;
     }
 
 
@@ -1105,10 +1122,14 @@ final class PaneBufferController {
 
 
     boolean shouldReplaceSingleUntitledBuffer() {
-        if (editor.buffers.size() != 1) {
+        return replaceableUntitled(editor.buffers);
+    }
+
+    private static boolean replaceableUntitled(List<FileBuffer> buffers) {
+        if (buffers.size() != 1) {
             return false;
         }
-        FileBuffer current = editor.buffers.get(0);
+        FileBuffer current = buffers.get(0);
         return !current.isScratch() && !current.hasFilePath() && !current.isModified()
             && current.getContent().isEmpty();
     }

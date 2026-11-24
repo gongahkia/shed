@@ -23,14 +23,11 @@ import java.util.function.BooleanSupplier;
 /**
  * Internal-only, fail-closed, project-relative acquisition of existing regular files.
  *
- * <p>The caller must obtain a RootPin at the moment the human authorizes a project.
- * Paths are never credentials. A read uses one channel opened relative to a chain of
- * already-open directories. No ancestor or leaf symbolic links are followed, and no
- * fallback to ordinary pathname-based reads is permitted.
- *
- * <p>Requires a provider supporting SecureDirectoryStream and usable file keys.
- * Unsupported providers fail closed. This is not a promise of an OS sandbox or a
- * stable point-in-time snapshot against in-place writes by another process.
+ * <p>The caller must obtain a RootPin when the human authorizes a project. Secure
+ * directory handles are used where available. Other providers use validated paths,
+ * no-follow file opens and before/after identity checks for trusted local projects.
+ * That portable path is NOT a sandbox against hostile concurrent path replacement.
+ * Neither path promises a stable snapshot against concurrent in-place writes.
  */
 final class ProjectBoundFileAcquisition {
     static final int MAX_BYTES = 25 * 1024 * 1024;
@@ -66,6 +63,7 @@ final class ProjectBoundFileAcquisition {
     static RootPin pinAuthorizedRoot(Path approvedRoot) throws IOException {
         Objects.requireNonNull(approvedRoot, "approvedRoot");
         Path path = approvedRoot.toAbsolutePath().normalize();
+        if (!path.equals(path.toRealPath())) throw new IOException("Project root must be canonical");
         BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         if (!attributes.isDirectory() || attributes.fileKey() == null) {
             throw new IOException("Project root does not have a supported stable identity");
@@ -90,7 +88,7 @@ final class ProjectBoundFileAcquisition {
         List<SecureDirectoryStream<Path>> handles = new ArrayList<>();
         try {
             if (!(rootStream instanceof SecureDirectoryStream<?>)) {
-                throw new IOException("Provider cannot guarantee project-bound acquisition");
+                return acquirePortable(root, relativeName, maximumBytes, cancelled);
             }
             @SuppressWarnings("unchecked")
             SecureDirectoryStream<Path> rootHandle = (SecureDirectoryStream<Path>) rootStream;
@@ -115,26 +113,7 @@ final class ProjectBoundFileAcquisition {
             byte[] bytes;
             try (SeekableByteChannel channel = parent.newByteChannel(leaf,
                     Set.<OpenOption>of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
-                ByteArrayOutputStream collected = new ByteArrayOutputStream((int) before.size());
-                ByteBuffer chunk = ByteBuffer.allocate(8192);
-                int idleReads = 0;
-                while (true) {
-                    checkCancelled(cancelled);
-                    int count = channel.read(chunk);
-                    if (count < 0) break;
-                    if (count == 0) {
-                        if (++idleReads > 16) throw new IOException("Resource read made no progress");
-                        continue;
-                    }
-                    idleReads = 0;
-                    chunk.flip();
-                    if ((long) collected.size() + chunk.remaining() > maximumBytes) {
-                        throw new IOException("Resource grew beyond bounded acquisition limit");
-                    }
-                    collected.write(chunk.array(), 0, chunk.remaining());
-                    chunk.clear();
-                }
-                bytes = collected.toByteArray();
+                bytes = readBounded(channel, maximumBytes, cancelled);
             }
             BasicFileAttributes after = attributes(parent, leaf);
             checkCancelled(cancelled);
@@ -151,6 +130,75 @@ final class ProjectBoundFileAcquisition {
             if (handles.isEmpty()) rootStream.close();
             else for (int i = handles.size() - 1; i >= 0; i--) handles.get(i).close();
         }
+    }
+
+    /** Trusted-local contract: detects observed changes, not replace-and-restore races. */
+    static Snapshot acquirePortable(RootPin root, String relativeName, int maximumBytes,
+                                    BooleanSupplier cancelled) throws IOException {
+        Objects.requireNonNull(root, "root");
+        Objects.requireNonNull(cancelled, "cancelled");
+        if (maximumBytes < 1 || maximumBytes > MAX_BYTES) throw new IllegalArgumentException("Invalid bounded file size");
+        Path relative = checkedRelativePath(relativeName);
+        checkCancelled(cancelled);
+        Path target = root.path().resolve(relative);
+        List<BasicFileAttributes> before = pathAttributes(root, relative);
+        BasicFileAttributes file = before.getLast();
+        if (file.size() > maximumBytes) throw new IOException("File exceeds bounded acquisition limit");
+        byte[] bytes;
+        try (SeekableByteChannel channel = Files.newByteChannel(target,
+                Set.<OpenOption>of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS))) {
+            bytes = readBounded(channel, maximumBytes, cancelled);
+        }
+        List<BasicFileAttributes> after = pathAttributes(root, relative);
+        checkCancelled(cancelled);
+        for (int i = 0; i < before.size(); i++) {
+            if (!Objects.equals(before.get(i).fileKey(), after.get(i).fileKey())
+                    || !before.get(i).creationTime().equals(after.get(i).creationTime()))
+                throw new IOException("Project resource identity changed during acquisition");
+        }
+        BasicFileAttributes latest = after.getLast();
+        if (file.size() != latest.size() || bytes.length != latest.size()
+                || !file.lastModifiedTime().equals(latest.lastModifiedTime()))
+            throw new IOException("Resource contents changed during acquisition");
+        return new Snapshot(target, bytes, latest.fileKey(), latest.creationTime(), latest.lastModifiedTime(), latest.size());
+    }
+
+    private static List<BasicFileAttributes> pathAttributes(RootPin root, Path relative) throws IOException {
+        Path current = root.path();
+        List<BasicFileAttributes> attributes = new ArrayList<>();
+        for (int i = 0; i <= relative.getNameCount(); i++) {
+            if (i > 0) current = current.resolve(relative.getName(i - 1));
+            BasicFileAttributes value = Files.readAttributes(current, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            boolean leaf = i == relative.getNameCount();
+            if (value.fileKey() == null || (leaf ? !value.isRegularFile() : !value.isDirectory()))
+                throw new IOException("Unsupported project resource or symbolic link");
+            attributes.add(value);
+        }
+        if (!root.fileKey().equals(attributes.getFirst().fileKey()) || !current.equals(current.toRealPath()))
+            throw new IOException("Authorized project path changed");
+        return attributes;
+    }
+
+    private static byte[] readBounded(SeekableByteChannel channel, int maximumBytes,
+                                      BooleanSupplier cancelled) throws IOException {
+        ByteArrayOutputStream collected = new ByteArrayOutputStream();
+        ByteBuffer chunk = ByteBuffer.allocate(8192);
+        int idleReads = 0;
+        while (true) {
+            checkCancelled(cancelled);
+            int count = channel.read(chunk);
+            if (count < 0) break;
+            if (count == 0) {
+                if (++idleReads > 16) throw new IOException("Resource read made no progress");
+                continue;
+            }
+            idleReads = 0;
+            if ((long) collected.size() + count > maximumBytes)
+                throw new IOException("Resource grew beyond bounded acquisition limit");
+            collected.write(chunk.array(), 0, count);
+            chunk.clear();
+        }
+        return collected.toByteArray();
     }
 
     private static BasicFileAttributes attributes(SecureDirectoryStream<Path> directory) throws IOException {

@@ -287,6 +287,9 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'WorkspaceNavigationTransportTest',
             'WorkspaceNavigationMeasurementTest',
             'ProjectFileOpenPrerequisiteTest',
+            'ProjectBoundFileAcquisitionTest',
+            'ProjectDocumentInstallTest',
+            'ProjectFileOpenTest',
         }
         self.assertEqual({line.split("=", 1)[0] for line in lines}, set(approved))
         for line in lines:

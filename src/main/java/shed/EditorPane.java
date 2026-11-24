@@ -19,6 +19,15 @@ public class EditorPane {
     private boolean hiddenByFocusMode;
     private boolean disposed;
     private String observationId;
+    private AgentEditPresentation agentPresentation;
+
+    AgentEditPresentation agentPresentation() {
+        if (disposed) throw new IllegalStateException("Editor pane is disposed");
+        if (agentPresentation == null) agentPresentation = new AgentEditPresentation(textArea);
+        return agentPresentation;
+    }
+
+    void clearAgentPresentation() { if (agentPresentation != null) agentPresentation.clear(); }
 
     String observationId() {
         if (!javax.swing.SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Pane identity belongs to the EDT");
@@ -74,6 +83,7 @@ public class EditorPane {
     void disposeSourceView() {
         if (disposed) return;
         disposed = true;
+        if (agentPresentation != null) { agentPresentation.close(); agentPresentation = null; }
         searchManager.clearHighlights();
         // Retired carets must not activate panes or inspect another view during detachment.
         for (var listener : textArea.getCaretListeners()) textArea.removeCaretListener(listener);

@@ -123,6 +123,11 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         showTab(Tab.AGENT);
     }
 
+    void showAgentProposal(String proposal) {
+        if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview(proposal);
+        showTab(Tab.AGENT);
+    }
+
     /** Focus is an explicit user-navigation action, never a side effect of refresh/completion. */
     void focus(Tab tab) {
         ToolSurface surface = surfaces.get(tab);

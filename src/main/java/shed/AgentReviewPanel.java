@@ -71,6 +71,8 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private boolean closed;
     private String requestedProposal;
     private long generation;
+    private final AgentEditPresentation proposedActivity;
+    private Consumer<WorkspaceProposalService.Preview> applied = ignored -> { };
 
     AgentReviewPanel(Texteditor editor) {
         this(editor.asyncJobService, () -> {
@@ -82,6 +84,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
 
     AgentReviewPanel(AsyncJobService jobs, Supplier<Scope> scopeSupplier, Supplier<Font> uiFont, Supplier<Font> codeFont) {
         this.jobs = jobs; this.scopeSupplier = scopeSupplier; this.uiFont = uiFont; this.codeFont = codeFont;
+        proposedActivity = new AgentEditPresentation(proposed);
         panel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         status.putClientProperty("html.disable", true);
         proposalList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -168,7 +171,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public JPanel component() { return panel; }
-    @Override public void close() { closed = true; generation++; }
+    @Override public void close() { closed = true; generation++; proposedActivity.close(); applied = ignored -> { }; }
     @Override public void refresh() {
         if (closed) return;
         Scope current = scopeSupplier.get();
@@ -265,6 +268,16 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             AccessibilitySupport.describe(proposed, proposedTitle.getText(), deletion || rename ? "This file operation is accepted or rejected as a whole." : "Edit the proposal, then save and review its hunks before applying.");
             WorkbenchStyle.emptyText(hunkTable, deletion ? "Whole-file deletion · no text hunks" : rename ? "File rename · contents preserved" : "No text hunks in this proposal");
             before.setText(value.before()); proposed.setText(value.proposed()); before.setCaretPosition(0); proposed.setCaretPosition(0);
+            if ("PROPOSED".equals(value.proposal().get("status"))) {
+                var ranges = new java.util.ArrayList<AgentEditPresentation.Range>();
+                int shift = 0;
+                for (var hunk : value.hunks()) {
+                    int start = hunk.start() + shift;
+                    if (ranges.size() < 32) ranges.add(new AgentEditPresentation.Range(start, start + hunk.replacement().length()));
+                    shift += hunk.replacement().length() - (hunk.end() - hunk.start());
+                }
+                proposedActivity.showPending(ranges);
+            }
             preservedDraft.setText(Objects.toString(value.preservedDraft(), "")); preservedDraft.setCaretPosition(0);
             reviewTabs.setEnabledAt(2, value.preservedDraft() != null);
             hunks.setRowCount(0);
@@ -305,6 +318,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     }
 
     void onNavigate(Consumer<AgentAnswer.Location> listener) { navigation = listener; controls(); }
+    void onApplied(Consumer<WorkspaceProposalService.Preview> listener) { applied = java.util.Objects.requireNonNull(listener); }
     private void openSource() {
         if (!openSource.isEnabled()) return;
         var captured = preview; Scope capturedScope = scope; int selectedHunk = hunkTable.getSelectedRow();
@@ -396,7 +410,11 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private void mutate(String message, Mutation mutation) {
         if (busy || dirty || preview == null || !Objects.equals(scope, scopeSupplier.get())) return;
         String id = selectedId(); int revision = revision();
-        run(message, service -> mutation.apply(service, id, revision), ignored -> loadPreview());
+        var reviewed = preview;
+        run(message, service -> mutation.apply(service, id, revision), result -> {
+            if ("APPLIED".equals(result.get("status"))) applied.accept(reviewed);
+            loadPreview();
+        });
     }
 
     private <T> void run(String message, Function<WorkspaceProposalService, T> operation, Consumer<T> completion) {

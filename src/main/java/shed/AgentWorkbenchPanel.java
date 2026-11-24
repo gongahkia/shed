@@ -19,6 +19,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     private final Runnable dismissCompletion;
     private final JButton add = new JButton("New conversation"), remove = new JButton("Close conversation"), stopAll = new JButton("Stop all");
     private AgentSessionPanel reviewOwner;
+    private boolean workspaceReview;
     private int nextConversation;
     private boolean closed;
 
@@ -29,12 +30,13 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
             return root == null ? null : new AgentReviewPanel.Scope(root, storage, editor.workspaceDocuments());
         }, editor.asyncJobService, editor::resolveUiFont, editor::resolveEditorFont, editor::stopAiCompletionRequests);
         review.onNavigate(location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent change")));
+        review.onApplied(editor::agentEditsApplied);
     }
 
     AgentWorkbenchPanel(Supplier<AgentSessionPanel> factory, Function<AgentSessionPanel, AgentReviewPanel.Scope> reviewScope,
                         AsyncJobService jobs, Supplier<Font> uiFont, Supplier<Font> codeFont, Runnable dismissCompletion) {
         this.factory = factory; this.uiFont = uiFont; this.dismissCompletion = dismissCompletion;
-        review = new AgentReviewPanel(jobs, () -> reviewScope.apply(reviewOwner == null ? current() : reviewOwner), uiFont, codeFont);
+        review = new AgentReviewPanel(jobs, () -> reviewScope.apply(workspaceReview ? null : reviewOwner == null ? current() : reviewOwner), uiFont, codeFont);
         conversations.setName("agent.conversations"); conversations.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         add.setName("agent.newConversation"); remove.setName("agent.closeConversation"); stopAll.setName("agent.stopAll");
         add.setToolTipText("Create an independent conversation. Connect explicitly to start its OpenCode process.");
@@ -54,7 +56,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     private void newConversation() {
         if (closed || sessions.size() >= 8) return;
         AgentSessionPanel session = factory.get(); sessions.add(session);
-        session.onReview(id -> { reviewOwner = session; review.showProposal(id); tabs.setSelectedIndex(1); });
+        session.onReview(id -> { workspaceReview = false; reviewOwner = session; review.showProposal(id); tabs.setSelectedIndex(1); });
         String title = "Conversation " + ++nextConversation;
         conversations.addTab(title, session.component());
         session.onActivity(working -> {
@@ -81,7 +83,8 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         if (tabs.getSelectedIndex() == 1) review.focus();
         else { var session = current(); if (session != null) session.focus(); }
     }
-    void showReview() { reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
+    void showReview() { workspaceReview = false; reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
+    void showReview(String proposal) { workspaceReview = true; reviewOwner = null; tabs.setSelectedIndex(1); review.showProposal(proposal); }
     void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); tabs.setSelectedIndex(0); }
     @Override public void refresh() {
         if (closed) return;

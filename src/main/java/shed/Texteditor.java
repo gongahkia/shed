@@ -315,6 +315,38 @@ public class Texteditor extends JFrame implements KeyListener {
             authorized, this::captureEditorNavigation);
     }
 
+    void clearAgentActivity() { for (var pane : editorPanes) pane.clearAgentPresentation(); }
+
+    void agentEditsApplied(WorkspaceProposalService.Preview preview) {
+        Object uri = preview.document().get("uri");
+        if (!(uri instanceof String path)) return;
+        FileBuffer buffer;
+        try { buffer = paneBufferController.findBufferByPath(Path.of(java.net.URI.create(path)).toFile()); }
+        catch (RuntimeException unavailable) { return; }
+        if (buffer == null || buffer.isLargeFile()) return;
+        VersionedTextSnapshot snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
+        asyncJobService.submit("Agent change presentation", token -> {
+            var ranges = new ArrayList<AgentEditPresentation.Range>();
+            if (token.isCancelled() || !snapshot.text().equals(preview.selected())) return ranges;
+            var selected = MiniJson.asArray(preview.document().get("selectedHunks"));
+            int shift = 0, index = 0;
+            for (var hunk : preview.hunks()) {
+                if (selected == null || selected.contains((long) index)) {
+                    int start = hunk.start() + shift;
+                    if (ranges.size() == 32) ranges.remove(0);
+                    ranges.add(new AgentEditPresentation.Range(start, start + hunk.replacement().length()));
+                    shift += hunk.replacement().length() - (hunk.end() - hunk.start());
+                }
+                index++;
+            }
+            return ranges;
+        }, (job, ranges, error) -> {
+            if (closingDown || error != null || ranges == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED
+                    || buffer.documentRevision() != revision || buffer.textSnapshot() != snapshot) return;
+            for (var pane : editorPanes) if (!pane.isDisposed() && pane.getBuffer() == buffer) pane.agentPresentation().showApplied(ranges);
+        });
+    }
+
     EditorMetadata.Context captureEditorMetadata() {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor observation belongs to the EDT");
         if (closingDown || !isDisplayable()) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);

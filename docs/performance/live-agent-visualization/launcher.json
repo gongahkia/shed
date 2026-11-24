@@ -1,0 +1,39 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "ec3ec4f32cac3e4cad3bd77f2cdd1110b0b045a7488cf39de1d875dc26874b3d",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-i0hid84c",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-i0hid84c/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-i0hid84c/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-i0hid84c/run/config",
+    "-cp",
+    "/private/tmp/shed-native-i0hid84c/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.ShedVisualizeLaunchProbe",
+    "/private/tmp/shed-native-i0hid84c/run/live",
+    "/private/tmp/shed-native-i0hid84c/run/project"
+  ],
+  "pid": 72176,
+  "exit": 0,
+  "log": "",
+  "result": {
+    "state": "PASS",
+    "native_shell": "NOT_USED",
+    "events": [
+      {
+        "phase": "launch_and_authenticated_watch_without_open_source",
+        "ready": true,
+        "elapsed_ms": 2132.215167
+      }
+    ]
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 3.2859155830010423
+}

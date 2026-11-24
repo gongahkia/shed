@@ -1,0 +1,98 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "3c481307ab783f8309ffc33ce26f52a88988826ca89e33c33cca241beee87e95",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-3nnyl7x4",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-3nnyl7x4/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-3nnyl7x4/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-3nnyl7x4/run/config",
+    "-cp",
+    "/private/tmp/shed-native-3nnyl7x4/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-3nnyl7x4/run/live",
+    "/private/tmp/shed-native-3nnyl7x4/run/project"
+  ],
+  "pid": 34419,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"441d303a-21dc-4dd2-a5fe-5abb872b4f80\", \"projectId\": \"project-2801912e-eedb-4a6f-82b8-624618814f16\", \"schemaVersion\": 1, \"documentId\": \"buffer-26e3116a-768c-4fab-8fda-828cb2db2714\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-3ad7c75d-86e0-468e-b26f-f6fb5ac48d41\", \"documentLength\": 107, \"available\": true, \"windowId\": \"ff3316a4-cdec-43d6-8cb9-28221924081d\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"contextRevision\": 9, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 0,
+      "stdout": "{\"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"441d303a-21dc-4dd2-a5fe-5abb872b4f80\", \"projectId\": \"project-2801912e-eedb-4a6f-82b8-624618814f16\", \"schemaVersion\": 1, \"documentId\": \"buffer-26e3116a-768c-4fab-8fda-828cb2db2714\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-3ad7c75d-86e0-468e-b26f-f6fb5ac48d41\", \"documentLength\": 107, \"available\": true, \"windowId\": \"ff3316a4-cdec-43d6-8cb9-28221924081d\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"contextRevision\": 10, \"operation\": \"editor/source/read\", \"outcome\": \"read\", \"offset\": 0, \"nextOffset\": 107, \"content\": \"public class Demo {\\n    public static String greet(String name) {\\n        return \\\"Hello, \\\" + name;\\n    }\\n}\\n\", \"truncated\": false}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "activity",
+      "exit": 0,
+      "stdout": "{\"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"441d303a-21dc-4dd2-a5fe-5abb872b4f80\", \"projectId\": \"project-2801912e-eedb-4a6f-82b8-624618814f16\", \"schemaVersion\": 1, \"documentId\": \"buffer-26e3116a-768c-4fab-8fda-828cb2db2714\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-3ad7c75d-86e0-468e-b26f-f6fb5ac48d41\", \"documentLength\": 107, \"available\": true, \"windowId\": \"ff3316a4-cdec-43d6-8cb9-28221924081d\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"contextRevision\": 10, \"operation\": \"editor/agent/activity\", \"outcome\": \"shown\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "propose",
+      "exit": 0,
+      "stdout": "{\"selectionEnd\": 0, \"documentRevision\": 1, \"dirty\": false, \"protocolVersion\": 2, \"valid\": true, \"instanceId\": \"441d303a-21dc-4dd2-a5fe-5abb872b4f80\", \"projectId\": \"project-2801912e-eedb-4a6f-82b8-624618814f16\", \"schemaVersion\": 1, \"documentId\": \"buffer-26e3116a-768c-4fab-8fda-828cb2db2714\", \"caretOffset\": 0, \"selectionStart\": 0, \"paneId\": \"pane-3ad7c75d-86e0-468e-b26f-f6fb5ac48d41\", \"documentLength\": 107, \"available\": true, \"windowId\": \"ff3316a4-cdec-43d6-8cb9-28221924081d\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"coordinateUnit\": \"utf-16\", \"contextRevision\": 10, \"operation\": \"editor/edits/propose\", \"outcome\": \"proposed\", \"proposalId\": \"proposal-c9c8061253e8474b821717e0ffffd4e5\", \"reviewRequired\": true}\n",
+      "stderr": ""
+    }
+  ],
+  "exit": 1,
+  "log": "LIVE_READY\njava.lang.IllegalStateException: editor/preview/open: TIMEOUT\n\tat shed.AgentWorkflowDesktopProbe.control(AgentWorkflowDesktopProbe.java:53)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:159)\nCaused by: shed.WorkspaceApiException: Control request rejected\n\tat shed.ShedControlCli.result(ShedControlCli.java:135)\n\tat shed.AgentWorkflowDesktopProbe.control(AgentWorkflowDesktopProbe.java:52)\n\t... 1 more\n",
+  "result": {
+    "error": "java.lang.IllegalStateException: editor/preview/open: TIMEOUT",
+    "events": [
+      {
+        "phase": "review_apply_undo_redo",
+        "exact": true,
+        "human_color": -13213771,
+        "agent_color": -14188196
+      },
+      {
+        "phase": "actual_window_typing",
+        "warm_p95_ms": 2.348917,
+        "first_ms": 2.112,
+        "samples_ms": [
+          2.112,
+          6.237625,
+          1.691292,
+          0.781625,
+          0.899042,
+          0.755125,
+          1.289542,
+          1.482958,
+          2.062167,
+          1.124959,
+          2.348917,
+          0.67725,
+          1.609833,
+          2.002042,
+          0.830042,
+          1.79975,
+          0.747834,
+          1.38275,
+          0.537917,
+          1.546625,
+          0.6405
+        ]
+      },
+      {
+        "phase": "save_acknowledgement",
+        "message": "Saving\u2026"
+      }
+    ],
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 18.57331979099945
+}

@@ -46,6 +46,10 @@ A failed refresh retains the last view with an explicit error. Stopping clears t
 
 The launcher uses the current Java executable and classpath directly, not a shell. It waits at most 45 seconds for its owned child's matching PID/project readiness record. Owner-only private session storage and the existing mutually authenticated bridge remain authoritative. This is a trusted-local workflow, not an OS sandbox against a same-user process that can read the user's files. Launch starts the existing editor-control scope; automatic Apply, Save, arbitrary shell execution and desktop screenshots remain unavailable.
 
+PNG provider/model logos are bundled for OpenAI/Codex, Claude, Gemini, Ollama, DeepSeek, Qwen, Meta/Llama, Mistral, OpenRouter, OpenCode and Hugging Face. Unknown/custom models retain their text labels. Light/dark assets are selected locally without network downloads. Model/provider names remain visible; common action buttons use Shed's outline icon family with tooltips and accessible names. Permission/sign-in/apply decisions keep explicit text.
+
+The icons come from LobeHub's MIT-licensed `@lobehub/icons-static-png` 2.12.0. Exact source URLs, SHA-256 values and license are in `assets/providers/`. Logos remain their owners' trademarks.
+
 ## Verification
 
 See [the evidence index](performance/live-agent-visualization/INDEX.md) for safe tests, fixed direct-Java launcher acceptance, real filesystem writers, disposable Git diffs, screenshots and qualifications. Native-shell confinement, whole-IDE native memory, remaining Unicode glyph/layout problems and Windows/Linux GUI qualification are not resolved by this feature.

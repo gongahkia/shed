@@ -35,6 +35,7 @@
         <targetPath>assets</targetPath>
         <includes>
           <include>logo/shed.png</include>
+          <include>providers/**</include>
           <include>fonts/JetBrainsMono-Regular.ttf</include>
           <include>fonts/JetBrainsMono-OFL.txt</include>
         </includes>

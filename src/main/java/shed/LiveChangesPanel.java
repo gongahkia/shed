@@ -24,7 +24,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
     private Map<String,ExternalChangeSnapshot.File> original=Map.of(),latest=Map.of();
     private TestWatchService watcher;private boolean closed,busy,dirty;private String selectedPath;
     LiveChangesPanel(Texteditor editor){
-        this.editor=editor;panel.setName("agent.liveChanges");files.setName("agent.changedFiles");follow.setName("agent.follow");baseline.setName("agent.changeBaseline");
+        this.editor=editor;state.putClientProperty("html.disable",true);panel.setName("agent.liveChanges");files.setName("agent.changedFiles");follow.setName("agent.follow");baseline.setName("agent.changeBaseline");
         panel.setBorder(BorderFactory.createEmptyBorder(8,10,8,10));
         var actions=new JPanel(new FlowLayout(FlowLayout.LEADING,6,0));
         actions.add(new JLabel("Agent"));actions.add(agent);actions.add(button("Watch project",WorkbenchIcons.PLAY,()->start(agent.getText())));
@@ -35,7 +35,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         var split=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(files),new JScrollPane(diff));split.setResizeWeight(.3);panel.add(split);
         files.setCellRenderer((list,value,index,selected,focus)->{
             var label=(JLabel)new DefaultListCellRenderer().getListCellRendererComponent(list,value,index,selected,focus);label.putClientProperty("html.disable",true);
-            if(value!=null){label.setToolTipText(value.previous()==null?value.path():value.previous()+" → "+value.path());
+            if(value!=null){label.setToolTipText(value.previous()==null?"File: "+value.path():"Renamed: "+value.previous()+" → "+value.path());
                 if(!selected){Color color=UIManager.getColor(value.kind().equals("D")?"shed.error":value.kind().equals("A")?"shed.success":"TextArea.foreground");if(color!=null)label.setForeground(AccessibilitySupport.readableText(color,label.getBackground()));}}
             return label;
         });

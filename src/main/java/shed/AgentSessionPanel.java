@@ -845,12 +845,16 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     }
     private static JScrollPane scrollRow(JPanel row) { var scroll = new JScrollPane(row, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); scroll.setBorder(BorderFactory.createEmptyBorder()); return scroll; }
     private static JTextArea area(String name, boolean editable) { JTextArea area = named(new JTextArea(), name); area.setEditable(editable); return area; }
-    private static JButton button(String title, String name, Runnable action) { JButton button = named(new JButton(title), name); button.addActionListener(event -> action.run()); return button; }
+    private static JButton button(String title, String name, Runnable action) { JButton button = named(new JButton(title), name);
+        Icon icon=switch(name){case "send"->WorkbenchIcons.SEND;case "stop","cancel"->WorkbenchIcons.STOP;case "copy"->WorkbenchIcons.COPY;default->null;};
+        if(icon!=null){button.setIcon(icon);button.setText(null);button.setToolTipText(title);AccessibilitySupport.describe(button,title,title);}
+        button.addActionListener(event -> action.run()); return button; }
     private static <T extends JComponent> T named(T component, String name) { component.setName("agent.session." + name); return component; }
     private static DefaultListCellRenderer plainRenderer() {
         return new DefaultListCellRenderer() {
             @Override public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
                 JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focus); label.putClientProperty("html.disable", true);
+                label.setIcon(ProviderIcons.forValue(value,label.getBackground()));
                 if (value instanceof Map<?, ?> option) label.setText(Objects.toString(option.get("name"), Objects.toString(option.get("id"), "Option"))); return label;
             }
         };

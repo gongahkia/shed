@@ -1,0 +1,117 @@
+{
+  "package": "@lobehub/icons-static-png",
+  "version": "2.12.0",
+  "license": "MIT; logos remain trademarks of their owners",
+  "assets": [
+    {
+      "file": "assets/providers/light/openai.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/openai.png",
+      "sha256": "8a33312f6bb17c1edddf8f9d7fbac09ce1d1d697d6601f37227afa879e94c52e"
+    },
+    {
+      "file": "assets/providers/light/claude.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/claude.png",
+      "sha256": "41411653318bcb1607cc1da7cf79f2916129402fb6660499953d3b2cb09333a9"
+    },
+    {
+      "file": "assets/providers/light/gemini.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/gemini.png",
+      "sha256": "e88ad7929d463e0d459398709a86d943b6797163a706d9875c7357918feb4977"
+    },
+    {
+      "file": "assets/providers/light/ollama.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/ollama.png",
+      "sha256": "2818613ff0dde6370819dcd6206316710ff01ee7821063cec55e1608b3a60296"
+    },
+    {
+      "file": "assets/providers/light/deepseek.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/deepseek.png",
+      "sha256": "8e0fd5830630f21d38bd57a277008149c3d73c77f3c41afe6cd102239b3ee2e7"
+    },
+    {
+      "file": "assets/providers/light/qwen.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/qwen.png",
+      "sha256": "08520bc68e89cf6d0dd89b2ceb86a6ddca310dad7cdbfbe85c39524e4dc9ca5c"
+    },
+    {
+      "file": "assets/providers/light/meta.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/meta.png",
+      "sha256": "5b8e394de240ebbcaea8f8756403935734c4831df718af746d28bbf9d1719cad"
+    },
+    {
+      "file": "assets/providers/light/mistral.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/mistral.png",
+      "sha256": "b992448a9a56f287ba9eb188dcfc0bc94f595ca2bdf8455e576f03d873fcce63"
+    },
+    {
+      "file": "assets/providers/light/openrouter.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/openrouter.png",
+      "sha256": "8baea3b5b20c253dc52c7d2b98b3fb6616190d845d02a500d85304e3b87c3adc"
+    },
+    {
+      "file": "assets/providers/light/opencode.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/opencode.png",
+      "sha256": "8dd736cfa2628863a6e008a134d2094da69727d7359caca5bd05fe322ab13905"
+    },
+    {
+      "file": "assets/providers/light/huggingface.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/light/huggingface.png",
+      "sha256": "862b5c465133aca86118908b5115ead4ae4150de770f8ebeb575be34bc9e8922"
+    },
+    {
+      "file": "assets/providers/dark/openai.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/openai.png",
+      "sha256": "375016542ebe78b63c7f36b8f6aee3058f2b706d861e5153fd74f9c27f63b8b7"
+    },
+    {
+      "file": "assets/providers/dark/claude.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/claude.png",
+      "sha256": "4dbf0aa77200058e8cb152e990597a95a99963db85632bf8abd8343a249e898e"
+    },
+    {
+      "file": "assets/providers/dark/gemini.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/gemini.png",
+      "sha256": "9c6558b792c7eadc1e9f20920b20d83ed7c836d1de6f0d3524f700968090ed33"
+    },
+    {
+      "file": "assets/providers/dark/ollama.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/ollama.png",
+      "sha256": "601c558832e50aa51e25782429de683fec8885da5fc3a29431fa4f611adf3dad"
+    },
+    {
+      "file": "assets/providers/dark/deepseek.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/deepseek.png",
+      "sha256": "2cb107c96e3edfc128b04cb8368929c9b9157ecf392b5addf9ae5bc81d8290f1"
+    },
+    {
+      "file": "assets/providers/dark/qwen.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/qwen.png",
+      "sha256": "9928978ef7f170aec69aa43798d2bd0ab83cddda2a25fcfbea1c37520f940190"
+    },
+    {
+      "file": "assets/providers/dark/meta.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/meta.png",
+      "sha256": "1d4a86efc202f2d11c12f7f38f6ac1899764fcd5635f49f1e59a4300545a91bb"
+    },
+    {
+      "file": "assets/providers/dark/mistral.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/mistral.png",
+      "sha256": "bb5e5a02505c8e28bcc5016ca15a9bf5c320d402a939f7544a71dd3bfe583c3c"
+    },
+    {
+      "file": "assets/providers/dark/openrouter.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/openrouter.png",
+      "sha256": "de7c51476f81c54f0caa5f872d94bbf4f670084363dac70572a87fc60625b096"
+    },
+    {
+      "file": "assets/providers/dark/opencode.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/opencode.png",
+      "sha256": "017ff9bc277303d042baa12017be114f876b045260603528f5a7beedfdd6c714"
+    },
+    {
+      "file": "assets/providers/dark/huggingface.png",
+      "source": "https://unpkg.com/@lobehub/icons-static-png@2.12.0/dark/huggingface.png",
+      "sha256": "32f77f08afbb15332283b1c0a175ef46fd67a0cf32bb1dba7d68bfdd7abae992"
+    }
+  ]
+}

@@ -37,3 +37,16 @@ This never types fake intermediate characters into the source or moves the human
 > Use the explicit Shed attachment selected by SHED_CONTROL. Read the intended source and retain its document ID and revision. Propose bounded changes through `shed ctl`; leave acceptance and saving to the human. If a request is stale, reread and reconsider. Never execute future/unknown endpoints, edit the backing file to bypass review, or treat screenshots as authoritative text. Leave the source and view useful for human review.
 
 Authentication protects the attachment against clients without its key and binds it to the selected instance. It is not an OS sandbox against another process with unrestricted access to the same user’s files. Do not expose the endpoint to other hosts or share private session files.
+
+## Named activity and cancellation
+
+```sh
+shed ctl progress --session-id turn-1 --agent Codex --phase thinking --completed 1 --total 3 --start 100 --end 150
+shed ctl activity-state
+shed ctl propose --session-id turn-1 --document DOCUMENT_ID --revision REVISION --start 100 --end 150 --text-file /tmp/chunk.txt
+shed ctl cancel --session-id turn-1
+```
+
+Phases are `reading`, `thinking`, `proposing`, `complete`, `cancelled`, and `failed`. A total of zero means indeterminate progress. One display session is active per attachment; another session is rejected until the current one finishes or is cancelled. A finished session ID cannot resume. Names are display labels, not authenticated agent identities. Updates reuse the status line and distinct source marker; progress pulses expire after 30 seconds without another update and stop on source edits, hidden/disposed views, completion, cancellation, or attachment revocation. Reduced-motion preferences remain authoritative.
+
+Pass the same `--session-id` with edit proposals to make cancellation meaningful: finished/cancelled sessions cannot submit new chunks. Cancellation is cooperative; it does not terminate an external agent process or retract an already durable proposal. Reject an outstanding proposal in the review panel. `:agent api stop` revokes the entire attachment. Legacy one-shot proposals without a session remain available.

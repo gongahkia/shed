@@ -183,6 +183,15 @@ final class AgentWorkspaceController implements AutoCloseable {
                 if (!presentation.available()) throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
                 presentation.showPending(start, end);
             }
+            public void progress(AgentActivityState.State state, int start, int end) {
+                if (state.terminal()) owner().clearAgentActivity();
+                else {
+                    var presentation=owner().getActivePane().agentPresentation();
+                    if (!presentation.available()) throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                    presentation.showProgress(start,end,state.agent());
+                }
+                owner().showMessage(state.label());
+            }
             public void review(String proposal) { owner().toolWindowHost.showAgentProposal(proposal); }
             public void clearActivity() { var live = editorOwner.get(); if (live != null) live.clearAgentActivity(); }
         };

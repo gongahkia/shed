@@ -9,3 +9,13 @@ The source overprinting in earlier app-owned captures is reproducible when a com
 - `render-live.json`: real workbench/external Java client acceptance, reviewed Apply, exact Undo/Redo, typing and deliberate save. Not an OS desktop screenshot or physical-keyboard qualification.
 
 Commands use the existing guarded `scripts/test-agent-desktop.py` with the previously generated demo payload. JDK 21.0.13.1+2, macOS aarch64; disposable home/preferences/project and no interactive shell or real language server. Failed exploratory renderer comparisons remain in the task scratch evidence; the renderer change was removed after the faithful native component capture identified the mismatch.
+
+## 2. Everyday CLI
+
+`cli-tests.json`: explicit attachment, state, project file opening, bounded reads, revision-pinned proposals, oversized input rejection and unknown-command refusal. See `docs/USING_SHED_WITH_AGENTS.md`.
+
+## 3. Agent activity
+
+Named display sessions, bounded counts and phases, sticky completion/cancellation, session-aware proposal rejection, status-line feedback and a 30-second maximum progress-pulse lease reuse the existing source decoration and coalesced timer. No additional idle worker or source mutation is introduced.
+
+`activity-cold-failure.json` preserves a failed cold component run and its EDT stack: hidden range repaint requested model-to-view geometry and entered `CFontManager.loadNativeFonts`. The correction avoids text geometry for hidden source views; tests retain the original Unicode fixture and deadlines. No retry or assertion relaxation was added. `activity-tests.json` records the corrected regression run, including a hidden component whose geometry method throws if called.

@@ -116,6 +116,9 @@ final class WorkspaceStatusProtocol {
             switch (method) {
                 case "editor/file/open" -> { if (!"applied".equals(outcome)) return false; }
                 case "editor/agent/activity" -> { if (!"shown".equals(outcome)) return false; }
+                case "editor/agent/progress", "editor/agent/state", "editor/agent/cancel" -> {
+                    if (!"activity".equals(outcome) || !validActivity(base.remove("activity"))) return false;
+                }
                 case "editor/edits/propose" -> {
                     if (!"proposed".equals(outcome) || !(base.remove("proposalId") instanceof String id)
                             || !id.matches("proposal-[a-f0-9]{32}") || !Boolean.TRUE.equals(base.remove("reviewRequired"))) return false;
@@ -129,6 +132,14 @@ final class WorkspaceStatusProtocol {
             }
             return acceptsNavigation(base, false);
         }
+    }
+
+    private static boolean validActivity(Object value) {
+        var m=MiniJson.asObject(value); if(m==null)return false;
+        if(m.equals(Map.of("phase","idle")))return true;
+        if(!m.keySet().equals(Set.of("sessionId","agent","phase","completed","total")))return false;
+        try {new AgentActivityState().update((String)m.get("sessionId"),(String)m.get("agent"),(String)m.get("phase"),(Long)m.get("completed"),(Long)m.get("total"));return true;}
+        catch(RuntimeException invalid){return false;}
     }
 
     static Session accept(WorkspaceStatusAttachment attachment, InputStream input, OutputStream output) throws IOException {

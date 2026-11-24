@@ -1,0 +1,62 @@
+{
+  "boundary": "source-reviewed non-native tests, not general process confinement",
+  "tests": [
+    "ShedControlCliTest"
+  ],
+  "fixture": "/private/tmp/shed-native-lcz9d0h8",
+  "native_benchmarks": "BLOCKED",
+  "phase": "test",
+  "dependency_copy": {
+    "entries": 1808,
+    "bytes": 98080024
+  },
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-lcz9d0h8/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-lcz9d0h8/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-lcz9d0h8/run/config",
+    "-Djava.awt.headless=true",
+    "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed",
+    "-cp",
+    "/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/boot/plexus-classworlds-2.9.0.jar",
+    "org.codehaus.plexus.classworlds.launcher.Launcher",
+    "-B",
+    "-o",
+    "-s",
+    "/private/tmp/shed-native-lcz9d0h8/run/config/settings.xml",
+    "-gs",
+    "/private/tmp/shed-native-lcz9d0h8/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-lcz9d0h8/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-lcz9d0h8/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-lcz9d0h8/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-lcz9d0h8/run/config",
+    "-Djava.awt.headless=true",
+    "-DforkCount=0",
+    "-Dtest=ShedControlCliTest",
+    "test"
+  ],
+  "exit": 1,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 3 resources from assets to target/classes/assets\n[INFO] Copying 2 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 422 source files with javac [debug release 21] to target/classes\n[WARNING] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/ApplicationErrorReporter.java:[120,77] java.lang.ThreadDeath in java.lang has been deprecated and marked for removal\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/EditorUiController.java: Some input files use or override a deprecated API.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/EditorUiController.java: Recompile with -Xlint:deprecation for details.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java: /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed dependency.\n[INFO] Compiling 312 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.ShedControlCliTest\nSLOW_CLI_EDT [replace, --document, buffer-a6d96d63-8a9d-40b6-88d6-7bb9ff5838cd, --revision, 1, --text-file, /private/tmp/shed-native-lcz9d0h8/run/tmp/junit3706211900590246917/chunk.txt] [java.desktop@21.0.13.1/sun.font.CFontManager.loadNativeFonts(Native Method), java.desktop@21.0.13.1/sun.font.CFontManager$1.run(CFontManager.java:218), java.base@21.0.13.1/java.security.AccessController.executePrivileged(AccessController.java:778), java.base@21.0.13.1/java.security.AccessController.doPrivileged(AccessController.java:319), java.desktop@21.0.13.1/sun.font.CFontManager.loadFonts(CFontManager.java:214), java.desktop@21.0.13.1/sun.font.SunFontManager.findFont2D(SunFontManager.java:2093), java.desktop@21.0.13.1/java.awt.Font.getFont2D(Font.java:529), java.desktop@21.0.13.1/java.awt.Font$FontAccessImpl.getFont2D(Font.java:265), java.desktop@21.0.13.1/sun.font.FontUtilities.getFont2D(FontUtilities.java:151), java.desktop@21.0.13.1/sun.font.FontDesignMetrics.initMatrixAndMetrics(FontDesignMetrics.java:353), java.desktop@21.0.13.1/sun.font.FontDesignMetrics.<init>(FontDesignMetrics.java:346), java.desktop@21.0.13.1/sun.font.FontDesignMetrics.getMetrics(FontDesignMetrics.java:298), java.desktop@21.0.13.1/sun.swing.SwingUtilities2.getFontMetrics(SwingUtilities2.java:1242), java.desktop@21.0.13.1/javax.swing.JComponent.getFontMetrics(JComponent.java:1700), java.desktop@21.0.13.1/javax.swing.text.PlainView.calculateLongestLine(PlainView.java:783), java.desktop@21.0.13.1/javax.swing.text.PlainView.updateMetrics(PlainView.java:332), java.desktop@21.0.13.1/javax.swing.text.PlainView.setSize(PlainView.java:630), java.desktop@21.0.13.1/javax.swing.plaf.basic.BasicTextUI$RootView.setSize(BasicTextUI.java:1839), java.desktop@21.0.13.1/javax.swing.plaf.basic.BasicTextUI.modelToView(BasicTextUI.java:1120), java.desktop@21.0.13.1/javax.swing.plaf.basic.BasicTextUI.modelToView2D(BasicTextUI.java:1106), java.desktop@21.0.13.1/javax.swing.text.JTextComponent.modelToView2D(JTextComponent.java:1410), shed.AgentEditPresentation.repaintRanges(AgentEditPresentation.java:95), shed.AgentEditPresentation.show(AgentEditPresentation.java:62), shed.AgentEditPresentation.showPending(AgentEditPresentation.java:44), shed.EditorControlTest$Fixture.activity(EditorControlTest.java:64), shed.EditorControl.lambda$dispatch$4(EditorControl.java:121), shed.EditorControl$$Lambda/0x000000b001524208.call(Unknown Source), shed.EditorControl.lambda$ui$9(EditorControl.java:185), shed.EditorControl$$Lambda/0x000000b001502c90.call(Unknown Source), java.base@21.0.13.1/java.util.concurrent.FutureTask.run(FutureTask.java:317), shed.EditorControl.lambda$ui$10(EditorControl.java:186), shed.EditorControl$$Lambda/0x000000b001502eb8.run(Unknown Source), java.desktop@21.0.13.1/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:318), java.desktop@21.0.13.1/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773), java.desktop@21.0.13.1/java.awt.EventQueue$4.run(EventQueue.java:720), java.desktop@21.0.13.1/java.awt.EventQueue$4.run(EventQueue.java:714), java.base@21.0.13.1/java.security.AccessController.executePrivileged(AccessController.java:778), java.base@21.0.13.1/java.security.AccessController.doPrivileged(AccessController.java:400), java.base@21.0.13.1/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87), java.desktop@21.0.13.1/java.awt.EventQueue.dispatchEvent(EventQueue.java:742), java.desktop@21.0.13.1/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203), java.desktop@21.0.13.1/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124), java.desktop@21.0.13.1/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113), java.desktop@21.0.13.1/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109), java.desktop@21.0.13.1/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101), java.desktop@21.0.13.1/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)]\n[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 4.505 s <<< FAILURE! -- in shed.ShedControlCliTest\n[ERROR] shed.ShedControlCliTest.ordinaryCommandsUseExplicitAttachmentAndCaptureCurrentContext -- Time elapsed: 4.457 s <<< FAILURE!\norg.opentest4j.AssertionFailedError: {jsonrpc=2.0, id=ctl, error={data={code=TIMEOUT, outcome=rejected}, code=-32000, message=Editor control request failed}} ==> expected: <0> but was: <65>\n\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:156)\n\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:598)\n\tat shed.ShedControlCliTest.ordinaryCommandsUseExplicitAttachmentAndCaptureCurrentContext(ShedControlCliTest.java:30)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\n[INFO] \n[INFO] Results:\n[INFO] \n[ERROR] Failures: \n[ERROR]   ShedControlCliTest.ordinaryCommandsUseExplicitAttachmentAndCaptureCurrentContext:30 {jsonrpc=2.0, id=ctl, error={data={code=TIMEOUT, outcome=rejected}, code=-32000, message=Editor control request failed}} ==> expected: <0> but was: <65>\n[INFO] \n[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  12.340 s\n[INFO] Finished at: 2026-11-24T04:09:23Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project shed: There are test failures.\n[ERROR] \n[ERROR] Please refer to /Users/gongahkia/Desktop/coding/projects/shed/target/surefire-reports for the individual test results.\n[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.\n[ERROR] -> [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n",
+  "elapsed_s": 14.066875624999739,
+  "fixture_removed": true,
+  "metrics": [
+    {
+      "operation": "creation",
+      "ns": 710083
+    },
+    {
+      "operation": "guard",
+      "ns": 406291
+    },
+    {
+      "operation": "guard",
+      "ns": 1449208
+    },
+    {
+      "operation": "cleanup",
+      "ns": 99489917
+    }
+  ]
+}

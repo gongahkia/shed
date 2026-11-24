@@ -22,7 +22,9 @@ final class AgentEditPresentation implements AutoCloseable {
     private Document document;
     private Highlighter highlighter;
     private boolean closed, pending;
-    private int ticks;
+    private int ticks, maximumTicks = TICKS;
+    private String agentName = "Agent";
+    void setAgentName(String name) { checkEdt(); agentName = name; repaintRanges(); }
     private final DocumentListener edits = new DocumentListener() {
         public void insertUpdate(DocumentEvent event) { clear(); }
         public void removeUpdate(DocumentEvent event) { clear(); }
@@ -39,6 +41,7 @@ final class AgentEditPresentation implements AutoCloseable {
         timer = new Timer(50, event -> advance()); timer.setCoalesce(true);
         area.addPropertyChangeListener(properties); area.addHierarchyListener(hierarchy); observe();
     }
+    void showProgress(int start, int end, String name) { showPending(start,end); maximumTicks=600; setAgentName(name); }
     void showPending(int start, int end) { show(List.of(new Range(start, end)), true); }
     void showPending(List<Range> changes) { show(changes, true); }
     void showApplied(int start, int end) { showApplied(List.of(new Range(start, end))); }
@@ -50,7 +53,7 @@ final class AgentEditPresentation implements AutoCloseable {
         for (Range range : changes)
             if (range.start() < 0 || range.end() < range.start() || range.end() > document.getLength())
                 throw new IllegalArgumentException("Invalid agent range");
-        clear(); ranges = List.copyOf(changes); pending = preparing; highlighter = area.getHighlighter();
+        clear(); maximumTicks=TICKS; ranges = List.copyOf(changes); pending = preparing; highlighter = area.getHighlighter();
         try {
             for (Range range : ranges) tags.add(highlighter.addHighlight(range.start(), range.end(), new Painter(range)));
         } catch (BadLocationException invalid) { clear(); throw new IllegalArgumentException(invalid); }
@@ -68,7 +71,7 @@ final class AgentEditPresentation implements AutoCloseable {
             || !area.getLineWrap() && !Boolean.TRUE.equals(document.getProperty("i18n"));
     }
     private void advance() {
-        if (!area.isShowing() || !animated() || ++ticks >= TICKS) clear(); else repaintRanges();
+        if (!area.isShowing() || !animated() || ++ticks >= maximumTicks) clear(); else repaintRanges();
     }
     private void visibilityChanged() { if (!area.isShowing()) clear(); }
     private void observe() {
@@ -86,7 +89,7 @@ final class AgentEditPresentation implements AutoCloseable {
         return Math.abs(a.getRed() - b.getRed()) + Math.abs(a.getGreen() - b.getGreen()) + Math.abs(a.getBlue() - b.getBlue());
     }
     private void repaintRanges() {
-        if (!available()) return;
+        if (!area.isShowing() || !available()) return;
         Rectangle visible = area.getVisibleRect(), dirty = null;
         for (Range range : ranges) {
             try {
@@ -94,7 +97,7 @@ final class AgentEditPresentation implements AutoCloseable {
                 if (first == null || last == null) continue;
                 Rectangle part = first.getBounds().union(last.getBounds());
                 if (first.getY() != last.getY()) { part.x = visible.x; part.width = visible.width; }
-                part.grow(area.getFontMetrics(area.getFont()).stringWidth("Agent") + 8, 3);
+                part.grow(area.getFontMetrics(area.getFont()).stringWidth(agentName) + 8, 3);
                 part = part.intersection(visible);
                 if (!part.isEmpty()) dirty = dirty == null ? part : dirty.union(part);
             } catch (BadLocationException unavailable) { }
@@ -133,7 +136,7 @@ final class AgentEditPresentation implements AutoCloseable {
                         Rectangle2D caret = area.modelToView2D(end);
                         if (caret != null) {
                             copy.setColor(color); copy.fillRect((int)caret.getX(), (int)caret.getY(), 3, (int)caret.getHeight());
-                            copy.drawString("Agent", (int)caret.getX() + 5, Math.max(area.getFontMetrics(area.getFont()).getAscent(), (int)caret.getY() - 2));
+                            copy.drawString(agentName, (int)caret.getX() + 5, Math.max(area.getFontMetrics(area.getFont()).getAscent(), (int)caret.getY() - 2));
                         }
                     }
                 } finally { copy.dispose(); }

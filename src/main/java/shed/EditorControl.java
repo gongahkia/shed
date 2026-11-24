@@ -14,7 +14,7 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel");
     static final int MAX_READ = 2048, MAX_REPLACEMENT = 8192, MAX_DOCUMENT = 1024 * 1024;
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
         "documentRevision", "contextRevision", "caretOffset", "selectionStart", "selectionEnd");
@@ -22,10 +22,12 @@ final class EditorControl implements AutoCloseable {
         ProjectFileOpen.Request open(ProjectBoundFileAcquisition.RootPin root, String path, EditorNavigation.State expected,
                                      BooleanSupplier current, Consumer<ProjectDocumentInstall.Result> completed);
         void activity(int start, int end);
+        default void progress(AgentActivityState.State state, int start, int end) { if (state.terminal()) clearActivity(); else activity(start,end); }
         void review(String proposal);
         void clearActivity();
     }
     private record Services(WorkspaceQueryService workspace, WorkspaceProposalService proposals) { }
+    private final AgentActivityState activity = new AgentActivityState();
     private final EditorMetadata grant;
     private final ProjectBoundFileAcquisition.RootPin root;
     private final AtomicReference<Host> host;
@@ -58,8 +60,12 @@ final class EditorControl implements AutoCloseable {
             case "editor/file/open" -> Set.of("path");
             case "editor/source/read" -> Set.of("offset", "limit");
             case "editor/edits/propose" -> Set.of("start", "end", "text", "requestId");
+            case "editor/agent/progress" -> Set.of("start", "end", "sessionId", "agent", "phase", "completed", "total");
+            case "editor/agent/state" -> Set.of();
+            case "editor/agent/cancel" -> Set.of("sessionId");
             default -> Set.of("start", "end");
         });
+        if (method.equals("editor/edits/propose") && params.containsKey("sessionId")) fields.add("sessionId");
         if (!params.keySet().equals(fields)) throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
         if (!Long.valueOf(1).equals(params.get("schemaVersion"))) throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
         if (!grant.projectId.equals(text(params, "projectId", 64))) throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
@@ -73,6 +79,13 @@ final class EditorControl implements AutoCloseable {
             Services current = services.get();
             if (current == null) throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
             if (method.equals("editor/file/open")) return open(lease, params, before, current);
+            if (method.equals("editor/agent/state") || method.equals("editor/agent/cancel")) {
+                if (method.endsWith("cancel")) {
+                    var state = activity.cancel(text(params,"sessionId",64));
+                    ui(lease, () -> { requireState(lease,before); owner().progress(state,0,0); return null; });
+                }
+                var reply=result(method,before,"activity");reply.put("activity",activity.snapshot());return reply;
+            }
             if (before.metadata().length() > MAX_DOCUMENT) throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
             WorkspaceDocument source = current.workspace().snapshot(current.workspace().workspaceId(), before.metadata().documentId());
             if (source.source() != WorkspaceDocument.Source.EDITOR || !source.documentId().equals(before.metadata().documentId()) || !source.complete())
@@ -96,6 +109,12 @@ final class EditorControl implements AutoCloseable {
                 ui(lease, () -> { requireState(lease, before); owner().activity(start, end); return null; });
                 return result(method, before, "shown");
             }
+            if (method.equals("editor/agent/progress")) {
+                var state=activity.update(text(params,"sessionId",64),text(params,"agent",40),text(params,"phase",20),number(params,"completed"),number(params,"total"));
+                ui(lease, () -> { requireState(lease,before); owner().progress(state,start,end); return null; });
+                var reply=result(method,before,"activity");reply.put("activity",state.json());return reply;
+            }
+            if (params.containsKey("sessionId")) activity.requireActive(text(params,"sessionId",64));
             String replacement = text(params, "text", MAX_REPLACEMENT), requestId = text(params, "requestId", 64);
             String after = source.content().substring(0, start) + replacement + source.content().substring(end);
             if (after.length() > MAX_DOCUMENT) throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
@@ -192,7 +211,7 @@ final class EditorControl implements AutoCloseable {
     private static WorkspaceApiException fail(WorkspaceApiException.Code code) { return new WorkspaceApiException(code, "Editor control unavailable: " + code); }
     @Override public void close() {
         var lease = active.get(); if (lease != null) lease.close();
-        Host old = host.getAndSet(null); services.set(null);
+        Host old = host.getAndSet(null); services.set(null); activity.close();
         if (old != null) SwingUtilities.invokeLater(old::clearActivity);
     }
 }

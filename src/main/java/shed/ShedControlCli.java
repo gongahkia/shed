@@ -16,7 +16,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -46,6 +46,14 @@ final class ShedControlCli {
                         if(path!=null)throw new IllegalArgumentException();
                         params.put("start",number(options,"--start",0));params.put("end",number(options,"--end",0));method="editor/agent/activity";
                     }
+                    case "progress" -> {
+                        if(path!=null)throw new IllegalArgumentException();
+                        params.put("sessionId",required(options,"--session-id"));params.put("agent",required(options,"--agent"));params.put("phase",required(options,"--phase"));
+                        params.put("completed",number(options,"--completed",0));params.put("total",number(options,"--total",0));
+                        params.put("start",number(options,"--start",0));params.put("end",number(options,"--end",0));method="editor/agent/progress";
+                    }
+                    case "activity-state" -> { if(path!=null)throw new IllegalArgumentException();method="editor/agent/state"; }
+                    case "cancel" -> { if(path!=null)throw new IllegalArgumentException();params.put("sessionId",required(options,"--session-id"));method="editor/agent/cancel"; }
                     case "propose", "replace" -> {
                         if(path!=null)throw new IllegalArgumentException();
                         String document=options.remove("--document");long revision=number(options,"--revision",-1);
@@ -58,6 +66,7 @@ final class ShedControlCli {
                         params.put("start",command.equals("replace")?0L:number(options,"--start",-1));
                         params.put("end",command.equals("replace")?context.get("documentLength"):number(options,"--end",-1));
                         params.put("text",replacement);String id=options.remove("--request-id");params.put("requestId",id==null?UUID.randomUUID().toString():id);
+                        String session=options.remove("--session-id");if(session!=null)params.put("sessionId",session);
                         method="editor/edits/propose";
                     }
                     default -> throw new IllegalArgumentException();
@@ -90,6 +99,7 @@ final class ShedControlCli {
         }
         return MiniJson.asObject(envelope.get("result"));
     }
+    private static String required(Map<String,String> options,String key){String value=options.remove(key);if(value==null)throw new IllegalArgumentException();return value;}
     private static long number(Map<String,String> options,String key,long fallback){String raw=options.remove(key);long n=raw==null?fallback:Long.parseLong(raw);if(n<0)throw new IllegalArgumentException();return n;}
     private static int emit(String response,PrintWriter output){output.println(response);return output.checkError()?74:MiniJson.asObject(MiniJson.parseStrict(response)).containsKey("error")?65:0;}
 }

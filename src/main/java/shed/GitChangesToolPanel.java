@@ -31,7 +31,9 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     private final JTable changeTable = new JTable(changes);
-    private final JTextArea diff = new JTextArea();
+    private final ChangeDiffView diff = new ChangeDiffView();
+    private final ChangePulse pulse=new ChangePulse(changeTable);
+    private boolean observedDiffDirty;
     private final JTextField commit = new JTextField();
     private final List<GitChangesWorkbenchModel.Change> visibleChanges = new ArrayList<>();
     private GitChangesWorkbenchModel.Snapshot snapshot;
@@ -52,7 +54,17 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         panel.add(actions(), BorderLayout.SOUTH);
         changeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         changeTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) loadDiff(); });
-        diff.setEditable(false);
+        diff.setName("git.changeDiff");changeTable.setName("git.changeFiles");
+        changeTable.setDefaultRenderer(Object.class,new javax.swing.table.DefaultTableCellRenderer(){
+            @Override public java.awt.Component getTableCellRendererComponent(JTable table,Object value,boolean selected,boolean focused,int row,int column){
+                var label=(JLabel)super.getTableCellRendererComponent(table,value,selected,focused,row,column);label.putClientProperty("html.disable",true);
+                if(row<visibleChanges.size()){
+                    var change=visibleChanges.get(row);String status=change.indexStatus()+" "+change.worktreeStatus();String kind=status.contains("Deleted")?"D":status.contains("Added")||status.contains("Untracked")?"A":"M";
+                    var accent=ChangePulse.color(kind);label.setBackground(ChangePulse.tint(label.getBackground(),accent,pulse.strength(change.path())));
+                    if(!selected&&accent!=null)label.setForeground(accent);label.setForeground(AccessibilitySupport.readableText(label.getForeground(),label.getBackground()));
+                }return label;
+            }
+        });
         AccessibilitySupport.describe(changeTable, "Git changes", "Staged, unstaged, and untracked repository files.");
         autoRefreshTimer = new javax.swing.Timer(editor.configManager.getGitAutoRefreshIntervalMs(), event -> refreshIfChanged());
         autoRefreshTimer.start();
@@ -62,7 +74,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     @Override public void focus() { changeTable.requestFocusInWindow(); }
 
     @Override public void close() {
-        closed = true; autoRefreshTimer.stop(); statusGeneration++; diffGeneration++;
+        closed = true; pulse.close();autoRefreshTimer.stop(); statusGeneration++; diffGeneration++;
     }
 
     private JPanel header() {
@@ -109,6 +121,14 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         requestRefresh(false);
     }
 
+    void observeExternalChanges(java.nio.file.Path root,java.util.Set<String> recent){
+        if(closed||snapshot==null||snapshot.root().isBlank()||recent.isEmpty())return;
+        var repository=java.nio.file.Path.of(snapshot.root()).toAbsolutePath().normalize();var paths=new java.util.HashSet<String>();
+        for(String name:recent){var path=root.resolve(name).normalize();if(path.startsWith(repository))paths.add(repository.relativize(path).toString());}
+        pulse.flash(paths);var selected=selected();observedDiffDirty|=selected!=null&&paths.contains(selected.path());
+        if(panel.isShowing()&&host.isSelected(ToolWindowHost.Tab.GIT))requestRefresh(true);
+    }
+    @Override public void refreshAppearance(){diff.refreshAppearance(editor.resolveEditorFont());changeTable.setFont(editor.resolveUiFont());}
     private void refreshIfChanged() {
         int interval = editor.configManager.getGitAutoRefreshIntervalMs();
         if (autoRefreshTimer.getDelay() != interval) {
@@ -130,11 +150,12 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
             if (!panel.isDisplayable()) return;
             if (error != null || result == null) {
                 snapshot = null; diffGeneration++; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0);
-                ToolOutput.update(diff, "", true);
+                diff.showPatch("",editor.resolveEditorFont());
                 WorkbenchStyle.message(state, "Git refresh failed: " + (error == null ? job.getErrorMessage() : error.getMessage()), "error");
                 return;
             }
-            if (automatic && Objects.equals(snapshot, result)) return;
+            if (automatic && Objects.equals(snapshot, result)) {if(observedDiffDirty){observedDiffDirty=false;loadDiff();}return;}
+            observedDiffDirty=false;
             render(result);
         });
     }
@@ -142,7 +163,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private void render(GitChangesWorkbenchModel.Snapshot result) {
         GitChangesWorkbenchModel.Change previous = selected();
         String selectedPath = previous == null ? null : previous.path();
-        snapshot = result; diffGeneration++; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0); ToolOutput.update(diff, "", true);
+        snapshot = result; diffGeneration++; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0); diff.showPatch("",editor.resolveEditorFont());
         repository.setText(result.root().isBlank() ? "Repository: unavailable" : "Repository: " + result.root());
         repository.setToolTipText(result.root());
         WorkbenchStyle.message(state, result.detail() + (result.branch().isBlank() ? "" : "  Branch: " + result.branch()), result.state() == GitChangesWorkbenchModel.State.ERROR ? "error" : null);
@@ -177,7 +198,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
             (job, result, error) -> {
                 if (closed || request != diffGeneration || snapshot != captured || !panel.isDisplayable()) return;
                 if (error != null || result == null) { WorkbenchStyle.message(state, "Diff failed: " + (error == null ? job.getErrorMessage() : error.getMessage()), "error"); return; }
-                selectedDiff = result; ToolOutput.update(diff, result.content(), true); WorkbenchStyle.message(state, result.detail(), result.available() ? null : "error");
+                selectedDiff = result; diff.showPatch(result.content(),editor.resolveEditorFont()); WorkbenchStyle.message(state, result.detail(), result.available() ? null : "error");
             });
     }
 

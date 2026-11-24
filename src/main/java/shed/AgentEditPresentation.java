@@ -21,8 +21,9 @@ final class AgentEditPresentation implements AutoCloseable {
     private List<Range> ranges = List.of();
     private Document document;
     private Highlighter highlighter;
-    private boolean closed, pending;
-    private int ticks, maximumTicks = TICKS;
+    private boolean closed, pending, touring;
+    private int ticks, maximumTicks = TICKS, activeRange, markerOffset;
+    private long version;
     private String agentName = "Agent";
     void setAgentName(String name) { checkEdt(); agentName = name; repaintRanges(); }
     private final DocumentListener edits = new DocumentListener() {
@@ -58,9 +59,16 @@ final class AgentEditPresentation implements AutoCloseable {
             for (Range range : ranges) tags.add(highlighter.addHighlight(range.start(), range.end(), new Painter(range)));
         } catch (BadLocationException invalid) { clear(); throw new IllegalArgumentException(invalid); }
         if (ranges.isEmpty()) return;
+        activeRange=ranges.size()-1;markerOffset=ranges.getLast().end();
         area.putClientProperty("shed.agentActivity", preparing ? "Agent preparing change" : "Agent change applied");
         if (animated() && area.isShowing()) timer.start();
         repaintRanges();
+    }
+    long version(){return version;}
+    void moveMarker(int index,int offset){
+        checkEdt();if(closed||index<0||index>=ranges.size())return;
+        var range=ranges.get(index);if(offset<range.start()||offset>range.end())throw new IllegalArgumentException("Marker outside change");
+        repaintRanges();touring=true;activeRange=index;markerOffset=offset;repaintRanges();
     }
     private boolean animated() {
         return !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"))
@@ -105,9 +113,9 @@ final class AgentEditPresentation implements AutoCloseable {
         if (dirty != null) area.repaint(dirty.x, dirty.y, dirty.width, dirty.height);
     }
     void clear() {
-        checkEdt(); timer.stop(); repaintRanges();
+        checkEdt(); version++;timer.stop(); repaintRanges();
         if (highlighter != null) for (Object tag : tags) highlighter.removeHighlight(tag);
-        tags.clear(); ranges = List.of(); highlighter = null; ticks = 0; agentName = "Agent";
+        tags.clear();touring=false; ranges = List.of(); highlighter = null; ticks = 0; agentName = "Agent";
         area.putClientProperty("shed.agentActivity", null);
     }
     @Override public void close() {
@@ -129,11 +137,11 @@ final class AgentEditPresentation implements AutoCloseable {
                 Graphics2D copy = (Graphics2D) graphics.create();
                 try {
                     Color color = agentColor();
-                    int alpha = !animated() ? 48 : pending ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
+                    int alpha = !animated() ? 48 : (pending||touring&&range.equals(ranges.get(activeRange))) ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
                     copy.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
                     copy.fill(line);
-                    if (end == range.end() && range.equals(ranges.getLast())) {
-                        Rectangle2D caret = area.modelToView2D(end);
+                    if (range.equals(ranges.get(activeRange))&&start<=markerOffset&&markerOffset<=end) {
+                        Rectangle2D caret = area.modelToView2D(markerOffset);
                         if (caret != null) {
                             copy.setColor(color); copy.fillRect((int)caret.getX(), (int)caret.getY(), 3, (int)caret.getHeight());
                             copy.drawString(agentName, (int)caret.getX() + 5, Math.max(area.getFontMetrics(area.getFont()).getAscent(), (int)caret.getY() - 2));

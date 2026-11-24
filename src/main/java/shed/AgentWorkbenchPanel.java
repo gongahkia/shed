@@ -54,6 +54,10 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         tabs.addChangeListener(e -> refresh()); conversations.addChangeListener(e -> refresh());
         panel.add(tabs, BorderLayout.CENTER); newConversation(); refreshAppearance();
     }
+    void observedSourceReady(){liveChanges.observedSourceReady();}
+    void pauseFollowing(){if(liveChanges!=null)liveChanges.pauseForHuman();}
+    boolean selectObserved(java.nio.file.Path path){if(liveChanges==null||!liveChanges.selectObserved(path))return false;tabs.setSelectedIndex(2);return true;}
+    void decorateExplorer(FileTreePanel tree){if(liveChanges!=null)liveChanges.decorateExplorer(tree);}
     private AgentSessionPanel current() {
         int index = conversations.getSelectedIndex(); return index < 0 || index >= sessions.size() ? null : sessions.get(index);
     }

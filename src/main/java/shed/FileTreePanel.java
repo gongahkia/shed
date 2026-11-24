@@ -38,24 +38,28 @@ final class FileTreePanel extends JPanel {
     private final Runnable onActivate;
     private Font iconFont;
     private final Function<java.io.File,java.io.File[]> childLoader;
-    private boolean refreshingExternal;
+    private boolean refreshingExternal,refreshAgain;
+    private volatile java.util.Map<java.nio.file.Path,FileChangeMarks.Mark> changeMarks=java.util.Map.of();
+    private ChangePulse changePulse;
 
     FileTreePanel(Texteditor editor, java.io.File root, Function<java.io.File, java.io.File[]> children, Consumer<java.io.File> openFile,
                   Runnable onActivate) {
         super(new BorderLayout());
         this.editor = editor;this.childLoader=children;
-        this.model = new FileTreeModel(root, children);
+        this.model = new FileTreeModel(root, this::visibleChildren);
         this.openFile = openFile == null ? file -> { } : openFile;
         this.onActivate = onActivate == null ? () -> { } : onActivate;
         this.tree = new JTree(model) {
             @Override public String getToolTipText(MouseEvent event) {
                 TreePath path = getPathForLocation(event.getX(), event.getY());
                 if (path == null || !(path.getLastPathComponent() instanceof FileTreeModel.Node node)) return null;
-                return node.file().getAbsolutePath();
+                var mark=changeMarks.get(node.file().toPath());return node.file().getAbsolutePath()+(mark==null?"":" · "+mark.detail());
             }
         };
         this.scrollPane = new JScrollPane(tree);
+        this.changePulse=new ChangePulse(tree);
 
+        tree.setName("agent.explorer");
         tree.setRootVisible(true);
         tree.setShowsRootHandles(true);
         tree.setToggleClickCount(2);
@@ -74,7 +78,7 @@ final class FileTreePanel extends JPanel {
         });
         tree.addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent event) {
-                FileTreePanel.this.onActivate.run();
+                FileTreePanel.this.onActivate.run();if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();
             }
 
             @Override public void mouseClicked(MouseEvent event) {
@@ -83,14 +87,17 @@ final class FileTreePanel extends JPanel {
         });
         tree.addFocusListener(new FocusAdapter() {
             @Override public void focusGained(FocusEvent event) {
-                FileTreePanel.this.onActivate.run();
+                FileTreePanel.this.onActivate.run();if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();
             }
         });
+        tree.addKeyListener(new java.awt.event.KeyAdapter(){public void keyPressed(KeyEvent event){FileTreePanel.this.onActivate.run();if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();}});
+        scrollPane.addMouseWheelListener(event->{if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();});
         installOpenActions();
         configureAppearance();
         add(scrollPane, BorderLayout.CENTER);
         tree.expandPath(new TreePath(model.rootNode().getPath()));
-        AccessibilitySupport.describe(tree, "File explorer", "Expandable project file tree. Press Enter to open the selected file.");
+        AccessibilitySupport.describe(tree, "File explorer", "Expandable project file tree. A added, M modified, D deleted, R moved, R? possible move. Press Enter to open a surviving file.");
+        if(editor.toolWindowHost!=null)editor.toolWindowHost.decorateExplorer(this);
     }
 
     @Override public void updateUI() {
@@ -99,16 +106,29 @@ final class FileTreePanel extends JPanel {
     }
 
     void refreshExternalChanges(){
-        if(refreshingExternal||!isDisplayable())return;refreshingExternal=true;
+        if(!isDisplayable())return;if(refreshingExternal){refreshAgain=true;return;}refreshingExternal=true;refreshAgain=false;
         var directories=model.loadedDirectories();var expanded=new java.util.ArrayList<TreePath>();
         var paths=tree.getExpandedDescendants(new TreePath(model.rootNode().getPath()));if(paths!=null)while(paths.hasMoreElements())expanded.add(paths.nextElement());
         TreePath selected=tree.getSelectionPath();
         editor.asyncJobService.submit("Refresh observed file tree",token->{
-            var listings=new java.util.HashMap<java.io.File,java.io.File[]>();for(var dir:directories){if(token.isCancelled())break;var values=childLoader.apply(dir);listings.put(dir,values==null?new java.io.File[0]:values);}return listings;
+            var listings=new java.util.HashMap<java.io.File,java.io.File[]>();for(var dir:directories){if(token.isCancelled())break;var values=visibleChildren(dir);listings.put(dir,values==null?new java.io.File[0]:values);}return listings;
         },(job,listings,error)->{
-            refreshingExternal=false;if(!isDisplayable()||error!=null||listings==null)return;model.refreshListings(listings);for(var path:expanded)if(currentPath(path))tree.expandPath(path);if(selected!=null&&currentPath(selected))tree.setSelectionPath(selected);else tree.clearSelection();
+            refreshingExternal=false;if(!isDisplayable()||error!=null||listings==null)return;model.refreshListings(listings);for(var path:expanded)if(currentPath(path))tree.expandPath(path);if(selected!=null&&currentPath(selected))tree.setSelectionPath(selected);else tree.clearSelection();tree.repaint();if(refreshAgain)refreshExternalChanges();
         });
     }
+
+    void observeChanges(java.util.Map<java.nio.file.Path,FileChangeMarks.Mark> marks,java.util.Set<String> recent){
+        changeMarks=marks;changePulse.flash(recent);refreshExternalChanges();
+    }
+    private java.io.File[] visibleChildren(java.io.File directory){
+        var result=new java.util.LinkedHashMap<java.io.File,java.io.File>();var listed=childLoader.apply(directory);
+        if(listed!=null)for(var file:listed)result.put(file.getAbsoluteFile(),file);
+        var path=directory.toPath().toAbsolutePath().normalize();
+        for(var entry:changeMarks.entrySet())if(java.util.Objects.equals(entry.getKey().getParent(),path))result.putIfAbsent(entry.getKey().toFile(),entry.getKey().toFile());
+        return result.values().stream().sorted((a,b)->a.isDirectory()!=b.isDirectory()?(a.isDirectory()?-1:1):a.getName().compareToIgnoreCase(b.getName())).toArray(java.io.File[]::new);
+    }
+    @Override public void addNotify(){super.addNotify();if(editor!=null&&editor.asyncJobService!=null)refreshExternalChanges();}
+    @Override public void removeNotify(){if(changePulse!=null)changePulse.clear();super.removeNotify();}
 
     private boolean currentPath(TreePath path){
         Object[] parts=path.getPath();if(parts.length==0||parts[0]!=model.rootNode())return false;
@@ -157,6 +177,7 @@ final class FileTreePanel extends JPanel {
     private void openSelectedFile() {
         java.io.File file = selectedFile();
         if (file != null && file.isFile()) openFile.accept(file);
+        else if(file!=null&&changeMarks.containsKey(file.toPath()))editor.toolWindowHost.showObservedChange(file.toPath());
     }
 
     private final class ExplorerFileTransferHandler extends TransferHandler {
@@ -226,12 +247,14 @@ final class FileTreePanel extends JPanel {
     private final class ExplorerRenderer extends JPanel implements TreeCellRenderer {
         private final JLabel icon = new JLabel();
         private final JLabel label = new JLabel();
+        private final JLabel badge=new JLabel();
 
         private ExplorerRenderer() {
             super(new BorderLayout());
             icon.setHorizontalAlignment(SwingConstants.CENTER);
             add(icon, BorderLayout.WEST);
-            add(label, BorderLayout.CENTER);
+            add(label, BorderLayout.CENTER);add(badge,BorderLayout.EAST);
+            label.putClientProperty("html.disable",true);badge.putClientProperty("html.disable",true);
         }
 
         @Override public Component getTreeCellRendererComponent(JTree value, Object nodeValue, boolean selected, boolean expanded,
@@ -240,6 +263,8 @@ final class FileTreePanel extends JPanel {
             java.io.File file = node == null ? null : node.file();
             Color surface = selected ? editor.configManager.getSelectionColor() : editor.configManager.getNormalColor();
             Color foreground = selected ? editor.configManager.getSelectionTextColor() : editor.configManager.getEditorForeground();
+            var mark=file==null?null:changeMarks.get(file.toPath());Color accent=mark==null?null:ChangePulse.color(mark.code());
+            if(mark!=null){surface=ChangePulse.tint(surface,accent,changePulse.strength(file.toPath().toString()));foreground=AccessibilitySupport.readableText(selected||accent==null?foreground:accent,surface);}
             Font textFont = editor.resolveUiFont();
             boolean hasNerdIcons = iconFont != null;
             int iconWidth = hasNerdIcons ? UiZoom.scale(24, editor.configManager.getUiZoom()) : 0;
@@ -254,8 +279,10 @@ final class FileTreePanel extends JPanel {
                 ? FileFinderIcons.iconForDirectory(file, expanded)
                 : FileFinderIcons.iconFor(file.getName()));
             label.setForeground(foreground);
-            label.setFont(textFont);
+            label.setFont(mark!=null&&mark.removed()?textFont.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.STRIKETHROUGH,java.awt.font.TextAttribute.STRIKETHROUGH_ON)):textFont);
             label.setText(node == null ? "" : node.toString());
+            badge.setFont(textFont);badge.setForeground(foreground);badge.setText(mark==null?"":"  "+mark.code()+(mark.files()>1?" "+mark.files():""));
+            label.getAccessibleContext().setAccessibleName((node==null?"":node.toString())+(mark==null?"":" · "+mark.detail()));
             return this;
         }
     }

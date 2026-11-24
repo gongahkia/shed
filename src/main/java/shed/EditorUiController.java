@@ -523,6 +523,7 @@ final class EditorUiController {
         textArea.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mousePressed(java.awt.event.MouseEvent e) {
+                if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();
                 if (paneRef[0] != null) {
                     activateEditorPane(paneRef[0]);
                 }
@@ -542,6 +543,8 @@ final class EditorUiController {
             }
         });
 
+        paneScrollPane.addMouseWheelListener(event->{if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();});
+        paneScrollPane.getVerticalScrollBar().addMouseListener(new java.awt.event.MouseAdapter(){public void mousePressed(java.awt.event.MouseEvent event){if(editor.toolWindowHost!=null)editor.toolWindowHost.pauseAgentFollowing();}});
         EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
         paneRef[0] = pane;
         installExplorerFileDropTarget(textArea, pane);

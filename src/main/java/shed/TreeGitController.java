@@ -417,6 +417,7 @@ final class TreeGitController {
         FileTreePanel explorer = new FileTreePanel(editor, root, this::listTreeChildren, file -> editor.showMessage(openTreeFile(file)),
             () -> editor.activateEditorPane(pane));
         pane.setAlternateComponent(explorer);
+        editor.renderWindowLayout();
         editor.activateEditorPane(pane);
         explorer.focusTree();
         return "Tree pane opened";
@@ -483,7 +484,7 @@ final class TreeGitController {
 
 
     File[] listTreeChildren(File directory) {
-        File[] children = directory.listFiles(file -> !editor.shouldSkipHiddenPath(file)
+        File[] children = directory.listFiles(file -> (!editor.shouldSkipHiddenPath(file)||ExternalChangeSnapshot.safeHiddenName(file.getName()))
             && (editor.workspaceController == null || !editor.workspaceController.isExplorerExcluded(file)));
         if (children == null || children.length == 0) {
             return new File[0];

@@ -25,6 +25,7 @@ def run_codex(binary, fixture, project, work, environment):
     """Real model writes inside the fixture; no shell, hooks, plugins or user configuration."""
     fixture.validate()
     expected=dict(fixture.env,PATH=str(fixture.run_root/'no-executables'),SHED_PORTABLE_FIXTURE_ROOT=str(fixture.root),SHED_LIVE_VISUAL_ONLY='1',SHED_WATCH_QUALIFICATION='1',SHED_LIVE_CODEX='1',**git_environment(fixture))
+    if environment.get('SHED_CONFIG_MOTION')=='1':expected['SHED_CONFIG_MOTION']='1'
     if environment!=expected:raise UnsafeFixture('Unexpected live Codex environment')
     checked(project,fixture.root,directory=True);checked(work,fixture.root,directory=True)
     checked(Path(environment['HOME']),fixture.root,directory=True)
@@ -44,6 +45,9 @@ def run_codex(binary, fixture, project, work, environment):
             'Create AgentCreated.txt containing "Created by live Codex\n". Delete AgentDelete.txt whose exact contents are "agent delete fixture\n". '
             'Move AgentOld.txt to AgentRenamed.txt and change its line from "original agent rename fixture" to "renamed by live Codex". '
             'Only modify these fixture files. No commits. Finish after the patch.\nDemo.java:\n'+current)
+    if environment.get('SHED_CONFIG_MOTION')=='1':
+        current=(project/'ModelBlocks.java').read_text()
+        prompt=('Use ONLY apply_patch on ModelBlocks.java in this disposable test. Replace BEFORE_ALPHA with AFTER_ALPHA, BEFORE_BETA with AFTER_BETA, and BEFORE_GAMMA with AFTER_GAMMA. Preserve every other character. Do not use shells, network, agents, other files or commits. Here is the exact source:\n'+current)
     command=[str(binary),'-a','never','exec','--ignore-user-config','--ignore-rules','--ephemeral','--sandbox','workspace-write',
              '-C',str(project),'--json','-c','model_reasoning_effort="low"','-c','web_search="disabled"']
     for feature in ['shell_tool','unified_exec','shell_snapshot','multi_agent','multi_agent_v2','apps','plugins','hooks','browser_use','computer_use','image_generation','skill_search']:
@@ -70,6 +74,7 @@ def run_codex(binary, fixture, project, work, environment):
                 elif item.get('type')=='command_execution':raise UnsafeFixture('Unexpected shell execution in restricted Codex run')
             except json.JSONDecodeError:continue
         changed=(project/'AgentCreated.txt').exists() and not (project/'AgentDelete.txt').exists() and not (project/'AgentOld.txt').exists() and (project/'AgentRenamed.txt').exists() and 'LIVE_CODEX_EDIT' in (project/'Demo.java').read_text()
+        if environment.get('SHED_CONFIG_MOTION')=='1':changed=all(word in (project/'ModelBlocks.java').read_text() for word in ['AFTER_ALPHA','AFTER_BETA','AFTER_GAMMA'])
         return {'exit':child.returncode if changed else 1,'cli_exit':child.returncode,'expected_changes_present':changed,'item_types':sorted(item_types),'elapsed_s':time.monotonic()-started,'events':events,'environment':'disposable HOME/XDG/history; only copied auth; ignored user config; shell tools/hooks/plugins disabled','stderr':(work/'codex-errors.log').read_text()[:2000],'auth_source_content_unchanged':auth.read_bytes()==auth_bytes,'auth_source_mtime_unchanged':auth.stat().st_mtime_ns==auth_stamp}
     finally:
         if child is not None and child.poll() is None:
@@ -84,6 +89,7 @@ def main():
     parser.add_argument('--jdk', required=True, type=Path)
     parser.add_argument('--jar', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--motion', action='store_true', help='Safe config, file tree/Git pulses and multi-block source following')
     parser.add_argument('--qualification', action='store_true', help='Bounded burst, conflict, theme and split desktop qualification')
     parser.add_argument('--live-codex', type=Path, help='Existing native Codex binary; isolated home/auth copy, shell tools disabled')
     parser.add_argument('--visual-only', action='store_true', help='Qualify live external-edit visualization separately from the existing HTML-preview endpoint')
@@ -93,6 +99,7 @@ def main():
     args = parser.parse_args()
     if args.launch_only and (args.replay_payload or args.qualification or args.live_codex or args.git_fixture): parser.error("Launch-only cannot run editing fixtures")
     if args.qualification and (args.replay_payload or not args.visual_only or not args.git_fixture): parser.error('Watch qualification requires visual-only and disposable Git, independently of proposal replay')
+    if args.motion and not args.qualification: parser.error('Motion qualification requires the bounded desktop fixture')
     if args.live_codex and not args.qualification: parser.error('Live Codex requires the qualified disposable workflow')
     jdk, jar = args.jdk.resolve(strict=True), args.jar.resolve(strict=True)
     output = args.output.absolute()
@@ -137,6 +144,7 @@ def main():
         if args.visual_only: env['SHED_LIVE_VISUAL_ONLY']='1'
         if args.qualification: env['SHED_WATCH_QUALIFICATION']='1'
         if args.live_codex: env['SHED_LIVE_CODEX']='1'
+        if args.motion: env['SHED_CONFIG_MOTION']='1'
         props = ['-Duser.home=' + env['HOME'], '-Djava.io.tmpdir=' + env['TMPDIR'],
                  '-Djava.util.prefs.userRoot=' + str(f.run_root / 'config')]
         report['probe_sha256']=hashlib.sha256((ROOT / ('src/benchmark/java/shed/ShedVisualizeLaunchProbe.java' if args.launch_only else 'src/benchmark/java/shed/AgentWorkflowDesktopProbe.java')).read_bytes()).hexdigest()

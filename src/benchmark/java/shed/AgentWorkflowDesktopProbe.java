@@ -82,6 +82,73 @@ public final class AgentWorkflowDesktopProbe {
             writer.endWriteSequence();
         } finally {writer.dispose();}
     }
+    private static void qualifyMotion(Path project)throws Exception {
+        edt(()->{editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});
+        Files.writeString(project.resolve(".gitignore"),"ignored-build/\n");Files.createDirectories(project.resolve(".github/workflows"));Files.writeString(project.resolve(".github/workflows/build.yml"),"name: Before\n");
+        Files.writeString(project.resolve(".env"),"synthetic private value");Files.writeString(project.resolve("DeleteFlash.txt"),"before deletion\n");
+        Path old=Files.createDirectories(project.resolve("before-folder"));String body="shared first line\nshared second line\nshared third line\nshared fourth line\nshared fifth line\n";
+        Files.writeString(old.resolve("one.txt"),body);Files.writeString(old.resolve("two.txt"),body+"second file\n");
+        StringBuilder model=new StringBuilder("class ModelBlocks {\n");for(int line=0;line<220;line++){if(line==5)model.append("static String alpha = \"BEFORE_ALPHA\";\n");else if(line==100)model.append("static String beta = \"BEFORE_BETA\";\n");else if(line==200)model.append("static String gamma = \"BEFORE_GAMMA\";\n");else model.append("// checkpoint ").append(line).append('\n');}model.append("}\n");Files.writeString(project.resolve("ModelBlocks.java"),model);
+        edt(()->{editor.treeGitController.showFileTree(project.toString());var content=editor.resolveTreeContentPaneForOpen();editor.activateEditorPane(content);content.getTextArea().requestFocusInWindow();editor.openFileAsync(project.resolve("ModelBlocks.java").toFile());return null;});
+        await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("ModelBlocks.java"),10);
+        var modelPane=edt(editor::getActivePane);
+        edt(()->{editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("pause","Codex");return null;});
+        await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),20);
+        Files.writeString(project.resolve(".gitignore"),"ignored-build/\nlocal-output/\n");Files.writeString(project.resolve(".github/workflows/build.yml"),"name: After\n");Files.writeString(project.resolve(".env"),"changed synthetic private value");
+        Files.move(old,project.resolve("after-folder"));Files.writeString(project.resolve("after-folder/one.txt"),body+"edited after moving\n");Files.delete(project.resolve("DeleteFlash.txt"));Files.writeString(project.resolve("AddedFlash.txt"),"new file\n");
+        try{await(()->((Number)editor.toolWindowHost.watchAgentChanges("state","Codex").get("files")).intValue()==6,15);}catch(Exception failure){System.out.println(edt(()->watchDiagnostics()));throw failure;}
+        await(()->{
+            var tree=find(editor.getRootPane(),JTree.class,"agent.explorer");if(tree==null)return false;
+            var modelTree=(FileTreeModel)tree.getModel();var nodes=modelTree.rootNode().breadthFirstEnumeration();boolean deleted=false,config=false;
+            while(nodes.hasMoreElements()){var node=(FileTreeModel.Node)nodes.nextElement();String name=node.file().getName();if(name.equals("DeleteFlash.txt"))deleted=true;if(name.equals(".gitignore"))config=true;check(!name.equals(".env"),"Private file appeared in observed explorer");}
+            return deleted&&config;
+        },10);
+        Files.writeString(project.resolve("after-folder/one.txt"),body+"edited after moving\nlater observed edit\n");
+        await(()->{var list=find(editor.getRootPane(),JList.class,"agent.changedFiles");for(int i=0;i<list.getModel().getSize();i++)if(list.getModel().getElementAt(i) instanceof ExternalChangeSnapshot.Change row&&row.path().equals("after-folder/one.txt")&&row.after().contains("later observed edit"))return true;return false;},10);
+        capture("16-config-folder-moves-tree-pulse");
+        edt(()->{var tree=find(editor.getRootPane(),JTree.class,"agent.explorer");var nodes=((FileTreeModel)tree.getModel()).rootNode().breadthFirstEnumeration();while(nodes.hasMoreElements()){var node=(FileTreeModel.Node)nodes.nextElement();if(node.file().getName().equals("DeleteFlash.txt")){tree.setSelectionPath(new javax.swing.tree.TreePath(node.getPath()));tree.getActionMap().get("shed.tree.open").actionPerformed(new java.awt.event.ActionEvent(tree,0,"open"));break;}}return null;});
+        await(()->find(editor.getRootPane(),JTextPane.class,"agent.liveDiff").getText().contains("before deletion"),5);check(!Files.exists(project.resolve("DeleteFlash.txt")),"Deleted tree row recreated a source file");
+        edt(()->{check(ExternalChangeSnapshot.moveSummary(java.util.Collections.list(((javax.swing.DefaultListModel<ExternalChangeSnapshot.Change>)find(editor.getRootPane(),JList.class,"agent.changedFiles").getModel()).elements())).contains("2 files"),"Folder move summary missing");return null;});
+        events.add(Map.of("phase","safe_configs_moves_tree_badges","changes",6,"exact",true));
+        // the Git state remains M while its selected patch changes twice
+        Files.writeString(project.resolve("Welcome.txt"),"Git page first\n");
+        edt(()->{editor.toolWindowHost.showTab(ToolWindowHost.Tab.GIT);return null;});
+        await(()->{var table=find(editor.getRootPane(),JTable.class,"git.changeFiles");if(table==null)return false;for(int row=0;row<table.getRowCount();row++)if(String.valueOf(table.getValueAt(row,2)).equals("Welcome.txt")){table.setRowSelectionInterval(row,row);return true;}return false;},15);
+        await(()->find(editor.getRootPane(),JTextPane.class,"git.changeDiff").getText().contains("Git page first"),10);
+        Files.writeString(project.resolve("Welcome.txt"),"Git page second\n");
+        await(()->find(editor.getRootPane(),JTextPane.class,"git.changeDiff").getText().contains("Git page second"),15);
+        capture("17-git-summary-refreshed-patch");events.add(Map.of("phase","git_same_status_patch_refresh","exact",true));
+        edt(()->{editor.activateEditorPane(modelPane);modelPane.getTextArea().requestFocusInWindow();editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});
+    }
+    private static void qualifyDelayedTourReload(Path project)throws Exception {
+        String before=Files.readString(project.resolve("ModelBlocks.java"));String changed=before.replace("BEFORE_ALPHA","DELAYED_ALPHA").replace("BEFORE_BETA","DELAYED_BETA").replace("BEFORE_GAMMA","DELAYED_GAMMA");
+        edt(()->{editor.reloadPromptActive=true;editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("follow","Codex");return null;});
+        try{
+            await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),20);Files.writeString(project.resolve("ModelBlocks.java"),changed);
+            await(()->{try{var pending=LiveChangesPanel.class.getDeclaredField("pendingTour");pending.setAccessible(true);return pending.get(livePanel())!=null;}catch(Exception failure){throw new IllegalStateException(failure);}},12);
+            edt(()->{check(editor.getCurrentBuffer().getContent().equals(before),"Reload barrier did not hold source");editor.reloadPromptActive=false;editor.checkForExternalChanges();return null;});
+            await(()->editor.writingArea.getClientProperty("shed.agentTour")!=null,5);
+            edt(()->{check(editor.getCurrentBuffer().getContent().equals(changed),"Tour preceded authoritative reload");editor.toolWindowHost.watchAgentChanges("pause","Codex");editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});
+            Files.writeString(project.resolve("ModelBlocks.java"),before);edt(()->{editor.checkForExternalChanges();check(editor.getCurrentBuffer().getContent().equals(before),"Fixture restore failed");return null;});
+            events.add(Map.of("phase","observation_before_authoritative_reload","exact",true));
+        }finally{edt(()->{editor.reloadPromptActive=false;return null;});}
+    }
+    private static boolean tourSettled(JTextArea area,String marker){
+        try{var bounds=area.modelToView2D(area.getText().indexOf(marker));var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);if(bounds==null||viewport==null)return false;int target=Math.max(0,Math.min(area.getHeight()-viewport.getExtentSize().height,(int)bounds.getY()-viewport.getExtentSize().height/3));return Math.abs(viewport.getViewPosition().y-target)<3;}catch(javax.swing.text.BadLocationException unavailable){return false;}
+    }
+    private static void qualifyModelTour(Path project)throws Exception {
+        var area=edt(()->editor.writingArea);var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);
+        try{await(()->Integer.valueOf(1).equals(area.getClientProperty("shed.agentTour")),100);}catch(Exception failure){System.out.println(edt(()->editor.toolWindowHost.watchAgentChanges("state","Codex")+" active="+editor.getCurrentBuffer().getFile()+" loaded="+area.getText().contains("AFTER_GAMMA")+" activity="+area.getClientProperty("shed.agentActivity")));throw failure;}String expected=edt(area::getText);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);boolean dirty=edt(buffer::isModified),undo=edt(()->buffer.getUndoManager().canUndo());int caret=edt(area::getCaretPosition),selection=edt(area::getSelectionStart);await(()->tourSettled(area,"AFTER_ALPHA"),2);int first=edt(()->viewport.getViewPosition().y);capture("18-model-tour-first-block");
+        await(()->Integer.valueOf(2).equals(area.getClientProperty("shed.agentTour")),5);await(()->tourSettled(area,"AFTER_BETA"),2);int middle=edt(()->viewport.getViewPosition().y);check(middle>first+200,"Tour did not scroll to middle block");capture("19-model-tour-middle-block");
+        await(()->Integer.valueOf(3).equals(area.getClientProperty("shed.agentTour")),5);await(()->tourSettled(area,"AFTER_GAMMA"),2);int last=edt(()->viewport.getViewPosition().y);check(last>middle+200,"Tour did not scroll to final block");capture("20-model-tour-last-block");await(()->area.getClientProperty("shed.agentTour")==null,5);
+        edt(()->{check(editor.getCurrentBuffer()==buffer&&buffer.documentRevision()==revision&&buffer.isModified()==dirty&&buffer.getUndoManager().canUndo()==undo&&area.getText().equals(expected)&&area.getCaretPosition()==caret&&area.getSelectionStart()==selection,"Tour changed source, revision, history or human caret");return null;});
+        events.add(Map.of("phase","actual_model_three_block_scroll_tour","caret_preserved",true,"exact",true,"scroll_y",List.of(first,middle,last)));
+        awaitFile(folder.resolve("codex-finished"),100);check(Files.readString(folder.resolve("codex-finished")).equals("ok"),"Live Codex execution failed");check(expected.equals(Files.readString(project.resolve("ModelBlocks.java"))),"Tour did not show exact model source");
+        Files.writeString(project.resolve("ModelBlocks.java"),expected.replace("AFTER_ALPHA","SECOND_ALPHA").replace("AFTER_BETA","SECOND_BETA").replace("AFTER_GAMMA","SECOND_GAMMA"));
+        await(()->area.getClientProperty("shed.agentTour")!=null,12);
+        edt(()->{var scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,area);scroll.dispatchEvent(new java.awt.event.MouseWheelEvent(scroll,java.awt.event.MouseWheelEvent.MOUSE_WHEEL,System.currentTimeMillis(),0,20,20,0,false,java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));check(area.getClientProperty("shed.agentTour")==null,"Human wheel did not cancel tour");check(!Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("following")),"Wheel did not pause Follow");return null;});
+        events.add(Map.of("phase","manual_scroll_cancels_native_tour","exact",true));
+    }
     private static void qualifyEdges(Path project)throws Exception {
         edt(()->{editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});
         Path bulk=Files.createDirectories(project.resolve("qualification"));
@@ -169,10 +236,12 @@ public final class AgentWorkflowDesktopProbe {
         for(int i=0;i<12&&watches.stream().anyMatch(ref->ref.get()!=null);i++){System.gc();Thread.sleep(50);edt(()->null);}
         long retained=watches.stream().filter(ref->ref.get()!=null).count();check(retained==0,"Stopped watcher retained after bounded diagnostic GC: "+retained);
         events.add(Map.of("phase","watch_start_stop_cycles","cycles",12,"retained_watchers",retained,"heap_before",heapBefore,"heap_after_diagnostic_gc",usedHeap(),"exact",true));
+        boolean motion="1".equals(System.getenv("SHED_CONFIG_MOTION"));if(motion){qualifyMotion(project);qualifyDelayedTourReload(project);}
         if("1".equals(System.getenv("SHED_LIVE_CODEX"))){
-            edt(()->{human.load(editor.configManager);editor.loadBufferIntoEditor(human);editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("follow","Codex");return null;});
+            edt(()->{if(!motion){human.load(editor.configManager);editor.loadBufferIntoEditor(human);}editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("follow","Codex");return null;});
             await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),20);
             Files.writeString(folder.resolve("codex-ready"),"ready");
+            if(motion){qualifyModelTour(project);return;}
             awaitFile(folder.resolve("codex-finished"),100);
             check(Files.readString(folder.resolve("codex-finished")).equals("ok"),"Live Codex execution failed; inspect runner evidence");
             await(()->((Number)editor.toolWindowHost.watchAgentChanges("state","Codex").get("files")).intValue()>=4,15);
@@ -225,6 +294,17 @@ public final class AgentWorkflowDesktopProbe {
         events.add(Map.of("phase","human_edit_during_delayed_follow","exact",true));
     }
     private static long usedHeap(){return Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();}
+    private static String watchDiagnostics()throws Exception {
+        var live=livePanel();var result=new StringBuilder(editor.toolWindowHost.watchAgentChanges("state","Codex").toString());
+        for(String name:List.of("root","busy","dirty","generation","rootsGeneration","state","original","latest")){
+            var field=LiveChangesPanel.class.getDeclaredField(name);field.setAccessible(true);Object value=field.get(live);
+            if(value instanceof Map<?,?> map)value="files="+map.size()+" gitignore="+map.get(".gitignore")+" old="+map.containsKey("before-folder/one.txt")+" new="+map.containsKey("after-folder/one.txt");
+            else if(value instanceof JLabel label)value=label.getText();result.append("\n").append(name).append("=").append(value);
+        }
+        Object watch=activeWatch();if(watch!=null)for(String name:List.of("root","directories","thread")){var field=TestWatchService.class.getDeclaredField(name);field.setAccessible(true);Object value=field.get(watch);if(value instanceof Map<?,?> map)value=map.values();if(value instanceof Thread thread)value=thread.getState()+" "+Arrays.toString(thread.getStackTrace());result.append("\nwatch.").append(name).append("=").append(value);}
+        for(var entry:Thread.getAllStackTraces().entrySet())if(Arrays.stream(entry.getValue()).anyMatch(frame->frame.getClassName().contains("PollingWatchService")))result.append("\nprovider ").append(entry.getKey().getState()).append(" ").append(Arrays.toString(entry.getValue()));
+        return result.toString();
+    }
     private static Object activeWatch()throws Exception {
         var watcher=LiveChangesPanel.class.getDeclaredField("watcher");watcher.setAccessible(true);return watcher.get(livePanel());
     }

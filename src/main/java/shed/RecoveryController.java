@@ -129,6 +129,7 @@ final class RecoveryController {
             }
         }
         if (autoReloaded > 0) {
+            SwingUtilities.invokeLater(() -> {if(!editor.closingDown&&editor.toolWindowHost!=null)editor.toolWindowHost.observedSourceReady();});
             editor.showMessage("Auto-reloaded " + autoReloaded + " externally changed buffer" + (autoReloaded == 1 ? "" : "s"));
         } else if (retainedAfterDeletion > 0) {
             editor.showMessage("Retained " + retainedAfterDeletion + " buffer" + (retainedAfterDeletion == 1 ? "" : "s")

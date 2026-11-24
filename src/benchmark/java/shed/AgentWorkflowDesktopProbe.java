@@ -171,6 +171,8 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
             await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),10);
             Files.writeString(folder.resolve("watch-ready"),"ready");
             await(()->((Number)editor.toolWindowHost.watchAgentChanges("state","Codex").get("files")).intValue()==4,10);
+            Files.writeString(folder.resolve("watch-first-batch"),"ready");
+            await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("Demo.java")&&editor.getCurrentBuffer().getContent().endsWith("// Latest observed source block\n")&&"Agent change applied".equals(editor.writingArea.getClientProperty("shed.agentActivity")),10);
             capture("07-live-external-changes");
             await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("Demo.java"),5);
             var watchedLatencies=new ArrayList<Double>();

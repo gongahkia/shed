@@ -118,6 +118,11 @@ def main():
                     (project / 'Fresh.java').write_text('class Fresh {}\n')
                     (project / 'DeleteMe.txt').unlink()
                     (project / 'RenameMe.txt').rename(project / 'Renamed.txt')
+                    deadline = time.monotonic() + 10
+                    while not (work / 'watch-first-batch').exists() and process.poll() is None and time.monotonic() < deadline:
+                        time.sleep(0.025)
+                    if (work / 'watch-first-batch').exists():
+                        (project / 'Demo.java').write_text((project / 'Demo.java').read_text() + '// Latest observed source block\n')
                     deadline = time.monotonic() + 12
                     while not (work / 'watch-paused').exists() and process.poll() is None and time.monotonic() < deadline:
                         time.sleep(0.025)

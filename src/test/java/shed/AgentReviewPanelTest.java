@@ -26,6 +26,17 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void explicitlyOpeningQueuedWorkspaceReviewKeepsItsWorkspaceOwnership()throws Exception {
+        jobs=new AsyncJobService();var owners=new java.util.ArrayList<AgentSessionPanel>();
+        edt(()->{
+            Font font=new Font(Font.MONOSPACED,Font.PLAIN,14);
+            try(var workbench=new AgentWorkbenchPanel(()->new AgentSessionPanel(jobs,()->null,()->List.of("fixture"),name->{throw new AssertionError("No connection was requested");},session->fail("No connection was requested"),()->font,()->font),owner->{owners.add(owner);return null;},jobs,()->font,()->font,()->{})){
+                owners.clear();workbench.showReview("proposal-workspace");workbench.showReview();
+                assertFalse(owners.isEmpty());assertTrue(owners.stream().allMatch(java.util.Objects::isNull),"Manual opening retargeted a workspace proposal to the conversation");
+            }
+        });
+    }
+
     @Test void sourceNavigationUsesReviewedHunksAndRejectsChangedFiles() throws Exception {
         var base = scope("project"); current.set(base);
         Path file = Files.writeString(base.root().resolve("source"), "first\nmiddle\nlast\n");

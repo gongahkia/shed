@@ -94,10 +94,10 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     }
     java.util.Map<String,Object> watch(String action,String name) {
         if(liveChanges==null)throw WorkspaceApiException.invalidRequest("Live changes unavailable");
-        if(!action.equals("state"))tabs.setSelectedIndex(2);
         return liveChanges.command(action,name);
     }
-    void showReview() { workspaceReview = false; reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
+    void showLiveChanges(){if(liveChanges!=null){tabs.setSelectedIndex(2);liveChanges.refresh();}}
+    void showReview() { if(!workspaceReview)reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
     void showReview(String proposal) { workspaceReview = true; reviewOwner = null; tabs.setSelectedIndex(1); review.showProposal(proposal); }
     void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); tabs.setSelectedIndex(0); }
     @Override public void refresh() {

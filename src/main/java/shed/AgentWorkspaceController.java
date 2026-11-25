@@ -44,6 +44,7 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
             case "watch" -> { editor.toolWindowHost.watchAgentChanges("start","Agent");yield "Watching external edits in Live changes."; }
             case "watch stop" -> {editor.toolWindowHost.watchAgentChanges("stop","Agent");yield "Watch stopped.";}
+            case "changes" -> {editor.toolWindowHost.showAgentChanges();yield "Live change controls.";}
             case "proposals" -> { if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentReview(); yield "Review proposals in the Agents panel."; }
             case "status", "api", "api status" -> status;
             case "api start" -> start(false, false);
@@ -53,7 +54,7 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "api start navigation" -> start(false, false, true, true);
             case "api start control" -> start(false, false, true, true, true);
             case "api stop" -> stop();
-            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose|status|metadata|navigation|control]|status|stop";
+            default -> "Usage: :agent [watch|watch stop|changes|proposals|edit|ask|run|complete] or :agent api start [propose|status|metadata|navigation|control]|status|stop";
         };
     }
 

@@ -34,6 +34,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     private java.awt.Component selectedSurface;
     private int automaticDockHeight = -1;
     private boolean closed;
+    private boolean agentToolsRequested;
     private final Map<Tab, Runnable> dockTransitions = new EnumMap<>(Tab.class);
     private int rememberedHeight = -1;
     private boolean rememberedAutomatic;
@@ -97,13 +98,20 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
             default -> 320;
         }, editor.configManager.getUiZoom()));
         presentations.put(tab, view);
-        tabs.addTab(title, view);
+        if(tab!=Tab.AGENT)tabs.addTab(title, view);
     }
 
     void showTab(Tab tab) {
         if (closed) return;
         ToolSurface surface = surfaces.get(tab);
         if (surface == null) return;
+        if(tab==Tab.AGENT){
+            agentToolsRequested=true;
+            if(tabs.indexOfComponent(presentations.get(tab))<0&&!detached.containsKey(tab)){
+                var presentation=presentations.get(tab);tabs.addTab("Agents",presentation);
+                editor.editorUiController.applyUiTheme(presentation);editor.editorUiController.applyUiFont(presentation);surface.refreshAppearance();
+            }
+        }
         JDialog dialog = detached.get(tab);
         if (dialog != null && dialog.isDisplayable()) {
             dialog.setVisible(true);
@@ -131,14 +139,15 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview();
         showTab(Tab.AGENT);
     }
+    void showAgentChanges(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.showLiveChanges();showTab(Tab.AGENT);}
 
     java.util.Map<String,Object> watchAgentChanges(String action,String name){
         if(!(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents))throw WorkspaceApiException.invalidRequest("Agents unavailable");
-        var result=agents.watch(action,name);if(!action.equals("state"))showTab(Tab.AGENT);return result;
+        return agents.watch(action,name);
     }
     void showAgentProposal(String proposal) {
         if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview(proposal);
-        showTab(Tab.AGENT);
+        editor.showMessage("Agent changes ready for review · :agent proposals");
     }
 
     /** Focus is an explicit user-navigation action, never a side effect of refresh/completion. */
@@ -408,17 +417,20 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         reattachAll();
         for (Tab tab : TAB_ORDER) {
             var entry = saved.get(tab);
+            if(tab==Tab.AGENT&&!agentToolsRequested)continue;
             if (entry != null && entry.mode() == WorkbenchPlacementState.Mode.DETACHED && "primary".equals(entry.ownerWindowId())) detach(tab, surfaces.get(tab), true);
         }
         if (dock == null) return;
+        boolean suppressAgentRestore=false;
         try {
             Tab selected = Tab.valueOf(String.valueOf(dock.get("selected")));
+            if(selected==Tab.AGENT&&!agentToolsRequested){selected=Tab.SEARCH;suppressAgentRestore=true;}
             if (!detached.containsKey(selected)) tabs.setSelectedComponent(presentations.get(selected));
         } catch (IllegalArgumentException ignored) { }
         if (dock.get("ratio") instanceof Number number && Double.isFinite(number.doubleValue()) && number.doubleValue() >= .1 && number.doubleValue() <= .9) {
             editor.validate(); rememberedHeight = (int) Math.round(editor.editorToolSplit.getHeight() * (1 - number.doubleValue())); rememberedAutomatic = false;
         }
-        if (Boolean.TRUE.equals(dock.get("visible"))) { editor.showToolWindow(); restoreDockSize(); }
+        if (Boolean.TRUE.equals(dock.get("visible"))&&!suppressAgentRestore) { editor.showToolWindow(); restoreDockSize(); }
         else {
             int savedHeight = rememberedHeight; editor.hideToolWindow(); rememberedHeight = savedHeight; rememberedAutomatic = false;
         }

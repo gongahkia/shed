@@ -120,6 +120,41 @@ public final class AgentWorkflowDesktopProbe {
         capture("17-git-summary-refreshed-patch");events.add(Map.of("phase","git_same_status_patch_refresh","exact",true));
         edt(()->{editor.activateEditorPane(modelPane);modelPane.getTextArea().requestFocusInWindow();editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});
     }
+    private static void qualifyEditorFirst(Path project)throws Exception {
+        edt(()->{
+            editor.setSize(1400,900);check(!editor.toolWindowHost.isVisible(),"Agent tools visible at startup");
+            editor.toolWindowHost.restoreWorkbench(Map.of("selected","AGENT","visible",true,"ratio",.5));check(!editor.toolWindowHost.isVisible(),"Saved agent panel reopened without a request");
+            var tabs=find(editor.getRootPane(),JTabbedPane.class,"workbench.tools");for(int i=0;i<tabs.getTabCount();i++)check(!tabs.getTitleAt(i).equals("Agents"),"Agent tab exposed before a request");
+            editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("watch");check(!editor.toolWindowHost.isVisible(),"Watch opened management tools");return null;
+        });
+        await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Agent").get("ready")),20);
+        String source="class EditorFirst {\n"+"// agent-created source block\n".repeat(240)+"}\n";Files.writeString(project.resolve("EditorFirst.java"),source);
+        await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("EditorFirst.java")&&editor.writingArea.getClientProperty("shed.agentTour")!=null,15);
+        edt(()->{check(!editor.toolWindowHost.isVisible(),"Observed edit opened management tools");return null;});capture("00-editor-first-agent-change");
+        var area=edt(()->editor.writingArea);String before=edt(area::getText);int dot=edt(()->area.getCaret().getDot()),mark=edt(()->area.getCaret().getMark());long revision=edt(()->editor.getCurrentBuffer().documentRevision());
+        edt(()->{
+            var scroll=editor.getActivePane().getScrollPane();check(scroll.getUI() instanceof SmoothScrollPaneUI,"Source missing shared smooth scroll UI");
+            scroll.getVerticalScrollBar().setValue(200);scroll.dispatchEvent(new java.awt.event.MouseWheelEvent(scroll,java.awt.event.MouseEvent.MOUSE_WHEEL,System.currentTimeMillis(),0,20,20,0,false,java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));
+            check(Boolean.TRUE.equals(scroll.getClientProperty("shed.smoothScrollActive")),"Native scroll did not animate");return null;
+        });
+        await(()->editor.getActivePane().getScrollPane().getClientProperty("shed.smoothScrollActive")==null,3);
+        edt(()->{check(editor.getActivePane().getScrollPane().getVerticalScrollBar().getValue()>200,"Smooth scroll did not settle");check(area.getText().equals(before)&&area.getCaret().getDot()==dot&&area.getCaret().getMark()==mark&&editor.getCurrentBuffer().documentRevision()==revision,"Scroll altered source or human selection");check(!editor.toolWindowHost.isVisible(),"Manual input exposed agent tools");editor.toolWindowHost.watchAgentChanges("stop","Agent");editor.toolWindowHost.watchAgentChanges("follow","Agent");return null;});
+        capture("00-editor-first-smooth-scroll");
+        edt(()->{
+            editor.handleAgentCommand("changes");check(editor.toolWindowHost.isVisible(),"Explicit change controls did not open");
+            editor.configManager.set("agent.fixture_acp.command","fixture-acp-not-executed");editor.toolWindowHost.showAgentAction(AgentAction.ASK);editor.toolWindowHost.refreshActive();
+            var providers=find(editor.getRootPane(),JComboBox.class,"agent.session.provider");check(providers!=null,"ACP selector missing after explicit request");var names=new ArrayList<String>();for(int i=0;i<providers.getItemCount();i++)names.add(String.valueOf(providers.getItemAt(i)));
+            check(names.contains("opencode")&&names.contains("fixture_acp"),"Configured ACP provider not listed");editor.configManager.set("agent.fixture_acp.command","");editor.toolWindowHost.showAgentChanges();return null;
+        });
+        int scrolls=edt(()->verifyScrollPanes(editor.getRootPane()));check(scrolls>=20,"Missing standard scroll surfaces in native qualification");
+        events.add(Map.of("phase","editor_first_quiet_watch_smooth_scroll_and_opt_in_controls","exact",true,"standard_scrollpanes",scrolls));
+    }
+    private static int verifyScrollPanes(Container root){
+        int count=0;for(Component child:root.getComponents()){
+            if(child instanceof JScrollPane scroll){check(scroll.getUI() instanceof SmoothScrollPaneUI,"A standard scroll pane lacks shared motion: "+scroll.getName());count++;}
+            if(child instanceof Container nested)count+=verifyScrollPanes(nested);
+        }return count;
+    }
     private static void qualifyDelayedTourReload(Path project)throws Exception {
         String before=Files.readString(project.resolve("ModelBlocks.java"));String changed=before.replace("BEFORE_ALPHA","DELAYED_ALPHA").replace("BEFORE_BETA","DELAYED_BETA").replace("BEFORE_GAMMA","DELAYED_GAMMA");
         edt(()->{editor.reloadPromptActive=true;editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("follow","Codex");return null;});
@@ -138,7 +173,7 @@ public final class AgentWorkflowDesktopProbe {
     }
     private static void qualifyModelTour(Path project)throws Exception {
         var area=edt(()->editor.writingArea);var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);
-        try{await(()->Integer.valueOf(1).equals(area.getClientProperty("shed.agentTour")),100);}catch(Exception failure){System.out.println(edt(()->editor.toolWindowHost.watchAgentChanges("state","Codex")+" active="+editor.getCurrentBuffer().getFile()+" loaded="+area.getText().contains("AFTER_GAMMA")+" activity="+area.getClientProperty("shed.agentActivity")));throw failure;}String expected=edt(area::getText);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);boolean dirty=edt(buffer::isModified),undo=edt(()->buffer.getUndoManager().canUndo());int caret=edt(area::getCaretPosition),selection=edt(area::getSelectionStart);await(()->tourSettled(area,"AFTER_ALPHA"),2);int first=edt(()->viewport.getViewPosition().y);capture("18-model-tour-first-block");
+        try{await(()->Integer.valueOf(1).equals(area.getClientProperty("shed.agentTour")),100);}catch(Exception failure){System.out.println(edt(()->editor.toolWindowHost.watchAgentChanges("state","Codex")+" active="+editor.getCurrentBuffer().getFile()+" loaded="+area.getText().contains("AFTER_GAMMA")+" activity="+area.getClientProperty("shed.agentActivity")));throw failure;}check(edt(()->!editor.toolWindowHost.isVisible()),"Model edits reopened management tools");String expected=edt(area::getText);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);boolean dirty=edt(buffer::isModified),undo=edt(()->buffer.getUndoManager().canUndo());int caret=edt(area::getCaretPosition),selection=edt(area::getSelectionStart);await(()->tourSettled(area,"AFTER_ALPHA"),2);int first=edt(()->viewport.getViewPosition().y);capture("18-model-tour-first-block");
         await(()->Integer.valueOf(2).equals(area.getClientProperty("shed.agentTour")),5);await(()->tourSettled(area,"AFTER_BETA"),2);int middle=edt(()->viewport.getViewPosition().y);check(middle>first+200,"Tour did not scroll to middle block");capture("19-model-tour-middle-block");
         await(()->Integer.valueOf(3).equals(area.getClientProperty("shed.agentTour")),5);await(()->tourSettled(area,"AFTER_GAMMA"),2);int last=edt(()->viewport.getViewPosition().y);check(last>middle+200,"Tour did not scroll to final block");capture("20-model-tour-last-block");await(()->area.getClientProperty("shed.agentTour")==null,5);
         edt(()->{check(editor.getCurrentBuffer()==buffer&&buffer.documentRevision()==revision&&buffer.isModified()==dirty&&buffer.getUndoManager().canUndo()==undo&&area.getText().equals(expected)&&area.getCaretPosition()==caret&&area.getSelectionStart()==selection,"Tour changed source, revision, history or human caret");return null;});
@@ -240,6 +275,7 @@ public final class AgentWorkflowDesktopProbe {
         if("1".equals(System.getenv("SHED_LIVE_CODEX"))){
             edt(()->{if(!motion){human.load(editor.configManager);editor.loadBufferIntoEditor(human);}editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("follow","Codex");return null;});
             await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),20);
+            if(motion)edt(()->{editor.hideToolWindow();return null;});
             Files.writeString(folder.resolve("codex-ready"),"ready");
             if(motion){qualifyModelTour(project);return;}
             awaitFile(folder.resolve("codex-finished"),100);
@@ -337,6 +373,7 @@ public final class AgentWorkflowDesktopProbe {
         try {
             editor=edt(()->new Texteditor(new String[]{project.resolve("Welcome.txt").toString()}));
             await(()->!editor.stagedStartupPending&&editor.getCurrentBuffer()!=null&&editor.isShowing(),30);
+            qualifyEditorFirst(project);
             edt(()->{
                 editor.setTitle("Shed — Agent workflow verification");editor.setSize(1400,900);
                 editor.workspaceController.addFolder(project,true);editor.setMode(EditorMode.INSERT);editor.writingArea.requestFocusInWindow();
@@ -347,6 +384,7 @@ public final class AgentWorkflowDesktopProbe {
             check(server.controlEnabled(),"Wrong attachment scope");
             Path ready=folder.resolve("ready.json");
             Files.writeString(ready,MiniJson.stringify(Map.of("descriptor",server.descriptor().toString(),"credential",server.credential().toString())));
+            if(!"1".equals(System.getenv("SHED_WATCH_QUALIFICATION")))edt(()->{editor.hideToolWindow();return null;});
             capture("01-ready");System.out.println("LIVE_READY");System.out.flush();
             if("1".equals(System.getenv("SHED_WATCH_QUALIFICATION"))){
                 edt(()->{editor.openFileAsync(project.resolve("Demo.java").toFile());return null;});
@@ -366,6 +404,7 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
             check(!human.equals(agent),"Agent marker matches human caret color");
             for(int i=0;i<8;i++){capture("02-pending-"+i);Thread.sleep(100);}
             await(()->{JButton apply=find(editor.getContentPane(),JButton.class,"agent.apply");return apply!=null&&apply.isEnabled();},30);
+            edt(()->{check(!editor.toolWindowHost.isVisible(),"Incoming proposal opened review without a request");editor.handleAgentCommand("proposals");check(editor.toolWindowHost.isVisible(),"Explicit proposal review did not open");return null;});
             JTextArea proposed=edt(()->find(editor.getContentPane(),JTextArea.class,"agent.proposed"));
             check(proposed!=null,"No actual review view");capture("03-review");
             Path expectedFile=folder.resolve("expected.txt");check(Files.isRegularFile(expectedFile),"Missing expected agent result");
@@ -430,7 +469,7 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
             await(()->((Number)editor.toolWindowHost.watchAgentChanges("state","Codex").get("files")).intValue()==4,10);
             Files.writeString(folder.resolve("watch-first-batch"),"ready");
             await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("Demo.java")&&editor.getCurrentBuffer().getContent().endsWith("// Latest observed source block\n")&&"Agent change applied".equals(editor.writingArea.getClientProperty("shed.agentActivity")),10);
-            capture("07-live-external-changes");
+            edt(()->{editor.handleAgentCommand("changes");return null;});capture("07-live-external-changes");
             await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("Demo.java"),5);
             var watchedLatencies=new ArrayList<Double>();
             for(int i=0;i<20;i++){

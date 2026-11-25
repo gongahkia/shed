@@ -85,6 +85,7 @@ final class ShedVisualize {
                 if(attachment==null&&editor.visualAttachmentFailed()){timer.stop();publish(directory,failure(project,"ATTACHMENT_FAILED","Local control attachment could not start; check local diagnostics and session directory permissions"));return;}
                 if(attachment==null||!Boolean.TRUE.equals(watch.get("ready")))return;
                 Map<String,Object> result=Map.of("schemaVersion",1,"ready",true,"project",project.toString(),"descriptor",attachment.descriptor().toString(),"credential",attachment.credential().toString(),"pid",ProcessHandle.current().pid(),"agent",args[2]);
+                editor.showMessage("Watching project changes · "+args[2]);
                 timer.stop();publish(directory,result);
             });timer.start();editor.addWindowListener(new java.awt.event.WindowAdapter(){public void windowClosed(java.awt.event.WindowEvent e){timer.stop();}});
         });

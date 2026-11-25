@@ -100,11 +100,11 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         this(editor.asyncJobService, () -> {
             Path root = editor.workspaceController.activeRoot();
             return root == null ? null : new Scope(root, editor.workspaceDocuments(), Path.of(editor.configManager.getSessionDirectory()));
-        }, () -> List.of("opencode"), name -> AgentProvider.configured(editor.configManager, name),
+        }, editor.configManager::getAgentProviderNames, name -> AgentProvider.configured(editor.configManager, name),
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
         selectionSource = editor::captureAgentSelection;
         performance = editor.perfService;
-        persistModel = value -> { try { editor.configManager.setAndPersist("agent.opencode.model", value); }
+        persistModel = value -> { try { editor.configManager.setAndPersist("agent."+Objects.toString(providerChoice.getSelectedItem(),"opencode")+".model", value); }
             catch (java.io.IOException failed) { throw new java.io.UncheckedIOException(failed); } };
         contextSettings = () -> AgentPromptContext.Settings.configured(editor.configManager);
         contextFile = () -> editor.getCurrentBuffer() == null || editor.getCurrentBuffer().getFilePath() == null || editor.getCurrentBuffer().getFilePath().isBlank() ? null : Path.of(editor.getCurrentBuffer().getFilePath());
@@ -120,7 +120,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         providerChoice.setRenderer(plainRenderer()); options.setRenderer(plainRenderer()); authMethods.setRenderer(plainRenderer());
         status.putClientProperty("html.disable", true); workspace.putClientProperty("html.disable", true);
         JPanel top = new JPanel(new BorderLayout(8, 5));
-        JPanel connection = row(new JLabel("Agent"), providerChoice, connect, stop);
+        JPanel connection = row(new JLabel("ACP agent"), providerChoice, connect, stop);
         top.add(scrollRow(connection), BorderLayout.NORTH); top.add(workspace, BorderLayout.CENTER);
         modelChoice.setRenderer(plainRenderer()); modelChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(230), modelChoice.getPreferredSize().height));
         modelChoice.setToolTipText("Models advertised by OpenCode. Use model updates this conversation and future completion requests.");
@@ -166,7 +166,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         requestCards.add(permission, "agent"); requestCards.add(commandPanel, "commands");
         views.addTab("Requests", requestCards);
         ConnectionDetails setup = new ConnectionDetails();
-        setup.addRow(help("OpenCode: install and sign in with its CLI, then Connect.\n"
+        setup.addRow(help("External CLI agents need no connection here: use shed visualize . and edit normally.\n"
+            + "This optional panel connects configured ACP-compatible programs only.\n"
+            + "OpenCode: install and sign in with its CLI, then Connect.\n"
             + "User settings: agent.opencode.command, .args and optional .model.\n"
             + "Complete uses the same OpenCode settings; enable ai.completion.enabled to opt in.\n"
             + "The preset reads/searches and returns proposals for review. Commands are proposed separately and run only after explicit approval.\n"
@@ -211,7 +213,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         actions.add(status, BorderLayout.SOUTH); compose.add(actions, BorderLayout.SOUTH); panel.add(compose, BorderLayout.SOUTH);
         prompt.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.CTRL_DOWN_MASK), "send");
         prompt.getActionMap().put("send", new AbstractAction() { public void actionPerformed(java.awt.event.ActionEvent event) { send(); } });
-        AccessibilitySupport.describe(providerChoice, "Agent backend", "OpenCode handles the focused AI actions. Connect starts the agent for this workspace.");
+        AccessibilitySupport.describe(providerChoice, "Configured ACP agent", "Configured ACP-compatible programs. Connect explicitly starts the selected program. External CLI visualization needs no connection.");
         AccessibilitySupport.describe(resume, "Resume session ID", "Optional provider session to load when connecting, if supported.");
         AccessibilitySupport.describe(prompt, "Message to agent", "Enter a message. Control Enter sends it; Enter adds a new line.");
         AccessibilitySupport.describe(transcript, "Agent conversation", "Streamed conversation. Incoming activity does not move keyboard focus.");

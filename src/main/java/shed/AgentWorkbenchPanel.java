@@ -55,6 +55,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         panel.add(tabs, BorderLayout.CENTER); newConversation(); refreshAppearance();
     }
     void observedSourceReady(){liveChanges.observedSourceReady();}
+    EditorPane followedSource(FileBuffer buffer){return liveChanges==null?null:liveChanges.followedSource(buffer);}
     void pauseFollowing(){if(liveChanges!=null)liveChanges.pauseForHuman();}
     void retirePresentation(){if(liveChanges!=null)liveChanges.retirePresentation();}
     boolean selectObserved(java.nio.file.Path path){if(liveChanges==null||!liveChanges.selectObserved(path))return false;tabs.setSelectedIndex(2);return true;}

@@ -23,9 +23,9 @@ final class AgentChangeTour implements AutoCloseable {
     private final List<AgentChangePlayback.Edit> playbackEdits;
     private AgentChangePlayback playback;
     private boolean closed;
-    private int index,fromY;
+    private int index,groupEnd,fromY;
     private long started,version;
-    private static final long MOVE=300_000_000L,DWELL=700_000_000L;
+    private static final long MOVE=300_000_000L,DWELL=700_000_000L,SETTLE=450_000_000L;
     private final KeyAdapter key=new KeyAdapter(){public void keyPressed(KeyEvent event){user();}};
     private final MouseAdapter mouse=new MouseAdapter(){public void mousePressed(MouseEvent event){user();}public void mouseWheelMoved(MouseWheelEvent event){user();}};
     private final FocusAdapter focus=new FocusAdapter(){public void focusLost(FocusEvent event){if(event.getOppositeComponent()!=null&&SwingUtilities.getWindowAncestor(event.getOppositeComponent())==SwingUtilities.getWindowAncestor(area))user();}};
@@ -55,8 +55,22 @@ final class AgentChangeTour implements AutoCloseable {
     private boolean animated(){return !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"))&&!Boolean.FALSE.equals(area.getClientProperty("shed.caretAnimation"));}
     private void begin(long now){
         started=now;fromY=viewport.getViewPosition().y;presentation.showApplied(ranges);presentation.setAgentName(name);version=presentation.version();
-        if(playbackEdits!=null){playback=new AgentChangePlayback(area,source,playbackEdits,presentation::agentColor);playback.frame(index,0);}
+        groupEnd=index+1;
+        if(playbackEdits!=null){playback=new AgentChangePlayback(area,source,playbackEdits,presentation::agentColor);groupEnd=parallelEnd();playback.frames(index,groupEnd,0);presentation.setAgentName(name+("deleting".equals(area.getClientProperty("shed.agentAnimation"))?" deleting":" writing"),name);}
         presentation.moveMarker(index,ranges.get(index).start());area.putClientProperty("shed.agentTour",index+1);
+    }
+    private int parallelEnd(){
+        if(!playback.inline(index)||area.getLineWrap()||Boolean.TRUE.equals(document.getProperty("i18n")))return index+1;
+        try{
+            var first=area.modelToView2D(ranges.get(index).start());if(first==null)return index+1;
+            double previous=first.getY();int end=index+1;
+            while(end<ranges.size()&&playback.inline(end)&&playback.durationMillis(end)==playback.durationMillis(index)){
+                var next=area.modelToView2D(ranges.get(end).start());
+                if(next==null||next.getY()<=previous||next.getY()-first.getY()>viewport.getExtentSize().height/2.0)break;
+                previous=next.getY();end++;
+            }
+            return end;
+        }catch(javax.swing.text.BadLocationException unavailable){return index+1;}
     }
     void advance(long now){
         if(closed)return;
@@ -68,10 +82,10 @@ final class AgentChangeTour implements AutoCloseable {
         else{
             double moving=Math.min(1,(elapsed-MOVE)/(double)Math.max(1,dwell));
             int offset=range.start()+(int)((range.end()-range.start())*moving);
-            if(playback!=null){offset=playback.frame(index,moving);presentation.setAgentName(name+("deleting".equals(area.getClientProperty("shed.agentAnimation"))?" deleting":" writing"));}
+            if(playback!=null){offset=playback.frames(index,groupEnd,moving);presentation.setAgentName(name+("deleting".equals(area.getClientProperty("shed.agentAnimation"))?" deleting":" writing"),name);}
             offset=Math.max(range.start(),GraphemeBoundary.floor(source,offset));reveal(offset,1);presentation.moveMarker(index,offset);
         }
-        if(elapsed>=MOVE+dwell){if(++index>=ranges.size())end(false);else begin(now);}
+        if(elapsed>=MOVE+dwell+(playback==null?0:SETTLE)){index=groupEnd;if(index>=ranges.size())end(false);else begin(now);}
     }
     private void reveal(int offset,double amount){
         try{
@@ -87,7 +101,7 @@ final class AgentChangeTour implements AutoCloseable {
         if(playback!=null){playback.close();playback=null;}
         area.removeKeyListener(key);area.removeMouseListener(mouse);area.removeFocusListener(focus);document.removeDocumentListener(edits);
         if(scroll!=null){scroll.removeMouseWheelListener(mouse);scroll.getVerticalScrollBar().removeMouseListener(mouse);scroll.getHorizontalScrollBar().removeMouseListener(mouse);}
-        if(clear&&presentation.version()==version)presentation.clear();area.putClientProperty("shed.agentTour",null);finished.run();
+        if(presentation.version()==version){if(clear)presentation.clear();else presentation.finishTour();}area.putClientProperty("shed.agentTour",null);finished.run();
     }
     boolean running(){return timer.isRunning();}
     @Override public void close(){end(true);}

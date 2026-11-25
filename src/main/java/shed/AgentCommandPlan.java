@@ -9,15 +9,16 @@ import java.util.Set;
 
 /** A model can request a command, but only the panel's explicit human decision authorizes execution. */
 record AgentCommandPlan(String reason, List<Command> commands) {
+    interface Runner { CommandResult run(String agent,Command command,AsyncJobService.JobToken token)throws Exception; }
     record Command(List<String> argv, Path directory, int timeoutSeconds) { }
     static String instructions() {
-        return "\n\nIf project investigation or validation needs a headless command, REQUEST it through Shed instead of using a shell tool. "
+        return "\n\nIf project validation needs a noninteractive command whose output matters, REQUEST it through Shed instead of using a shell tool. "
             + "Return only {\"reason\":\"why this check is needed\",\"commands\":[{\"argv\":[\"executable\",\"argument\"],\"directory\":\".\",\"timeoutSeconds\":60}]}. "
             + "Use at most four commands, workspace-relative directories, and 1–600 second timeouts. "
             + "Shed asks the human before execution and returns actual exit codes/output; denial means the command did not run. "
-            + "Request background checks only; never request source edits, model downloads, GUI apps, interactive input or persistent services. "
+            + "Request lint, formatter, build, test or diagnostic commands only. Keep ordinary reads, searches and file CRUD in their existing IDE actions; never request model downloads, GUI apps, interactive input or persistent services.  "
             + "Do not combine commands with an answer or proposal. After receiving results, continue the original request using its original response format. "
-            + "Changes still require a reviewed proposal. Never claim checks passed without successful command results.";
+            + "Ordinary edits still require a reviewed proposal. A formatter may update saved files only through its separately approved command. Never claim checks passed without successful command results.";
     }
     static AgentCommandPlan requested(String response, WorkspaceQueryService workspace) {
         var data = AgentAnswer.json(response);
@@ -43,12 +44,19 @@ record AgentCommandPlan(String reason, List<Command> commands) {
         return new AgentCommandPlan(reason, List.copyOf(commands));
     }
     String describe() {
-        StringBuilder text = new StringBuilder(reason).append("\n\nThese commands run with your account's filesystem and network access. They are not sandboxed and can change files. Approve only checks you trust.\n");
+        StringBuilder text = new StringBuilder(reason).append("\n\nThese commands run with your account's filesystem and network access. They are not sandboxed and can change files. Approve only checks you trust.\nIn the editor, approval visibly types these arguments into the normal terminal. Its output and shell-reported exit status are returned to the agent. Human keyboard input takes control.\n");
         for (var command : commands) text.append("\nArguments: ").append(MiniJson.stringify(command.argv()))
             .append("\nDirectory: ").append(command.directory()).append("\nDeadline: ").append(command.timeoutSeconds()).append(" seconds\n");
         return text.toString();
     }
     String execute(WorkspaceQueryService workspace, AsyncJobService.JobToken token) throws Exception {
+        return execute(workspace,token,AgentCommandPlan::runHeadless,"Agent");
+    }
+    static CommandResult runHeadless(String agent,Command command,AsyncJobService.JobToken token)throws Exception {
+        var process=BackgroundTaskProcess.start(command.argv(),command.directory().toFile(),Map.of("JAVA_TOOL_OPTIONS","-Djava.awt.headless=true"),8192,"");
+        try{return process.awaitCompletion(token,command.timeoutSeconds()*1000);}finally{process.stop();}
+    }
+    String execute(WorkspaceQueryService workspace,AsyncJobService.JobToken token,Runner runner,String agent)throws Exception {
         workspace.policy().require(AgentPolicy.Capability.RUN_HEADLESS);
         if (workspace.visibleDocuments().stream().anyMatch(WorkspaceDocument::dirty))
             throw new IllegalArgumentException("Save the workspace's unsaved buffers before running disk-based checks; no files were saved or commands run");
@@ -57,10 +65,7 @@ record AgentCommandPlan(String reason, List<Command> commands) {
             if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
             Path cwd = WorkspacePaths.resolve(workspace.root(), command.directory().toString());
             if (!cwd.equals(command.directory()) || !Files.isDirectory(cwd)) throw new IllegalArgumentException("Approved command directory changed");
-            var process = BackgroundTaskProcess.start(command.argv(), cwd.toFile(), Map.of("JAVA_TOOL_OPTIONS", "-Djava.awt.headless=true"), 8192, "");
-            CommandResult result;
-            try { result = process.awaitCompletion(token, command.timeoutSeconds() * 1000); }
-            finally { process.stop(); }
+            CommandResult result=runner.run(agent,command,token);
             if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
             String output = result.stdout;
             Map<String, Object> entry;

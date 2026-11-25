@@ -46,6 +46,7 @@
         <includes>
           <include>NIB_THEME_LICENSE.txt</include>
           <include>UNICODE_LICENSE.txt</include>
+          <include>SWINGX_LICENSE.txt</include>
         </includes>
       </resource>
     </resources>
@@ -135,6 +136,11 @@
     </plugins>
   </build>
   <dependencies>
+    <dependency>
+      <groupId>org.swinglabs.swingx</groupId>
+      <artifactId>swingx-painters</artifactId>
+      <version>1.6.5-1</version>
+    </dependency>
     <!-- Independent ACP peer for interoperability tests; excluded from the shipped editor. -->
     <dependency>
       <groupId>com.agentclientprotocol</groupId>

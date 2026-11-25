@@ -21,9 +21,12 @@ final class TerminalController {
     }
 
     private final Texteditor editor;
+    private final AgentTerminalRequests agentRequests;
+    private EditorPane lastAgentTerminal;
 
     TerminalController(Texteditor editor) {
         this.editor = editor;
+        agentRequests=new AgentTerminalRequests(editor);
     }
 
     public String openTerminal() {
@@ -39,6 +42,33 @@ final class TerminalController {
         Map<String, String> environment = workingDirectory == null ? Map.of() : editor.toolchainService.environment(workingDirectory.toPath());
         return openTerminal(normalizedLabel, workingDirectory, command, "Terminal opened with " + normalizedLabel, sourcePathMapper,
             WindowLayoutNode.Orientation.VERTICAL, environment);
+    }
+
+    CommandResult runAgentCommand(String agent,AgentCommandPlan.Command command,AsyncJobService.JobToken token)throws Exception{
+        if(SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Wait for terminal commands off the EDT");
+        var pane=new java.util.concurrent.atomic.AtomicReference<PtyTerminalPane>();
+        var begin=new java.util.concurrent.FutureTask<java.util.concurrent.CompletableFuture<CommandResult>>(() -> {
+            if(token.isCancelled()||editor.closingDown)throw new java.util.concurrent.CancellationException();
+            if(!editor.configManager.getTerminalShellIntegrationEnabled())throw new IllegalArgumentException("Enable terminal.shell.integration before running agent commands");
+            var selected=resolveDefaultProfile();
+            List<String> shell=selected.profile()==null?ShellCommand.interactiveCommand():selected.profile().command();
+            AgentTerminalCommand.quotedLine(shell.getFirst(),command.argv());
+            if(!command.directory().toFile().isDirectory())throw new IllegalArgumentException("Approved command directory is unavailable");
+            if(lastAgentTerminal!=null&&editor.editorPanes.contains(lastAgentTerminal)&&lastAgentTerminal.getTerminalPane()!=null&&lastAgentTerminal.getTerminalPane().reusableForAgent(command.directory(),shell.getFirst())){
+                editor.activateEditorPane(lastAgentTerminal);lastAgentTerminal.getTerminalPane().requestFocusInWindow();
+            }else{
+                String opened=openTerminal("Terminal",command.directory().toFile(),shell,"Terminal opened",null,WindowLayoutNode.Orientation.VERTICAL,editor.toolchainService.environment(command.directory()));
+                if(!opened.equals("Terminal opened"))throw new java.io.IOException(opened);
+                lastAgentTerminal=editor.getActivePane();
+            }
+            var terminal=editor.getActivePane().getTerminalPane();pane.set(terminal);
+            return terminal.typeAgentCommand(command.argv(),agent,command.timeoutSeconds());
+        });
+        SwingUtilities.invokeLater(begin);
+        token.onCancel(()->SwingUtilities.invokeLater(()->{var terminal=pane.get();if(terminal!=null)terminal.cancelAgentCommand();}));
+        var result=begin.get().get();
+        if(result.stderr.equals("Human took terminal control")||result.stderr.equals("Agent terminal command cancelled"))throw new java.util.concurrent.CancellationException(result.stderr);
+        return result;
     }
 
     String handle(String argument) {
@@ -185,6 +215,7 @@ final class TerminalController {
 
 
     void closeTerminalSession(FileBuffer buffer) {
+        if(lastAgentTerminal!=null&&lastAgentTerminal.getBuffer()==buffer)lastAgentTerminal=null;
         if (buffer == null) {
             return;
         }
@@ -195,7 +226,11 @@ final class TerminalController {
     }
 
 
+    Map<String,Object> agentRequest(String owner,String action,String id,String agent,String body,java.util.function.BooleanSupplier authorized){return agentRequests.action(owner,action,id,agent,body,authorized);}
+    void revokeAgentRequests(String owner){agentRequests.revoke(owner);}
+
     void closeAllTerminalSessions() {
+        agentRequests.close();lastAgentTerminal=null;
         for (PtyTerminalPane terminalPane : new ArrayList<>(editor.ptyTerminalPanes.values())) {
             terminalPane.close();
         }

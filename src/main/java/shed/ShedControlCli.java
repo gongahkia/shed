@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--output","--kind","--status","--ranges","--focus").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -34,6 +34,18 @@ final class ShedControlCli {
                 if(command.equals("state")) {
                     if(path!=null || !options.isEmpty()) throw new IllegalArgumentException();
                     return emit(client.exchange(client.navigationContextRequest()),out);
+                }
+                if(Set.of("terminal-run","terminal-status","terminal-cancel").contains(command)){
+                    if(path!=null)throw new IllegalArgumentException();
+                    String id=options.remove("--request-id"),agent="",body="";
+                    String action=command.equals("terminal-run")?"request":command.equals("terminal-status")?"status":"cancel";
+                    if(action.equals("request")){
+                        String file=required(options,"--commands-file");byte[] bytes=file.equals("-")?input.readNBytes(24001):boundedFile(Path.of(file),24000);if(bytes.length>24000)throw new IllegalArgumentException();
+                        body=WorkspaceFrames.decode(bytes);MiniJson.parseStrict(body);agent=options.remove("--agent");if(agent==null)agent="Agent";if(id==null)id=UUID.randomUUID().toString();
+                    }
+                    if(id==null||!id.matches("[A-Za-z0-9_-]{1,64}")||!options.isEmpty())throw new IllegalArgumentException();
+                    mutationSent=!action.equals("status");
+                    return emit(client.exchange(request("editor/terminal",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"action",action,"requestId",id,"agent",agent,"commands",body))),out);
                 }
                 if(Set.of("watch","watch-state","watch-stop","follow","pause").contains(command)){
                     if(path!=null)throw new IllegalArgumentException();String name=options.remove("--agent");if(!options.isEmpty())throw new IllegalArgumentException();
@@ -146,7 +158,7 @@ final class ShedControlCli {
             boolean unknown=mutationSent && Set.of(WorkspaceApiException.Code.TIMEOUT,WorkspaceApiException.Code.SESSION_INVALID,WorkspaceApiException.Code.SESSION_EXPIRED,WorkspaceApiException.Code.OUTCOME_UNKNOWN).contains(failure.code());
             out.println(WorkspaceRpc.error("ctl",-32000,"Control request failed",Map.of("code",unknown?"OUTCOME_UNKNOWN":failure.code().name(),"outcome",unknown?"unknown":"rejected")));return unknown?79:65;
         } catch(IllegalArgumentException invalid) {
-            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|intent|activity|propose|replace [options]",Map.of("code","INVALID_REQUEST")));return 64;
+            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|intent|activity|propose|replace|terminal-run|terminal-status|terminal-cancel [options]",Map.of("code","INVALID_REQUEST")));return 64;
         } catch(IOException failure) {
             out.println(WorkspaceRpc.error("ctl",-32000,"Control connection or input unavailable",Map.of("code",mutationSent?"OUTCOME_UNKNOWN":"TRANSPORT_ERROR","outcome",mutationSent?"unknown":"rejected")));return mutationSent?79:74;
         }

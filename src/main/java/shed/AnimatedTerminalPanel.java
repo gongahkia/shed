@@ -11,12 +11,12 @@ import java.awt.event.InputMethodEvent;
 import java.util.function.IntSupplier;
 import javax.swing.Timer;
 
-/** Adds motion while leaving JediTerm responsible for the settled cursor and terminal semantics. */
+/** Adds cursor motion and agent tint without changing terminal text or input semantics. */
 class AnimatedTerminalPanel extends TerminalPanel {
     private boolean disposed;
     private final CaretMotion motion = new CaretMotion();
     private final Timer animation = new Timer(16, event -> {
-        if (disposed || !isShowing() || !isFocusOwner()) resetMotion();
+        if (disposed || !isShowing() || !isFocusOwner()&&!Boolean.TRUE.equals(getClientProperty("shed.agentControl"))) resetMotion();
         repaint(0, 0, getWidth(), getHeight());
     });
     private volatile Point cursor = new Point(0, 1);
@@ -91,7 +91,7 @@ class AnimatedTerminalPanel extends TerminalPanel {
     @Override public void paintComponent(Graphics graphics) {
         CursorShape effectiveShape = shape == null ? defaultShape : shape;
         Rectangle bounds = cursorBounds(effectiveShape);
-        boolean enabled = !disposed && isShowing() && isFocusOwner() && cursorVisible && !composing && getSelection() == null
+        boolean enabled = !disposed && isShowing() && (isFocusOwner() || Boolean.TRUE.equals(getClientProperty("shed.agentControl"))) && cursorVisible && !composing && getSelection() == null
             && !Boolean.FALSE.equals(getClientProperty("shed.caretAnimation"))
             && !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"));
         boolean alternate = getTerminalTextBuffer().isUsingAlternateBuffer();
@@ -110,26 +110,45 @@ class AnimatedTerminalPanel extends TerminalPanel {
         paintedShape = effectiveShape;
         motion.advance(now);
         boolean moving = target != null && motion.moving();
-        // Hide only the native cursor during the smear. JediTerm still paints all text,
-        // selection, IME composition and (once settled) its exact cursor glyph and shape.
-        super.setCursorVisible(cursorVisible && !moving);
+        Color agentColor = agentCursorBounds().isEmpty() ? null : AgentTerminalDecoration.cursorColor(this);
+        // keep the native cursor for human input; tint the agent cursor over unmodified text
+        super.setCursorVisible(cursorVisible && !moving && agentColor == null);
         try {
             super.paintComponent(graphics);
         } finally {
             super.setCursorVisible(cursorVisible);
         }
-        if (moving && graphics instanceof Graphics2D original) {
+        if ((moving || agentColor != null) && graphics instanceof Graphics2D original) {
             Graphics2D g = (Graphics2D) original.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(getForeground());
+                g.setColor(agentColor == null ? getForeground() : agentColor);
                 g.setComposite(AlphaComposite.SrcOver.derive(.75f));
-                g.fill(motion.shape());
+                g.fill(moving ? motion.shape() : bounds);
             } finally { g.dispose(); }
-            if (!animation.isRunning()) animation.start();
+            if (moving && !animation.isRunning()) animation.start();
+            else if (!moving) animation.stop();
         } else {
             animation.stop();
         }
+        if(AgentTerminalDecoration.active(this)){
+            Rectangle agentCursor=agentCursorBounds();
+            AgentTerminalDecoration.paintBadge(this,graphics,agentCursor,agentFont(),agentBadgeSpace(agentCursor));
+        }
+    }
+
+    Font agentFont(){return getFontToDisplay(new char[]{'M'},0,1,com.jediterm.terminal.TextStyle.EMPTY);}
+    Rectangle agentCursorBounds(){return disposed||!cursorVisible||composing||getSelection()!=null||getTerminalTextBuffer().isUsingAlternateBuffer()?new Rectangle():cursorBounds(CursorShape.STEADY_BLOCK);}
+    private int agentBadgeSpace(Rectangle caret){
+        if(caret.isEmpty())return 0;
+        int x=caret.x+caret.width+6,column=Math.max(0,(caret.x-getInsetX())/myCharSize.width+1),row=cursor.y-1;
+        var buffer=getTerminalTextBuffer();buffer.lock();
+        try{
+            while(column<buffer.getWidth()){
+                char value=buffer.getCharAt(column,row);if(value!=' '&&value!='\0')break;column++;
+            }
+        }finally{buffer.unlock();}
+        return Math.max(0,Math.min(getWidth(),getInsetX()+column*myCharSize.width)-x);
     }
 
     private Rectangle cursorBounds(CursorShape effectiveShape) {

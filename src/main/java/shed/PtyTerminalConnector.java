@@ -11,6 +11,14 @@ final class PtyTerminalConnector extends ProcessTtyConnector {
     private final PtyProcess process;
     private final String name;
     private TermSize lastSize;
+    private final java.util.List<java.util.function.Consumer<String>> readers=new java.util.concurrent.CopyOnWriteArrayList<>();
+    void addReader(java.util.function.Consumer<String> reader){readers.add(reader);}
+    void removeReader(java.util.function.Consumer<String> reader){readers.remove(reader);}
+    @Override public int read(char[] buffer,int offset,int length)throws java.io.IOException{
+        int count=super.read(buffer,offset,length);
+        if(count>0&&!readers.isEmpty()){String text=new String(buffer,offset,count);for(var reader:readers)reader.accept(text);}
+        return count;
+    }
 
     PtyTerminalConnector(PtyProcess process, List<String> commandLine, Charset charset) {
         super(process, charset, commandLine);

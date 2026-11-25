@@ -8,6 +8,87 @@ import javax.swing.undo.UndoManager;
 import org.junit.jupiter.api.Test;
 
 class AgentChangeTourTest {
+    @Test void inlineDeletionKeepsAPulsingHighlightBehindEveryRemainingWord()throws Exception {
+        EditorControlTest.edt(()->{
+            for(var background:List.of(java.awt.Color.WHITE,new java.awt.Color(0x202020))){
+                String source="String visitor;\nprint(visitor);\n";var area=playbackArea(source);area.setBackground(background);
+                var edits=AgentChangePlayback.refineAll(source,new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"String name;\nprint(name);\n"));
+                int oldWidth=area.getFontMetrics(area.getFont()).stringWidth("name");
+                try(var playback=new AgentChangePlayback(area,source,edits,()->java.awt.Color.GREEN)){
+                    playback.frames(0,2,0);var initial=image(area);
+                    playback.frames(0,2,.1);var pulsed=image(area);
+                    playback.frames(0,2,.3);var shrinking=image(area);
+                    for(var edit:edits){
+                        var anchor=area.modelToView2D(edit.range().start());int x=(int)anchor.getX(),y=(int)anchor.getMaxY()-2;
+                        assertNotEquals(background.getRGB(),initial.getRGB(x+oldWidth/2,y),"Removed word must have a visible highlight behind its glyphs");
+                        assertNotEquals(initial.getRGB(x+oldWidth/2,y),pulsed.getRGB(x+oldWidth/2,y),"Deletion highlight must pulse before erasure");
+                        assertNotEquals(background.getRGB(),shrinking.getRGB(x+2,y));
+                        assertEquals(background.getRGB(),shrinking.getRGB(x+oldWidth-2,y),"Highlight must disappear with the removed glyphs");
+                        assertEquals(background.getRGB(),initial.getRGB(x-2,y),"Highlight must stay within the word");
+                    }
+                    assertEquals(source,area.getText());assertEquals(0,area.getCaretPosition());
+                }
+            }
+            return null;
+        });
+    }
+    @Test void laterEditsKeepTheirOldGlyphsUntilTheirReplayStarts()throws Exception {
+        EditorControlTest.edt(()->{
+            String source="String visitor;\nprint(visitor);\n";var area=playbackArea(source);
+            var edits=AgentChangePlayback.refineAll(source,new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"String name;\nprint(name);\n"));
+            int height=area.getFontMetrics(area.getFont()).getHeight();
+            try(var playback=new AgentChangePlayback(area,source,edits,()->java.awt.Color.GREEN)){
+                playback.frame(0,.9);assertTrue(ink(image(area),height,height*2,true)>0,"A later edit must retain its old glyphs rather than reveal completed text early");
+                playback.frame(1,1);assertEquals(0,ink(image(area),height,height*2,true));assertEquals(source,area.getText());
+            }
+            return null;
+        });
+    }
+    @Test void ordinaryBatchReplacementsEraseAndWriteAtMultipleCursorsWithoutEditingSource()throws Exception {
+        EditorControlTest.edt(()->{
+            String before="String name;\nprint(name);\n",source="String visitor;\nprint(visitor);\n";var area=playbackArea(source);
+            var edits=AgentChangePlayback.refineAll(source,new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),before));
+            assertEquals(2,edits.size());assertTrue(edits.stream().allMatch(e->e.removed().equals("name")));
+            var undo=new UndoManager();area.getDocument().addUndoableEditListener(undo);area.select(1,4);
+            var scroll=new JScrollPane(area);scroll.setSize(600,240);scroll.doLayout();area.setSize(580,500);
+            try(var presentation=new AgentEditPresentation(area);var tour=new AgentChangeTour(area,presentation,edits.stream().map(AgentChangePlayback.Edit::range).toList(),source,"Codex",()->true,()->{},()->{},edits)){
+                tour.start();long now=System.nanoTime();assertEquals(2,area.getClientProperty("shed.agentCursorCount"));assertEquals("deleting",area.getClientProperty("shed.agentAnimation"));
+                int height=area.getFontMetrics(area.getFont()).getHeight();var deletion=image(area);
+                assertTrue(ink(deletion,0,height,true)>0);assertTrue(ink(deletion,height,height*2,true)>0,"Both old words must be erased together");
+                tour.advance(now+1_300_000_000L);assertEquals("typing",area.getClientProperty("shed.agentAnimation"));assertEquals(2,area.getClientProperty("shed.agentCursorCount"));
+                var writing=image(area);int first=0,second=0;var color=presentation.agentColor();
+                for(int y=0;y<height*2;y++)for(int x=0;x<350;x++)if(writing.getRGB(x,y)==color.getRGB()){if(y<height)first++;else second++;}
+                assertTrue(first>0&&second>0,"Both writing cursors must be visible");
+                assertEquals(source,area.getText());assertEquals(1,area.getSelectionStart());assertEquals(4,area.getSelectionEnd());assertFalse(undo.canUndo());
+                scroll.dispatchEvent(new MouseWheelEvent(scroll,MouseWheelEvent.MOUSE_WHEEL,System.currentTimeMillis(),0,10,10,0,false,MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));
+                assertFalse(tour.running());assertNull(area.getClientProperty("shed.agentCursorCount"));assertNull(area.getClientProperty(AgentChangePlayback.KEY));
+            }
+            return null;
+        });
+    }
+    @Test void inlineReplayKeepsTheExistingPrefixAndMovesTheTailAsOnlyNewCharactersAppear()throws Exception {
+        EditorControlTest.edt(()->{
+            String source="greetVisitor(arg)\n";var area=playbackArea(source);
+            var edit=AgentChangePlayback.refine(source,new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"greet(arg)\n"));
+            assertEquals(new AgentEditPresentation.Range(5,12),edit.range());assertEquals("",edit.removed());
+            int cell=area.getFontMetrics(area.getFont()).charWidth('x'),height=area.getFontMetrics(area.getFont()).getHeight();
+            try(var playback=new AgentChangePlayback(area,source,List.of(edit),()->java.awt.Color.GREEN)){
+                for(double progress:new double[]{0,.5,1}){
+                    int revealed=playback.frame(0,progress);var actual=image(area);
+                    var expected=image(playbackArea(source.substring(0,revealed)+source.substring(edit.range().end())));
+                    for(int y=0;y<height;y++)for(int x=0;x<20*cell;x++){
+                        if(x>=revealed*cell&&x<revealed*cell+3)continue;
+                        assertEquals(expected.getRGB(x,y),actual.getRGB(x,y),"Inline replay must keep surrounding text together at progress "+progress);
+                    }
+                }
+                assertEquals(source,area.getText());assertEquals(0,area.getCaretPosition());
+            }
+            String unicode="a😀e\u0301z";
+            var safe=AgentChangePlayback.refine(unicode,new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,unicode.length()),"a😀ez"));
+            assertTrue(GraphemeBoundary.isBoundary(unicode,safe.range().start()));assertTrue(GraphemeBoundary.isBoundary(unicode,safe.range().end()));
+            return null;
+        });
+    }
     private static JTextArea playbackArea(String source){
         var area=new JTextArea(source){@Override public boolean isShowing(){return true;}@Override protected void paintComponent(java.awt.Graphics g){super.paintComponent(g);AgentChangePlayback.paint(this,g);}};
         area.setFont(new java.awt.Font("Monospaced",0,16));area.setBackground(java.awt.Color.WHITE);area.setForeground(java.awt.Color.BLACK);area.setCaretColor(java.awt.Color.BLUE);area.setSize(600,240);return area;
@@ -43,7 +124,7 @@ class AgentChangeTourTest {
             }
             area.setText("");
             try(var playback=new AgentChangePlayback(area,"",List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,0),"removed whole document\n")),()->java.awt.Color.GREEN)){
-                playback.frame(0,0);assertTrue(ink(image(area),height,height*2,true)>0);playback.frame(0,1);assertEquals("",area.getText());assertEquals(0,area.getDocument().getLength());
+                playback.frame(0,0);assertTrue(ink(image(area),0,height,true)>0);assertEquals(0,ink(image(area),height,height*2,true),"Deletion preview must not reserve a caption row");playback.frame(0,1);assertEquals("",area.getText());assertEquals(0,area.getDocument().getLength());
             }
             return null;
         });
@@ -84,6 +165,21 @@ class AgentChangeTourTest {
         }
         AgentEditPresentation.Range range(int line){int start=source.indexOf("line "+line+"\n");return new AgentEditPresentation.Range(start,start+5);}
         public void close(){presentation.close();}
+    }
+    @Test void completedReplayHoldsBrieflyAndHumanInputStillCancelsImmediately()throws Exception {
+        EditorControlTest.edt(()->{
+            var area=playbackArea("alpha beta\n");var scroll=new JScrollPane(area);scroll.setSize(600,240);scroll.doLayout();area.setSize(580,500);
+            var range=new AgentEditPresentation.Range(0,5);var edits=List.of(new AgentChangePlayback.Edit(range,""));
+            for(boolean cancel:new boolean[]{false,true})try(var presentation=new AgentEditPresentation(area);var tour=new AgentChangeTour(area,presentation,List.of(range),area.getText(),"Codex",()->true,()->{},()->{},edits)){
+                tour.start();long now=System.nanoTime();tour.advance(now+1_050_000_000L);
+                assertTrue(tour.running(),"Completed writing must remain visible during its finishing hold");
+                assertNotNull(area.getClientProperty(AgentChangePlayback.KEY));
+                assertEquals("alpha beta\n",area.getText());
+                if(cancel){scroll.dispatchEvent(new MouseWheelEvent(scroll,MouseWheelEvent.MOUSE_WHEEL,System.currentTimeMillis(),0,10,10,0,false,MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));assertFalse(tour.running());assertNull(area.getClientProperty(AgentChangePlayback.KEY));}
+                tour.advance(now+1_500_000_000L);assertFalse(tour.running());assertNull(area.getClientProperty(AgentChangePlayback.KEY));
+            }
+            return null;
+        });
     }
     @Test void toursSeparatedBlocksWithoutMovingHumanSelectionOrEditingSource()throws Exception {
         EditorControlTest.edt(()->{

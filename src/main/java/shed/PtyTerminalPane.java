@@ -32,6 +32,8 @@ final class PtyTerminalPane implements AutoCloseable {
     private final File workingDirectory;
     private final TerminalShellIntegrationTracker shellIntegration;
     private boolean closed;
+    private AgentTerminalCommand agentCommand;
+    private boolean humanUsed;
 
     private PtyTerminalPane(JediTermWidget widget, ShedTerminalSettingsProvider settingsProvider, PtyTerminalConnector connector, PtyProcess process, File workingDirectory,
                             TerminalShellIntegrationTracker shellIntegration) {
@@ -41,6 +43,8 @@ final class PtyTerminalPane implements AutoCloseable {
         this.process = process;
         this.workingDirectory = workingDirectory;
         this.shellIntegration = shellIntegration;
+        widget.getTerminalPanel().addKeyListener(new java.awt.event.KeyAdapter(){@Override public void keyPressed(java.awt.event.KeyEvent event){humanUsed=true;}});
+        widget.getTerminalPanel().addMouseListener(new java.awt.event.MouseAdapter(){@Override public void mousePressed(java.awt.event.MouseEvent event){humanUsed=true;}});
     }
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont) throws IOException {
@@ -88,6 +92,7 @@ final class PtyTerminalPane implements AutoCloseable {
         PtyTerminalConnector connector = new PtyTerminalConnector(process, command, StandardCharsets.UTF_8);
         ShedTerminalSettingsProvider settingsProvider = new ShedTerminalSettingsProvider(configManager, terminalFont);
         JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, settingsProvider) {
+            @Override protected void paintChildren(java.awt.Graphics graphics){super.paintChildren(graphics);AgentTerminalDecoration.paintGlow(this,graphics);}
             @Override protected com.jediterm.terminal.ui.TerminalPanel createTerminalPanel(
                     com.jediterm.terminal.ui.settings.SettingsProvider settings, com.jediterm.terminal.model.StyleState style,
                     com.jediterm.terminal.model.TerminalTextBuffer buffer) {
@@ -113,6 +118,40 @@ final class PtyTerminalPane implements AutoCloseable {
     JComponent getInputComponent() {
         return widget.getTerminalPanel();
     }
+
+    boolean reusableForAgent(java.nio.file.Path directory,String shell){
+        if(closed||humanUsed||!process.isRunning()||agentCommand==null||!agentCommand.result().isDone()||!connector.getCommandLine().getFirst().equals(shell))return false;
+        String detected=detectedWorkingDirectory();
+        return detected!=null&&java.nio.file.Path.of(detected).toAbsolutePath().normalize().equals(directory.toAbsolutePath().normalize());
+    }
+    java.util.concurrent.CompletableFuture<CommandResult> typeAgentCommand(List<String> argv,String agent,int timeoutSeconds){
+        if(!javax.swing.SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Terminal input belongs on the EDT");
+        if(shellIntegration==null)throw new IllegalArgumentException("Enable terminal.shell.integration before agent command execution");
+        if(agentCommand!=null&&!agentCommand.result().isDone())throw new IllegalStateException("Terminal is already controlled");
+        String line=AgentTerminalCommand.quotedLine(connector.getCommandLine().getFirst(),argv);
+        var decoration=new AgentTerminalDecoration(getComponent(),getInputComponent(),agent);
+        var events=new java.util.concurrent.atomic.AtomicReference<Consumer<TerminalShellIntegrationTracker.Event>>();
+        var output=new java.util.concurrent.atomic.AtomicReference<Consumer<String>>();
+        var keys=new java.util.concurrent.atomic.AtomicReference<java.awt.KeyEventDispatcher>();
+        agentCommand=new AgentTerminalCommand(new AgentTerminalCommand.Terminal(){
+            public boolean ready(){return shellIntegration.currentDirectory()!=null;}
+            public boolean connected(){return !closed&&process.isRunning();}
+            public void send(String text){if(!closed)widget.getTerminalStarter().sendString(text,false);}
+            public void activity(String value){decoration.phase(value);}
+            public void pulse(){decoration.pulse();}
+            public void release(){
+                decoration.close();shellIntegration.removeListener(events.get());connector.removeReader(output.get());
+                java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keys.get());
+            }
+        },line,timeoutSeconds);
+        var command=agentCommand;
+        events.set(command::event);output.set(command::output);
+        keys.set(event->{if(event.getID()==java.awt.event.KeyEvent.KEY_PRESSED&&javax.swing.SwingUtilities.isDescendingFrom(event.getComponent(),widget))command.cancel("Human took terminal control");return false;});
+        shellIntegration.addListener(events.get());connector.addReader(output.get());
+        java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keys.get());
+        return command.start();
+    }
+    void cancelAgentCommand(){if(agentCommand!=null)agentCommand.cancel("Agent terminal command cancelled");}
 
     void requestFocusInWindow() {
         widget.requestFocusInWindow();
@@ -167,6 +206,7 @@ final class PtyTerminalPane implements AutoCloseable {
         if (closed) {
             return;
         }
+        cancelAgentCommand();
         closed = true;
         widget.stop();
         connector.close();

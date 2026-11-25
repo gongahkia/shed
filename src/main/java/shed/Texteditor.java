@@ -1794,6 +1794,13 @@ public class Texteditor extends JFrame implements KeyListener {
         return terminalController.resolveTerminalStartDirectory();
     }
 
+    Map<String,Object> agentTerminalRequest(String owner,String action,String id,String agent,String body,java.util.function.BooleanSupplier authorized){return terminalController.agentRequest(owner,action,id,agent,body,authorized);}
+    void revokeAgentTerminalRequests(String owner){terminalController.revokeAgentRequests(owner);}
+
+    CommandResult runAgentCommand(String agent,AgentCommandPlan.Command command,AsyncJobService.JobToken token)throws Exception {
+        return terminalController.runAgentCommand(agent,command,token);
+    }
+
     void closeTerminalSession(FileBuffer buffer) {
         terminalController.closeTerminalSession(buffer);
     }

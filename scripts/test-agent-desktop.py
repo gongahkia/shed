@@ -15,6 +15,36 @@ from native_fixture import Fixture, UnsafeFixture, checked
 
 ROOT = Path(__file__).resolve().parents[1]
 
+ANIMATIONS = {
+    'terminal': 'Normal Shed terminal with visible command typing and real output',
+    'reading': 'Amber reading highlight and top-to-bottom band',
+    'typing': 'Ordinary batch edits with deletion and parallel character insertion',
+    'insertion': 'Large addition with phased line reveal',
+    'deletion': 'Removed block preview and right-to-left erasure',
+    'rewrite': 'Removal followed by phased replacement',
+    'interrupt': 'Explicit reading interrupts an edit replay',
+    'search': 'Search matches and focused result',
+    'navigate': 'Navigation destination marker',
+    'target': 'Intended edit range',
+    'checking': 'Check in progress',
+    'passed': 'Reported successful check',
+    'failed': 'Reported failed check',
+    'conflict': 'Conflict over a retained human draft',
+    'file-create': 'New file and Explorer/Git presentation',
+    'file-modify': 'Modified file and Explorer/Git presentation',
+    'file-rename': 'Renamed file and Explorer/Git presentation',
+    'file-delete': 'Deleted file and Explorer/Git presentation',
+}
+
+
+def desktop_environment(environment):
+    # only the GUI process needs access to the current X11 desktop
+    result = dict(environment)
+    for key in ('DISPLAY', 'XAUTHORITY'):
+        if os.environ.get(key):
+            result[key] = os.environ[key]
+    return result
+
 
 def git_environment(fixture):
     root=fixture.run_root
@@ -84,11 +114,16 @@ def run_codex(binary, fixture, project, work, environment):
         target.unlink(missing_ok=True)
 
 
+def demo_succeeded(report, loop=False):
+    states = {'PASS', 'PAUSED'} if loop else {'PASS'}
+    return report.get('exit') == 0 and report.get('result', {}).get('state') in states
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--jdk', required=True, type=Path)
-    parser.add_argument('--jar', required=True, type=Path)
-    parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--jdk', type=Path)
+    parser.add_argument('--jar', type=Path)
+    parser.add_argument('--output', type=Path)
     parser.add_argument('--motion', action='store_true', help='Safe config, file tree/Git pulses and multi-block source following')
     parser.add_argument('--qualification', action='store_true', help='Bounded burst, conflict, theme and split desktop qualification')
     parser.add_argument('--live-codex', type=Path, help='Existing native Codex binary; isolated home/auth copy, shell tools disabled')
@@ -97,7 +132,23 @@ def main():
     parser.add_argument('--launch-only', action='store_true', help='Fixed direct Java launch-and-return acceptance; no shell')
     parser.add_argument('--animation-demo', action='store_true', help='Paced source changes, reading, search/navigation, refactoring intentions, checks and conflicts')
     parser.add_argument('--replay-payload', type=Path, help='Replay a bounded previously generated proposal through the same external CLI')
+    parser.add_argument('--list-animations', action='store_true', help='List individual make demo targets without launching')
+    parser.add_argument('--animation', choices=[*ANIMATIONS, 'deletion,insertion'], help='Run one animation or the deletion,insertion sequence; requires --animation-demo')
+    parser.add_argument('--loop', action='store_true', help='Repeat the selected animation or sequence in the same window until closed')
+    parser.add_argument('--check-terminal-handoff', action='store_true', help='Exercise terminal loop handoff once inside the disposable demo')
     args = parser.parse_args()
+    if args.list_animations:
+        for name, description in ANIMATIONS.items():
+            print(f'make demo-{name:<12} {description}')
+        return 0
+    if not all((args.jdk, args.jar, args.output)):
+        parser.error('--jdk, --jar and --output are required')
+    if args.check_terminal_handoff and not (args.loop and args.animation == 'terminal'):
+        parser.error('--check-terminal-handoff requires --animation terminal --loop')
+    if args.loop and not args.animation:
+        parser.error('--loop requires an individual --animation')
+    if args.animation and not args.animation_demo:
+        parser.error('--animation requires --animation-demo')
     if args.animation_demo and (not args.git_fixture or not args.visual_only or args.launch_only or args.qualification or args.replay_payload or args.live_codex or args.motion):parser.error('Animation demo requires only disposable Git and visual-only execution')
     if args.launch_only and (args.replay_payload or args.qualification or args.live_codex or args.git_fixture): parser.error("Launch-only cannot run editing fixtures")
     if args.qualification and (args.replay_payload or not args.visual_only or not args.git_fixture): parser.error('Watch qualification requires visual-only and disposable Git, independently of proposal replay')
@@ -135,6 +186,20 @@ def main():
             source='public class Demo {\n'+''.join('// '+markers[i]+'\n' if i in markers else f'// demonstration checkpoint {i:03d}\n' for i in range(240))+'    public static String greet(String name) {\n        return "Hello, " + name;\n    }\n}\n'
             (project/'Demo.java').write_text(source)
             for name,text in {'Notes.txt':'Demo notes\n- Improve greeting\n- Add helper methods\n','RenameMe.txt':'Keep this content when renaming.\n','DeleteMe.txt':'This disposable file will be deleted.\n'}.items():(project/name).write_text(text)
+        if args.animation == 'terminal' and not args.loop:
+            (project/'FormatFixture.java').write_text('''import java.nio.file.*;
+class FormatFixture {
+    public static void main(String[] args) throws Exception {
+        var file = Path.of("Demo.java");
+        var original = Files.readString(file);
+        var formatted = original.replace("String greet(String name) {", "String greet( String name ) {");
+        if (formatted.equals(original)) throw new IllegalStateException("Formatting fixture did not change source");
+        Files.writeString(file, formatted);
+        System.out.println("Formatted Demo.java");
+        Thread.sleep(1500);
+    }
+}
+''')
         (f.run_root / 'no-executables').mkdir(mode=0o700)
         env = dict(f.env, PATH=str(f.run_root / 'no-executables'), SHED_PORTABLE_FIXTURE_ROOT=str(f.root))
         if args.git_fixture:
@@ -145,10 +210,16 @@ def main():
             (f.run_root / 'empty-git-config').write_text('')
             env.update(git_environment(f))
             tracked=['Welcome.txt','Demo.java','AgentOld.txt','AgentDelete.txt']+(['Notes.txt','RenameMe.txt','DeleteMe.txt'] if args.animation_demo else [])
+            if (project/'FormatFixture.java').exists(): tracked.append('FormatFixture.java')
             for arguments in [['init','--quiet'], ['add','--',*tracked], ['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Fixture baseline']]:
                 completed=subprocess.run([str(git),*arguments],cwd=project,env=env,stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=10)
                 if completed.returncode: raise UnsafeFixture('Disposable Git setup failed: '+completed.stderr[:1000])
             report['git_fixture']='fixed system git; empty owned config/hooks; terminal prompts and signing disabled'
+        if args.animation == 'terminal':
+            shell = Path('/bin/bash').resolve(strict=True)
+            if not shell.is_file(): raise UnsafeFixture('System Bash is required for the terminal demo')
+            env['SHELL'] = str(shell)
+            report['terminal_fixture'] = 'system Bash in disposable HOME; normal Shed PTY and generated shell integration'
         if args.visual_only: env['SHED_LIVE_VISUAL_ONLY']='1'
         if args.qualification: env['SHED_WATCH_QUALIFICATION']='1'
         if args.live_codex: env['SHED_LIVE_CODEX']='1'
@@ -171,9 +242,17 @@ def main():
         session.chmod(0o600)
         command = [str(jdk / 'bin/java'), '-Djava.awt.headless=false', *props, '-cp', str(classes) + ':' + str(jar),
                    f'shed.{probe}', str(work), str(project)]
+        if args.animation:
+            command.append(args.animation)
+            report['animation'] = args.animation
+            if args.loop:
+                command.append('--loop')
+                report['loop'] = True
+                if args.check_terminal_handoff:
+                    command.append('--check-terminal-handoff')
         report['command'] = command
         with (work / 'stdout.log').open('w') as log:
-            process = subprocess.Popen(command, env=env, cwd=project, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(command, env=desktop_environment(env), cwd=project, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
             report['pid'] = process.pid
             print('LIVE_DEMO_SESSION ' + str(session), flush=True)
             if args.replay_payload:
@@ -227,7 +306,7 @@ def main():
                 if not (work/'codex-ready').exists(): raise UnsafeFixture('Workbench did not reach real Codex phase')
                 report['live_codex']=run_codex(args.live_codex, f, project, work, env)
                 (work/'codex-finished').write_text('ok' if report['live_codex']['exit']==0 else 'failed')
-            process.wait(timeout=310 if args.qualification else 160)
+            process.wait(timeout=None if args.loop else 310 if args.qualification else 160)
         report['exit'] = process.returncode
         report['log'] = (work / 'stdout.log').read_text()[:524288]
         if (work / 'result.json').exists():
@@ -247,6 +326,8 @@ def main():
         animation = work / 'agent-workflow.gif'
         if animation.exists() and animation.stat().st_size <= 8 * 1024 * 1024:
             shutil.copyfile(animation, output / animation.name)
+    except KeyboardInterrupt:
+        report.update(exit=130, error="Demo stopped by interrupt")
     except (OSError, UnsafeFixture, subprocess.TimeoutExpired) as failure:
         report.update(exit=2, error=str(failure))
     finally:
@@ -262,11 +343,13 @@ def main():
             if (work/'result.json').is_file():report['result']=json.loads((work/'result.json').read_text())
             for picture in sorted(work.glob('*.png')):
                 if picture.stat().st_size<=4*1024*1024:shutil.copyfile(picture,output/picture.name)
+        if report.get('exit') == 0 and report.get('result', {}).get('state') == 'FAIL':
+            report['exit'] = 1
         f.close()
         report.update(fixture_removed=not f.root.exists(), elapsed_s=time.monotonic() - started)
         (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print('LIVE_DEMO_RESULT ' + str(report.get('exit', 2)) + ' ' + str(output / 'report.json'), flush=True)
-    return 0 if report.get('exit') == 0 and report.get('result', {}).get('state') == 'PASS' else 1
+    return 130 if report.get('exit') == 130 else 0 if demo_succeeded(report, args.loop) else 1
 
 
 if __name__ == '__main__':

@@ -122,6 +122,16 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         if(editor.isTreePaneActive()){var content=editor.resolveTreeContentPaneForOpen();if(content!=null){editor.activateEditorPane(content);content.getTextArea().requestFocusInWindow();}}
     }
     void pauseForHuman(){if(root!=null&&(tour!=null||pendingTour!=null))follow.setSelected(false);}
+    EditorPane followedSource(FileBuffer buffer){
+        if(!current()||!follow.isSelected()||humanBusy()||buffer==null||buffer.isModified()||buffer.isLargeFile()||!buffer.hasFilePath()||buffer.getContent().length()>65536)return null;
+        Path path=buffer.getFile().toPath().toAbsolutePath().normalize();if(!path.startsWith(root)||excludedRoots.stream().anyMatch(path::startsWith))return null;
+        var active=editor.getActivePane();if(active==null)return null;
+        for(var pane:editor.editorPanes)if(pane.getBuffer()==buffer&&sourceContext(pane)&&pane.getTerminalPane()==null&&!pane.isMarkdownPreview()&&pane.getAlternateComponent()==null
+            &&pane.getTextArea().getDocument()==buffer.getDocument()&&(pane==active||active.getTerminalPane()!=null))return pane;
+        return null;
+    }
+    private boolean sourceContext(EditorPane pane){var active=editor.getActivePane();return active!=null&&pane!=null&&!pane.isDisposed()&&editor.editorPanes.contains(pane)&&pane.getTextArea().isShowing()
+        &&(pane==active||active.getTerminalPane()!=null);}
     private void publishRows(Set<String> recent){
         var changes=java.util.Collections.list(rows.elements());String summary=ExternalChangeSnapshot.moveSummary(changes);moves.setText(summary);moves.setToolTipText(summary);moves.setVisible(!summary.isEmpty());
         explorerMarks=FileChangeMarks.from(root,changes);editor.toolWindowHost.observeAgentFiles(root,changes,recent);
@@ -131,7 +141,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         for(int i=0;i<rows.size();i++){var row=rows.get(i);if(row.path().equals(name)||name.equals(row.previous())){follow.setSelected(false);files.setSelectedIndex(i);files.ensureIndexIsVisible(i);return true;}}return false;
     }
     void decorateExplorer(FileTreePanel tree){tree.observeChanges(current()?explorerMarks:Map.of(),Set.of());}
-    private void closeTour(){presentationGeneration++;pendingTour=null;if(tour!=null){var previous=tour;tour=null;previous.close();}}
+    private void closeTour(){presentationGeneration++;if(pendingTour!=null){var pane=pendingTour.pane().get();if(pane!=null)AgentSourceHandoff.clear(pane.getTextArea());}pendingTour=null;AgentSourceHandoff.clear(editor.writingArea);if(tour!=null){var previous=tour;tour=null;previous.close();}}
     void retirePresentation(){closeTour();}
     private boolean humanBusy(){return editor.getCurrentBuffer()!=null&&editor.getCurrentBuffer().isModified()||System.nanoTime()-editor.inputController.lastKeyPressNanos()<1_500_000_000L;}
     private record Update(Map<String,ExternalChangeSnapshot.File> now,List<ExternalChangeSnapshot.Change> changes,GitChangesWorkbenchModel.Snapshot git,List<ExternalChangeSnapshot.Change> activity) { }
@@ -176,6 +186,13 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         if(automatic&&(editor.getCurrentBuffer()!=null&&editor.getCurrentBuffer().isModified()||System.nanoTime()-editor.inputController.lastKeyPressNanos()<1_500_000_000L)){
             follow.setSelected(false);state.setText("Follow paused · continue editing, or enable Follow to resume");return;}
         closeTour();long expected=generation,intent=presentationGeneration;Path target=root.resolve(change.path());
+        if(automatic&&editor.getActivePane().getTerminalPane()!=null){
+            var buffer=editor.buffers.stream().filter(b->b.getFile()!=null&&b.getFile().toPath().toAbsolutePath().normalize().equals(target)).findFirst().orElse(null);
+            var source=followedSource(buffer);
+            if(source==null){follow.setSelected(false);state.setText("Follow paused · keep the terminal visible");return;}
+            pendingTour=new PendingTour(change,expected,new java.lang.ref.WeakReference<>(source),new java.lang.ref.WeakReference<>(buffer),editor.inputController.lastKeyPressNanos(),source.getTextArea().getCaret().getDot(),source.getTextArea().getCaret().getMark());
+            observedSourceReady();return;
+        }
         var pane=editor.getActivePane();var before=editor.getCurrentBuffer();long revision=before==null?-1:before.documentRevision(),input=editor.inputController.lastKeyPressNanos();
         int dot=editor.writingArea.getCaret().getDot(),mark=editor.writingArea.getCaret().getMark();
         java.util.function.BooleanSupplier valid=()->!closed&&expected==generation&&current()&&Objects.equals(selectedPath,change.path())&&pane==editor.getActivePane()
@@ -187,28 +204,38 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
             if(automatic){pendingTour=new PendingTour(change,expected,new java.lang.ref.WeakReference<>(editor.getActivePane()),new java.lang.ref.WeakReference<>(buffer),input,editor.writingArea.getCaret().getDot(),editor.writingArea.getCaret().getMark());observedSourceReady();}
             else presentChange(change,false,expected,buffer);
         };
-        if(automatic)editor.paneBufferController.openFileCheckedAsync(target.toFile(),valid,b->!b.isModified(),b->true,()->{},complete);
+        if(automatic&&before!=null&&before.getFile()!=null&&before.getFile().toPath().toAbsolutePath().normalize().equals(target)){
+            if(valid.getAsBoolean())complete.accept(null);
+        }else if(automatic)editor.paneBufferController.openFileCheckedAsync(target.toFile(),valid,b->!b.isModified(),b->true,()->{},complete);
         else editor.openFileAsync(target.toFile(),complete);
     }
     void observedSourceReady(){
-        var pending=pendingTour;if(pending==null)return;var source=pending.buffer().get();
-        if(closed||pending.generation()!=generation||!current()||!follow.isSelected()||humanBusy()||editor.getActivePane()!=pending.pane().get()||source==null||editor.getCurrentBuffer()!=source
+        var pending=pendingTour;if(pending==null)return;var source=pending.buffer().get();var pane=pending.pane().get();
+        if(closed||pending.generation()!=generation||!current()||!follow.isSelected()||humanBusy()||!sourceContext(pane)||source==null||source.isModified()||pane.getBuffer()!=source
             ||!Objects.equals(selectedPath,pending.change().path())||editor.inputController.lastKeyPressNanos()!=pending.input()
-            ||editor.writingArea.getCaret().getDot()!=pending.dot()||editor.writingArea.getCaret().getMark()!=pending.mark()){pendingTour=null;return;}
+            ||pane.getTextArea().getCaret().getDot()!=pending.dot()||pane.getTextArea().getCaret().getMark()!=pending.mark()){pendingTour=null;return;}
         if(!source.getContent().equals(pending.change().after()))return;
-        pendingTour=null;presentChange(pending.change(),true,pending.generation(),source);
+        pendingTour=null;presentChange(pending.change(),true,pending.generation(),source,pane);
     }
     private void presentChange(ExternalChangeSnapshot.Change change,boolean automatic,long expected,FileBuffer buffer){
+        presentChange(change,automatic,expected,buffer,editor.getActivePane());
+    }
+    private void presentChange(ExternalChangeSnapshot.Change change,boolean automatic,long expected,FileBuffer buffer,EditorPane sourcePane){
         if(!buffer.getContent().equals(change.after())||change.hunks().isEmpty())return;
         var ranges=new ArrayList<AgentEditPresentation.Range>();var edits=new ArrayList<AgentChangePlayback.Edit>();int shift=0;
-        for(var h:change.hunks()){if(ranges.size()==32)break;int start=h.start()+shift;var range=new AgentEditPresentation.Range(start,start+h.replacement().length());ranges.add(range);edits.add(new AgentChangePlayback.Edit(range,h.before()));shift+=h.replacement().length()-h.before().length();}
-        var presentation=editor.getActivePane().agentPresentation();
+        for(var h:change.hunks()){
+            if(ranges.size()==32)break;int start=h.start()+shift;
+            var whole=new AgentChangePlayback.Edit(new AgentEditPresentation.Range(start,start+h.replacement().length()),h.before());
+            var refined=AgentChangePlayback.refineAll(change.after(),whole);if(ranges.size()+refined.size()>32)refined=List.of(whole);
+            for(var edit:refined){ranges.add(edit.range());edits.add(edit);}shift+=h.replacement().length()-h.before().length();
+        }
+        var presentation=sourcePane.agentPresentation();var area=sourcePane.getTextArea();
         if(automatic){
-            long sourceRevision=buffer.documentRevision();var sourcePane=editor.getActivePane();
-            tour=new AgentChangeTour(editor.writingArea,presentation,ranges,change.after(),watcherName,
-                ()->!closed&&expected==generation&&current()&&follow.isSelected()&&editor.getActivePane()==sourcePane&&editor.getCurrentBuffer()==buffer&&!buffer.isModified()&&buffer.documentRevision()==sourceRevision,
+            long sourceRevision=buffer.documentRevision();
+            tour=new AgentChangeTour(area,presentation,ranges,change.after(),watcherName,
+                ()->!closed&&expected==generation&&current()&&follow.isSelected()&&sourceContext(sourcePane)&&sourcePane.getBuffer()==buffer&&!buffer.isModified()&&buffer.documentRevision()==sourceRevision,
                 ()->follow.setSelected(false),()->tour=null,edits);tour.start();
-        }else{presentation.showApplied(ranges);presentation.setAgentName(watcherName+" change");if(presentation.available()&&!ranges.isEmpty())try{var rectangle=editor.writingArea.modelToView2D(ranges.getFirst().start());if(rectangle!=null)editor.writingArea.scrollRectToVisible(rectangle.getBounds());}catch(javax.swing.text.BadLocationException unavailable){editor.showMessage("Change revealed in the diff; source location unavailable");}}
+        }else{presentation.showApplied(ranges);presentation.setAgentName(watcherName+" change");if(presentation.available()&&!ranges.isEmpty())try{var rectangle=area.modelToView2D(ranges.getFirst().start());if(rectangle!=null)area.scrollRectToVisible(rectangle.getBounds());}catch(javax.swing.text.BadLocationException unavailable){editor.showMessage("Change revealed in the diff; source location unavailable");}}
     }
     private void hunk(int direction){String text=diff.getText();int caret=diff.getCaretPosition();int next=ChangeDiffView.nextHunk(text,caret,direction);if(next>=0)diff.setCaretPosition(next);}
     void stop(){startupError="";closeTour();pulse.clear();if(root!=null)editor.toolWindowHost.observeAgentFiles(root,List.of(),Set.of());explorerMarks=Map.of();activity=Map.of();moves.setVisible(false);generation++;selectionGeneration++;if(diffJob>=0)editor.asyncJobService.cancel(diffJob);diffJob=-1;if(watcher!=null)watcher.close();watcher=null;observedEvent.set(null);busy=false;dirty=false;original=Map.of();latest=Map.of();rows.clear();gitRows=List.of();root=null;state.setText("Watch stopped. Start a new watch to capture a new baseline.");}

@@ -92,15 +92,7 @@ final class RecoveryController {
                 if (state == FileBuffer.ExternalFileState.EXTERNALLY_CHANGED
                     || state == FileBuffer.ExternalFileState.REPLACED) {
                     try {
-                        int caret = 0;
-                        if (buffer == editor.getCurrentBuffer()) {
-                            caret = editor.writingArea.getCaretPosition();
-                        }
-                        buffer.load(editor.configManager);
-                        if (buffer == editor.getCurrentBuffer()) {
-                            editor.loadBufferIntoEditor(buffer);
-                            editor.writingArea.setCaretPosition(Math.min(caret, editor.writingArea.getText().length()));
-                        }
+                        reloadPreservingViews(buffer);
                         autoReloaded++;
                     } catch (IOException e) {
                         editor.showMessage("Reload failed: " + e.getMessage());
@@ -138,6 +130,37 @@ final class RecoveryController {
             editor.showMessage("Retained " + unsupportedExternalTargets + " buffer" + (unsupportedExternalTargets == 1 ? "" : "s")
                 + " with unsupported external target");
         }
+    }
+
+    private void reloadPreservingViews(FileBuffer buffer) throws IOException {
+        var views = new IdentityHashMap<EditorPane, BufferViewState>();
+        for (var pane : editor.editorPanes)
+            if (pane.getBuffer() == buffer && !buffer.isLargeFile() && pane.getTextArea().getDocument() == buffer.getDocument())
+                views.put(pane, BufferViewState.capture(pane.getTextArea(), pane.getScrollPane()));
+        String before = buffer.getContent();
+        var followed=editor.toolWindowHost==null?null:editor.toolWindowHost.followedAgentSource(buffer);
+        var handoff=followed==null?null:AgentSourceHandoff.capture(followed.getTextArea());
+        int caret = buffer == editor.getCurrentBuffer() ? editor.writingArea.getCaretPosition() : 0;
+        try {
+            editor.withSuppressedDocumentEvents(() -> {
+                try {
+                    buffer.load(editor.configManager);
+                    if (buffer == editor.getCurrentBuffer()) {
+                        editor.loadBufferIntoEditor(buffer);
+                        editor.writingArea.setCaretPosition(Math.min(caret, editor.writingArea.getText().length()));
+                    }
+                    for (var entry : views.entrySet()) {
+                        var pane = entry.getKey();
+                        if (pane.getBuffer() != buffer || pane.getTextArea().getDocument() != buffer.getDocument()) continue;
+                        entry.getValue().restoreSelectionAfterChanges(pane.getTextArea(), before, buffer.getContent());
+                        entry.getValue().restoreViewport(pane.surface());
+                    }
+                } catch (IOException failure) { throw new UncheckedIOException(failure); }
+            });
+            if(handoff!=null&&!before.equals(buffer.getContent()))handoff.install();
+            else if(handoff!=null)handoff.close();
+        } catch (UncheckedIOException failure) { if(handoff!=null)handoff.close();throw failure.getCause(); }
+        catch(RuntimeException failure){if(handoff!=null)handoff.close();throw failure;}
     }
 
     private boolean hasModifiedSettingsBuffer() {

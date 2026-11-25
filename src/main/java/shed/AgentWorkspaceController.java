@@ -20,6 +20,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     private int startingJob = -1;
     private boolean stopping;
     private boolean proposalMode;
+    private boolean terminalMode;
     private boolean applicationReady;
     private ApplicationStatus applicationStatus;
     private String status = "Agent API is stopped; no listener is running.";
@@ -53,8 +54,9 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "api start metadata" -> start(false, false, true);
             case "api start navigation" -> start(false, false, true, true);
             case "api start control" -> start(false, false, true, true, true);
+            case "api start terminal" -> start(false,false,true,true,true,true);
             case "api stop" -> stop();
-            default -> "Usage: :agent [watch|watch stop|changes|proposals|edit|ask|run|complete] or :agent api start [propose|status|metadata|navigation|control]|status|stop";
+            default -> "Usage: :agent [watch|watch stop|changes|proposals|edit|ask|run|complete] or :agent api start [propose|status|metadata|navigation|control|terminal]|status|stop";
         };
     }
 
@@ -71,9 +73,12 @@ final class AgentWorkspaceController implements AutoCloseable {
     }
 
     private String start(boolean allowProposals, boolean statusOnly, boolean metadataMode, boolean navigationMode, boolean controlMode) {
+        return start(allowProposals,statusOnly,metadataMode,navigationMode,controlMode,false);
+    }
+    private String start(boolean allowProposals,boolean statusOnly,boolean metadataMode,boolean navigationMode,boolean controlMode,boolean allowTerminal) {
         if (disposed.get()) return "Agent API is unavailable while the editor closes.";
         if (active != null && active.running()) return active.statusOnly() == statusOnly && active.metadataEnabled() == metadataMode
-            && active.navigationEnabled() == navigationMode && active.controlEnabled() == controlMode && proposalMode == allowProposals ? status
+            && active.navigationEnabled() == navigationMode && active.controlEnabled() == controlMode && proposalMode == allowProposals && terminalMode==allowTerminal ? status
             : "Stop the current API before starting it with different permissions.";
         if (startingJob >= 0) return "Agent API startup is already running.";
         Path root = statusOnly ? null : editor.workspaceController.activeRoot();
@@ -91,12 +96,12 @@ final class AgentWorkspaceController implements AutoCloseable {
             if (live == null) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
             return live.captureEditorMetadata();
         };
-        EditorControl.Host navigationHost = navigationHost(editorOwner, controlMode);
+        EditorControl.Host navigationHost = navigationHost(editorOwner, controlMode,allowTerminal);
         long request = generation.incrementAndGet();
         stopping = false;
         Path directory = Path.of(editor.configManager.getSessionDirectory(), "agent-api");
-        proposalMode = allowProposals;
-        String mode = controlMode ? "Reviewed editor control" : navigationMode ? "Editor navigation" : metadataMode ? "Editor metadata" : statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
+        proposalMode = allowProposals;terminalMode=allowTerminal;
+        String mode = allowTerminal?"Reviewed editor and terminal control":controlMode ? "Reviewed editor control" : navigationMode ? "Editor navigation" : metadataMode ? "Editor metadata" : statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
         AgentPolicy policy = allowProposals ? new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE),
             java.util.List.of("**/README.md"), java.util.List.of(), true) : AgentPolicy.readOnly();
         Path sessions = Path.of(editor.configManager.getSessionDirectory());
@@ -164,7 +169,8 @@ final class AgentWorkspaceController implements AutoCloseable {
         return status;
     }
 
-    private static EditorControl.Host navigationHost(java.lang.ref.WeakReference<Texteditor> editorOwner, boolean controlMode) {
+    private static EditorControl.Host navigationHost(java.lang.ref.WeakReference<Texteditor> editorOwner, boolean controlMode,boolean terminalMode) {
+        String terminalOwner=java.util.UUID.randomUUID().toString();
         return new EditorControl.Host() {
             private Texteditor owner() {
                 var live = editorOwner.get();
@@ -222,10 +228,15 @@ final class AgentWorkspaceController implements AutoCloseable {
                     var presentation=owner().getActivePane().agentPresentation();
                     if (!presentation.available()) throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
                     if(state.phase().equals("reading"))reading(start,end,state.agent());
-                    else presentation.showProgress(start,end,state.agent());
+                    else presentation.showProgress(start,end,state.agent(),state.phase());
                 }
                 owner().showMessage(state.label());
             }
+            public java.util.Map<String,Object> terminal(String action,String id,String agent,String body,java.util.function.BooleanSupplier authorized){
+                if(!terminalMode)throw new WorkspaceApiException(WorkspaceApiException.Code.UNSUPPORTED,"Start :agent api start terminal to request reviewed terminal commands");
+                return owner().agentTerminalRequest(terminalOwner,action,id,agent,body,authorized);
+            }
+            public void revokeTerminals(){var live=editorOwner.get();if(live!=null)live.revokeAgentTerminalRequests(terminalOwner);}
             public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(owner().workspaceController.activeRoot(),owner().workspaceRoots.generation());}
             public java.util.Map<String,Object> watch(String action,String agent){return owner().toolWindowHost.watchAgentChanges(action,agent);}
             public java.util.Map<String,Object> observe(String operation){return EditorObservation.read(owner(),operation);}

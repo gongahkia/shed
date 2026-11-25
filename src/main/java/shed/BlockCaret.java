@@ -26,6 +26,25 @@ class BlockCaret extends DefaultCaret {
     private Rectangle paintedTarget;
     private Rectangle paintedViewport;
     private Document observedDocument;
+    private int automaticScrollHolds;
+
+    Runnable holdAutomaticScrolling() {
+        if (!javax.swing.SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Caret scroll preservation belongs to the EDT");
+        automaticScrollHolds++;
+        return new Runnable() {
+            private boolean released;
+            public void run() {
+                if (released) return;
+                released = true;
+                // DefaultCaret queues visibility work when a document or selection changes
+                javax.swing.SwingUtilities.invokeLater(() -> automaticScrollHolds--);
+            }
+        };
+    }
+
+    @Override protected void adjustVisibility(Rectangle bounds) {
+        if (automaticScrollHolds == 0) super.adjustVisibility(bounds);
+    }
     private final DocumentListener edits = new DocumentListener() {
         public void insertUpdate(DocumentEvent event) { resetMotion(); }
         public void removeUpdate(DocumentEvent event) { resetMotion(); }

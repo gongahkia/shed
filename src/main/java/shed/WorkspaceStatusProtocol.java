@@ -107,6 +107,17 @@ final class WorkspaceStatusProtocol {
         }
 
         boolean acceptsControl(String method, Map<String, Object> value) {
+            if(method.equals("editor/terminal")){
+                var observation=value==null?null:MiniJson.asObject(value.get("observation"));
+                return EditorControl.SCOPE.equals(scope())&&value!=null&&value.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","operation","observation"))
+                    &&Long.valueOf(1).equals(value.get("schemaVersion"))&&target.instanceId().equals(value.get("instanceId"))&&target.windowId().equals(value.get("windowId"))&&target.projectId().equals(value.get("projectId"))&&method.equals(value.get("operation"))
+                    &&observation!=null&&observation.keySet().equals(Set.of("requestId","agent","state","result","error"))
+                    &&observation.get("requestId") instanceof String id&&id.matches("[A-Za-z0-9_-]{1,64}")
+                    &&observation.get("agent") instanceof String agent&&agent.length()<=40&&!agent.isBlank()&&!agent.codePoints().anyMatch(Character::isISOControl)
+                    &&Set.of("awaiting-approval","running","completed","failed","cancelled","rejected").contains(observation.get("state"))
+                    &&MiniJson.asObject(observation.get("result"))!=null&&observation.get("error") instanceof String error&&error.length()<=1024
+                    &&MiniJson.stringify(observation).getBytes(StandardCharsets.UTF_8).length<24000;
+            }
             if(method.equals("editor/watch")){
                 var observation=value==null?null:MiniJson.asObject(value.get("observation"));
                 return EditorControl.SCOPE.equals(scope())&&value!=null&&value.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","operation","observation"))

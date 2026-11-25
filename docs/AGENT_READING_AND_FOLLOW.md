@@ -20,6 +20,22 @@ shed ctl read src/App.java --offset 0 --limit 2048 --agent "My agent"
 
 The path form explicitly opens an authorized file, returns a bounded chunk of the actual source buffer and presents that chunk in the editor. Continue from the returned `nextOffset`. The pulse uses the existing theme warning color, a slower alpha cycle and top-to-bottom sweep, an underline marker and a reading label, distinguishing it from the existing success-colored edit cursor. The status line identifies the file being read. Rendering never changes source, revision, Undo history or the human caret. Opening another file retains the normal tab/navigation behavior.
 
+The inline label also paints the bundled provider logo at one text-line height and a
+16-segment circular spinner with a fading trail. The spinner uses SwingX
+`BusyPainter`, driven by the existing 50 ms presentation timer. Reading, thinking,
+proposing, active edit/deletion replays and all active source intents show the busy
+indicator. Completed passed/failed checks and finished replays stop spinning; thinking/proposing labels retain the reported
+phase. Provider identity is kept separately from the activity suffix so brands such
+as OpenCode still resolve correctly. Unknown names keep a text label and spinner.
+The badge is painted after deletion/rewrite previews so the preview cannot hide it.
+The badge uses only free space after the source line and is omitted when that space
+is too narrow. It scales with the source font and uses the matching light/dark
+bundled logo, with no runtime image download. Reduced motion keeps a static spinner.
+
+`make demo-reading LOOP=1` cycles scripted Codex, Claude Code and OpenCode labels to
+audit their logos and the spinner in the same window. These remain display examples,
+not model calls. The reading sweep remains top-to-bottom.
+
 The animated indicator expires after approximately six seconds. Editing, replacing or hiding its source clears it. Reduced motion retains a static indication until replacement/cleanup with no running animation timer. The existing explicit `progress` reading phase uses the same treatment. Reading does not raise the application's OS window or expose the agent-management dock.
 
 Plain `ctl read` remains an observation without presentation; `read-file` remains the existing project read. Ordinary `cat`, a model's own file tool and filesystem access do not automatically emit reading activity. A vendor-neutral agent instruction is: “Use `shed ctl read <relative-file>` for reads, continue from `nextOffset`, and keep making your normal filesystem edits while Shed watches.” No Codex-specific watcher or log parser is added.

@@ -25,6 +25,8 @@ public final class WorkbenchStyle {
         color("shed.error", AccessibilitySupport.readableText(new Color(0xCC4855), config.getNormalColor()));
         color("shed.warning", AccessibilitySupport.readableText(new Color(0xA87808), config.getNormalColor()));
         color("shed.success", AccessibilitySupport.readableText(new Color(0x27815C), config.getNormalColor()));
+        color("shed.info", AccessibilitySupport.readableText(new Color(0x087F9C), config.getNormalColor()));
+        color("shed.navigation", AccessibilitySupport.readableText(new Color(0x8B52C7), config.getNormalColor()));
         UIManager.put("ButtonUI", ButtonUI.class.getName());
         UIManager.put("ToggleButtonUI", ButtonUI.class.getName());
         UIManager.put("CheckBoxUI", CheckUI.class.getName());

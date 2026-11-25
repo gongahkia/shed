@@ -11,6 +11,9 @@ final class TerminalShellIntegrationTracker {
     private static final int MAX_EVENTS = 200;
     private static final int MAX_VALUE_LENGTH = 8 * 1024;
     private final List<Event> events = new CopyOnWriteArrayList<>();
+    private final List<java.util.function.Consumer<Event>> listeners=new CopyOnWriteArrayList<>();
+    void addListener(java.util.function.Consumer<Event> listener){listeners.add(listener);}
+    void removeListener(java.util.function.Consumer<Event> listener){listeners.remove(listener);}
 
     void accept(List<String> arguments) {
         if (arguments == null || arguments.size() != 3 || !"shed".equals(arguments.getFirst())) return;
@@ -19,7 +22,8 @@ final class TerminalShellIntegrationTracker {
         if (!"cwd".equals(type) && !"command".equals(type) && !"finished".equals(type)) return;
         if (value == null || value.length() > MAX_VALUE_LENGTH || value.indexOf('\0') >= 0) return;
         if ("finished".equals(type) && !value.matches("-?\\d{1,5}")) return;
-        events.add(new Event(Instant.now(), type, value));
+        var event=new Event(Instant.now(),type,value);events.add(event);
+        for(var listener:listeners)listener.accept(event);
         while (events.size() > MAX_EVENTS) events.removeFirst();
     }
 

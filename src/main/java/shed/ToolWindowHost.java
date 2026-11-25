@@ -132,6 +132,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         if(surfaces.get(Tab.GIT) instanceof GitChangesToolPanel git)git.observeExternalChanges(root,recent);
     }
     void observedSourceReady(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.observedSourceReady();}
+    EditorPane followedAgentSource(FileBuffer buffer){return surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents?agents.followedSource(buffer):null;}
     void pauseAgentFollowing(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.pauseFollowing();}
     void retireAgentPresentation(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.retirePresentation();}
     void showObservedChange(java.nio.file.Path path){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents&&agents.selectObserved(path))showTab(Tab.AGENT);}

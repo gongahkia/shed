@@ -14,7 +14,7 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal");
     static boolean mutation(String method) {
         return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
@@ -34,6 +34,8 @@ final class EditorControl implements AutoCloseable {
         default Map<String,Object> watch(String action,String agent){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default Map<String,Object> observe(String operation){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default java.awt.image.BufferedImage capturePreview(){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
+        default Map<String,Object> terminal(String action,String id,String agent,String body,BooleanSupplier authorized){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
+        default void revokeTerminals(){}
         void review(String proposal);
         void clearActivity();
     }
@@ -69,6 +71,7 @@ final class EditorControl implements AutoCloseable {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Control dispatch belongs off the EDT");
         if (!OPERATIONS.contains(method)) throw fail(WorkspaceApiException.Code.UNSUPPORTED);
         if(method.equals("editor/watch"))return watch(params,connection);
+        if(method.equals("editor/terminal"))return terminal(params,connection);
         boolean initialOpen=method.equals("editor/file/open")&&params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","path"));
         var fields = new java.util.HashSet<>(initialOpen?Set.of("schemaVersion","instanceId","windowId","projectId"):CONTEXT);
         fields.addAll(switch (method) {
@@ -185,6 +188,21 @@ final class EditorControl implements AutoCloseable {
         } finally { active.compareAndSet(lease, null); }
     }
 
+    private Map<String,Object> terminal(Map<String,Object> params,BooleanSupplier connection){
+        if(!params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","action","requestId","agent","commands")))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        if(!Long.valueOf(1).equals(params.get("schemaVersion")))throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
+        grant.requireIdentity(text(params,"instanceId",64),text(params,"windowId",64));
+        if(!grant.projectId.equals(text(params,"projectId",64)))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
+        String action=text(params,"action",16),id=text(params,"requestId",64),agent=text(params,"agent",40),commands=text(params,"commands",24000);
+        if(!Set.of("request","status","cancel").contains(action)||!action.equals("request")&&(!agent.isEmpty()||!commands.isEmpty()))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        var lease=new Lease(connection);if(!active.compareAndSet(null,lease))throw fail(WorkspaceApiException.Code.BUSY);
+        try(lease){
+            var before=ui(lease,()->owner().watchRoot());grant.authorizeProject(before.root(),before.generation());
+            BooleanSupplier authorized=()->{try{grant.requireLive();return host.get()!=null;}catch(RuntimeException revoked){return false;}};
+            var observation=ui(lease,()->{if(!before.equals(owner().watchRoot()))throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);return owner().terminal(action,id,agent,commands,authorized);});
+            return Map.of("schemaVersion",1,"instanceId",params.get("instanceId"),"windowId",params.get("windowId"),"projectId",grant.projectId,"operation","editor/terminal","observation",observation);
+        }finally{active.compareAndSet(lease,null);}
+    }
     private Map<String,Object> watch(Map<String,Object> params,BooleanSupplier connection){
         if(!params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","action","agent")))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
         if(!Long.valueOf(1).equals(params.get("schemaVersion")))throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
@@ -312,6 +330,6 @@ final class EditorControl implements AutoCloseable {
     @Override public void close() {
         var lease = active.get(); if (lease != null) lease.close();
         Host old = host.getAndSet(null); services.set(null); activity.close();
-        if (old != null) SwingUtilities.invokeLater(old::clearActivity);
+        if (old != null) SwingUtilities.invokeLater(()->{old.clearActivity();old.revokeTerminals();});
     }
 }

@@ -20,19 +20,19 @@ class AgentBufferIntentTest {
     static Object wire(Object value){return MiniJson.parseStrict(MiniJson.stringify(value));}
     static Map<String,Object> params(Map<String,Object> context,AgentBufferIntent event){var p=EditorControlTest.params(context);p.put("intent",wire(event.json()));return p;}
     @Test void contractBoundsKindsAndOutcomesAreExplicit(){
-        for(String kind:AgentBufferIntent.KINDS){var e=event(kind,kind.equals("verify")?"checking":"active",0,kind.equals("move")?new AgentEditPresentation.Range[]{range(0,2),range(4,4)}:new AgentEditPresentation.Range[]{range(0,2)});assertEquals(e,AgentBufferIntent.parse(wire(e.json())));assertFalse(e.label(0).isBlank());}
+        for(String kind:AgentBufferIntent.KINDS){var e=event(kind,kind.equals("verify")?"checking":"active",0,range(0,2));assertEquals(e,AgentBufferIntent.parse(wire(e.json())));assertFalse(e.label(0).isBlank());}
         assertThrows(WorkspaceApiException.class,()->event("execute","active",0,range(0,1)));
         assertThrows(WorkspaceApiException.class,()->event("search","passed",0,range(0,1)));
         assertThrows(WorkspaceApiException.class,()->event("verify","success",0,range(0,1)));
         assertThrows(WorkspaceApiException.class,()->event("move","active",0,range(0,1)));
+        assertThrows(WorkspaceApiException.class,()->event("rename","active",0,range(0,1)));
+        for(String kind:List.of("format","undo"))assertThrows(WorkspaceApiException.class,()->event(kind,"active",0,range(0,1)));
         assertThrows(WorkspaceApiException.class,()->event("target","active",1,range(0,1)));
         assertThrows(WorkspaceApiException.class,()->new AgentBufferIntent("target","active","bad\nlabel",List.of(range(0,1)),0));
         assertThrows(WorkspaceApiException.class,()->new AgentBufferIntent("search","active","Agent",Collections.nCopies(33,range(0,1)),0));
         assertThrows(WorkspaceApiException.class,()->AgentBufferIntent.parse(Map.of()));
         var extra=new LinkedHashMap<>(event("target","active",0,range(0,1)).json());extra.put("text","forbidden");assertThrows(WorkspaceApiException.class,()->AgentBufferIntent.parse(extra));
-        assertEquals("warning",event("move","active",0,range(0,1),range(3,3)).role(0));assertEquals("success",event("move","active",0,range(0,1),range(3,3)).role(1));
-        assertTrue(event("verify","passed",0,range(0,1)).label(0).contains("reports check passed"));
-        assertEquals("warning",event("move","source",0,range(0,2)).role(0));assertEquals("success",event("move","destination",0,range(4,4)).role(0));
+        assertEquals("Local agent check passed",event("verify","passed",0,range(0,1)).label(0));
     }
     @Test void offsetsRemainUtf16AndMustRespectGraphemeBoundaries(){
         String source="a😀e\u0301क्षz";
@@ -45,8 +45,8 @@ class AgentBufferIntentTest {
         try(var f=new EditorControlTest.Fixture(temporary){public void intent(AgentBufferIntent event){assertTrue(SwingUtilities.isEventDispatchThread());seen.add(event);pane.agentPresentation().showIntent(event);}};
             var c=WorkspaceBridgeClient.control(f.server.descriptor(),f.server.credential())){
             var before=EditorControlTest.edt(()->List.of(f.pane.getBuffer().getContent(),f.pane.getBuffer().documentRevision(),f.pane.getBuffer().isModified(),f.pane.getBuffer().getUndoManager().canUndo(),f.pane.getTextArea().getCaretPosition()));
-            for(String kind:AgentBufferIntent.KINDS){var e=event(kind,kind.equals("verify")?"passed":"active",0,kind.equals("move")?new AgentEditPresentation.Range[]{range(0,5),range(12,12)}:new AgentEditPresentation.Range[]{range(0,5)});var r=EditorControlTest.result(EditorControlTest.exchange(c,"editor/agent/intent",params(EditorControlTest.context(c),e)));assertEquals("shown",r.get("outcome"));assertEquals(e,AgentBufferIntent.parse(r.get("intent")));}
-            assertEquals(9,seen.size());assertEquals(before,EditorControlTest.edt(()->List.of(f.pane.getBuffer().getContent(),f.pane.getBuffer().documentRevision(),f.pane.getBuffer().isModified(),f.pane.getBuffer().getUndoManager().canUndo(),f.pane.getTextArea().getCaretPosition())));
+            for(String kind:AgentBufferIntent.KINDS){var e=event(kind,kind.equals("verify")?"passed":"active",0,range(0,5));var r=EditorControlTest.result(EditorControlTest.exchange(c,"editor/agent/intent",params(EditorControlTest.context(c),e)));assertEquals("shown",r.get("outcome"));assertEquals(e,AgentBufferIntent.parse(r.get("intent")));}
+            assertEquals(5,seen.size());assertEquals(before,EditorControlTest.edt(()->List.of(f.pane.getBuffer().getContent(),f.pane.getBuffer().documentRevision(),f.pane.getBuffer().isModified(),f.pane.getBuffer().getUndoManager().canUndo(),f.pane.getTextArea().getCaretPosition())));
             assertEquals(before.getFirst(),Files.readString(f.root.resolve("One.java")));
         }
     }
@@ -72,13 +72,11 @@ class AgentBufferIntentTest {
             assertNotEquals(0,cli(f,"intent","--kind","target","--start","0","--end","5","--document","wrong","--revision","0"));assertEquals(4,seen.size());
             String id=EditorControlTest.edt(()->f.capture().documentId());
             assertEquals(0,cli(f,"intent","--kind","verify","--status","failed","--start","0","--end","5","--document",id,"--revision",Long.toString(EditorControlTest.edt(()->f.pane.getBuffer().documentRevision()))));
-            assertEquals(0,cli(f,"intent","Two.java","--kind","move","--status","source","--start","0","--end","5"));
-            assertEquals(0,cli(f,"intent","One.java","--kind","move","--status","destination","--start","0","--end","0"));assertEquals("One.java",EditorControlTest.edt(()->f.pane.getBuffer().getFile().getName()));
         }
     }
     @Test void malformedCliIntentsRejectBeforeFileOpening()throws Exception{
         try(var f=new EditorControlTest.Fixture(temporary)){
-            for(String[] args:List.of(new String[]{"--kind","search","--ranges","0:1,2:3","--start","0"},new String[]{"--kind","unknown","--ranges","0:1"},new String[]{"--kind","target","--ranges","-1:5"},new String[]{"--kind","target","--ranges","1:0"},new String[]{"--kind","target","--ranges","0:1","--focus","4"},new String[]{"--kind","target","--ranges","0:1","--agent","bad\nlabel"},new String[]{"--kind","target","--ranges","0:1","--status","passed"},new String[]{"--kind","target","--ranges","0:1","--document","missing-revision"})){
+            for(String[] args:List.of(new String[]{"--kind","search","--ranges","0:1,2:3","--start","0"},new String[]{"--kind","unknown","--ranges","0:1"},new String[]{"--kind","move","--ranges","0:1,2:3"},new String[]{"--kind","rename","--ranges","0:1,2:3"},new String[]{"--kind","format","--ranges","0:1"},new String[]{"--kind","undo","--ranges","0:1"},new String[]{"--kind","target","--ranges","-1:5"},new String[]{"--kind","target","--ranges","1:0"},new String[]{"--kind","target","--ranges","0:1","--focus","4"},new String[]{"--kind","target","--ranges","0:1","--agent","bad\nlabel"},new String[]{"--kind","target","--ranges","0:1","--status","passed"},new String[]{"--kind","target","--ranges","0:1","--document","missing-revision"})){
                 var all=new ArrayList<>(List.of("intent","Two.java"));all.addAll(List.of(args));assertNotEquals(0,cli(f,all.toArray(String[]::new)));assertEquals("One.java",EditorControlTest.edt(()->f.pane.getBuffer().getFile().getName()));
             }
             assertNotEquals(0,cli(f,"intent","../outside.java","--kind","target","--ranges","0:1"));
@@ -101,7 +99,7 @@ class AgentBufferIntentTest {
         EditorControlTest.edt(()->{
             var area=new JTextArea("alpha beta\n");area.setFont(new Font("Monospaced",0,16));area.setSize(700,250);area.putClientProperty("shed.caretAnimation",false);
             try(var p=new AgentEditPresentation(area)){
-                var colors=new HashSet<Color>();for(String status:List.of("checking","passed","failed")){p.showIntent(event("verify",status,0,range(0,5)));colors.add(p.agentColor());assertTrue(area.getClientProperty("shed.agentActivity").toString().contains("reports check "+status));}
+                var colors=new HashSet<Color>();for(String status:List.of("checking","passed","failed")){p.showIntent(event("verify",status,0,range(0,5)));colors.add(p.agentColor());assertEquals(status.equals("checking")?"Local agent checking":"Local agent check "+status,area.getClientProperty("shed.agentActivity"));}
                 assertEquals(3,colors.size());
                 p.showIntent(event("navigate","active",0,range(area.getDocument().getLength(),area.getDocument().getLength())));
                 var baseline=new java.awt.image.BufferedImage(700,250,java.awt.image.BufferedImage.TYPE_INT_RGB);var g=baseline.createGraphics();area.paint(g);g.dispose();
@@ -126,6 +124,31 @@ class AgentBufferIntentTest {
                 p.showIntent(event("target","active",0,range(0,6)));area.append("human");assertNull(area.getClientProperty("shed.agentIntent"));
             }catch(ReflectiveOperationException e){throw new AssertionError(e);}
             assertEquals(listeners,doc.getDocumentListeners().length);assertEquals(keys,area.getKeyListeners().length);assertEquals(mouse,scroll.getMouseWheelListeners().length);return null;
+        });
+    }
+    @Test void successiveSearchFocusesScrollSmoothlyAndHumanInputStopsTheTransition()throws Exception{
+        EditorControlTest.edt(()->{
+            String source="source line\n".repeat(100);var area=new JTextArea(source){@Override public boolean isShowing(){return true;}};
+            area.setFont(new Font("Monospaced",0,16));area.select(2,6);var undo=new UndoManager();area.getDocument().addUndoableEditListener(undo);
+            var scroll=new JScrollPane(area);scroll.setSize(700,250);scroll.doLayout();area.setSize(680,2200);
+            var matches=new AgentEditPresentation.Range[]{range(0,6),range(900,906),range(300,306)};
+            try(var p=new AgentEditPresentation(area)){
+                var tick=AgentEditPresentation.class.getDeclaredMethod("advance");tick.setAccessible(true);
+                p.showIntent(event("search","active",0,matches));for(int i=0;i<6;i++)tick.invoke(p);
+                int first=scroll.getViewport().getViewPosition().y;
+                p.showIntent(event("search","active",1,matches));assertEquals(first,scroll.getViewport().getViewPosition().y,"Focus changes must not jump immediately");
+                tick.invoke(p);int intermediate=scroll.getViewport().getViewPosition().y;
+                for(int i=1;i<6;i++)tick.invoke(p);int second=scroll.getViewport().getViewPosition().y;
+                assertTrue(first<intermediate&&intermediate<second,"Scroll must pass through an intermediate position");
+                assertTrue(area.getVisibleRect().intersects(area.modelToView2D(matches[1].start())));
+                p.showIntent(event("search","active",2,matches));assertEquals(second,scroll.getViewport().getViewPosition().y);
+                tick.invoke(p);int movingBack=scroll.getViewport().getViewPosition().y;assertTrue(movingBack<second);
+                scroll.dispatchEvent(new MouseWheelEvent(scroll,MouseWheelEvent.MOUSE_WHEEL,System.currentTimeMillis(),0,10,10,0,false,MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));
+                var stopped=scroll.getViewport().getViewPosition();for(int i=0;i<6;i++)tick.invoke(p);
+                assertEquals(stopped,scroll.getViewport().getViewPosition());assertNull(area.getClientProperty("shed.agentIntent"));
+                assertEquals(source,area.getText());assertEquals(2,area.getSelectionStart());assertEquals(6,area.getSelectionEnd());assertFalse(undo.canUndo());
+            }catch(ReflectiveOperationException|javax.swing.text.BadLocationException e){throw new AssertionError(e);}
+            return null;
         });
     }
 }

@@ -438,7 +438,9 @@ final class EditorUiController {
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
                 paintExplorerFileDropPreview(g, this);
+                AgentSourceHandoff.paint(this,g);
                 AgentChangePlayback.paint(this,g);
+                AgentEditPresentation.paintPlaybackBadge(this,g);
                 editorPainted(this, paintStartedAt);
             }
         };
@@ -492,6 +494,7 @@ final class EditorUiController {
         final EditorPane[] paneRef = new EditorPane[1];
         final int[] previousCaretLine = {-1};
         textArea.addCaretListener(e -> {
+            if (editor.suppressDocumentEvents) return;
             if (paneRef[0] != null && paneRef[0] != getActivePane()) {
                 activateEditorPane(paneRef[0]);
             }

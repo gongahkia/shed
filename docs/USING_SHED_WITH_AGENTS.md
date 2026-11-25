@@ -52,7 +52,7 @@ Authentication protects the attachment against clients without its key and binds
 
 ## Named activity and cancellation
 
-For search matches, navigation, edit targets, moves, symbol renames, formatting, reverts, check results and conflicts in the actual source buffer, see [agent buffer intentions](AGENT_BUFFER_INTENTS.md). All harnesses use the same `shed ctl intent` contract; filesystem watching alone cannot infer these semantics.
+For search matches, examining/navigation targets, check results and conflicts in the actual source buffer, see [agent buffer intentions](AGENT_BUFFER_INTENTS.md). All harnesses use the same `shed ctl intent` contract for these signals. Moves, symbol renames, formatting and agent-driven reverts use ordinary observed edits with the existing deletion/creation animations.
 
 ```sh
 shed ctl progress --session-id turn-1 --agent Codex --phase thinking --completed 1 --total 3 --start 100 --end 150
@@ -107,3 +107,5 @@ Capture reads only the current source's existing, showing, revision-current prev
 ## Visualize ordinary CLI edits
 
 For a CLI agent that already edits files directly, use `shed visualize .`. The watcher works with any agent or tool writing project files; an optional `--agent "Display name"` only labels the presentation. It opens a normal editor window with background watching and returns; ordinary filesystem changes appear in Agents → Live changes without being converted to proposals. See [the live visualization guide](LIVE_AGENT_VISUALIZATION.md) for baselines, follow/pause, controls and limits.
+
+For output-producing tool commands in the normal terminal, see [agent terminal commands](AGENT_TERMINAL.md). They require the explicit terminal-enabled attachment and per-request approval.

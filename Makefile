@@ -26,7 +26,7 @@ run: $(JAR)
 demo: $(JAR)
 	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
 	 output="$$(pwd -P)/target/agent-demo-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
-	 printf 'Starting the disposable live animation demo. Watch the Shed window.\nResults: %s\n' "$$output"; \
+	 printf 'Starting the disposable live agent demo: changes, navigation, checks and conflicts. Watch the Shed window.\nResults: %s\n' "$$output"; \
 	 python3 scripts/test-agent-desktop.py --jdk "$$java_home" --jar "$(abspath $(JAR))" \
 	   --output "$$output" --git-fixture --visual-only --animation-demo
 
@@ -58,7 +58,7 @@ clean:
 help:
 	@printf '%s\n' 'make build              package Shed without tests'
 	@printf '%s\n' 'make run [path ...]     rebuild if needed, then launch files or folders (make run . opens this folder)'
-	@printf '%s\n' 'make demo               run the disposable live agent animation demo; reports in target/agent-demo-*'
+	@printf '%s\n' 'make demo               show agent changes and buffer intentions; reports in target/agent-demo-*'
 	@printf '%s\n' 'make profile-startup    print local startup phase timings, then keep Shed open'
 	@printf '%s\n' 'make install            install the shed launcher and JAR under ~/.local'
 	@printf '%s\n' 'make uninstall          remove the locally installed shed launcher and JAR'

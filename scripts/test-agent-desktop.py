@@ -95,7 +95,7 @@ def main():
     parser.add_argument('--visual-only', action='store_true', help='Qualify live external-edit visualization separately from the existing HTML-preview endpoint')
     parser.add_argument('--git-fixture', action='store_true', help='Direct fixed /usr/bin/git in a disposable repository, no shell or personal config')
     parser.add_argument('--launch-only', action='store_true', help='Fixed direct Java launch-and-return acceptance; no shell')
-    parser.add_argument('--animation-demo', action='store_true', help='Paced source-only typing, block deletion/rewrite and directional reading demonstration')
+    parser.add_argument('--animation-demo', action='store_true', help='Paced source changes, reading, search/navigation, refactoring intentions, checks and conflicts')
     parser.add_argument('--replay-payload', type=Path, help='Replay a bounded previously generated proposal through the same external CLI')
     args = parser.parse_args()
     if args.animation_demo and (not args.git_fixture or not args.visual_only or args.launch_only or args.qualification or args.replay_payload or args.live_codex or args.motion):parser.error('Animation demo requires only disposable Git and visual-only execution')

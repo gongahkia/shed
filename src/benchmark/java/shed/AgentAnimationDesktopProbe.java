@@ -12,6 +12,8 @@ public class AgentAnimationDesktopProbe {
     static final Set<String> modes=new LinkedHashSet<>();
     static final List<Double> typingMs=new ArrayList<>();
     static final Set<String> directions=new LinkedHashSet<>();
+    static final Set<String> intents=new LinkedHashSet<>();
+    static final List<Double> intentMs=new ArrayList<>();
     static int readingFrames;
     static String descriptor;
     static <T>T ui(Callable<T> action)throws Exception{var task=new FutureTask<T>(action);SwingUtilities.invokeAndWait(task);return task.get(5,TimeUnit.SECONDS);}
@@ -53,6 +55,44 @@ public class AgentAnimationDesktopProbe {
         if(p95>16)throw new AssertionError("Typing paint p95 exceeds 16 ms: "+p95);
         System.out.println("TYPING_PAINT first_ms="+typingMs.getFirst()+" warm_p95_ms="+p95);
     }
+    static void intent(String kind,String status,int focus,String agent,AgentEditPresentation.Range...ranges)throws Exception{
+        var buffer=ui(editor::getCurrentBuffer);String source=ui(buffer::getContent);long revision=ui(buffer::documentRevision);boolean dirty=ui(buffer::isModified),undo=ui(()->buffer.getUndoManager().canUndo());int dot=ui(()->editor.writingArea.getCaret().getDot()),mark=ui(()->editor.writingArea.getCaret().getMark());
+        String pairs=Arrays.stream(ranges).map(r->r.start()+":"+r.end()).collect(java.util.stream.Collectors.joining(","));
+        long started=System.nanoTime();var response=cli("intent","--kind",kind,"--status",status,"--ranges",pairs,"--focus",Integer.toString(focus),"--agent",agent,"--document",ui(()->editor.captureEditorMetadata().documentId()),"--revision",Long.toString(revision));intentMs.add((System.nanoTime()-started)/1e6);
+        if(!"shown".equals(response.get("outcome")))throw new AssertionError("Intent not acknowledged");Thread.sleep(400);
+        ui(()->{var area=editor.writingArea;
+            if(!kind.equals(area.getClientProperty("shed.agentIntent"))||!status.equals(area.getClientProperty("shed.agentIntentStatus")))throw new AssertionError("Intent not visible: "+kind);
+            if(buffer!=editor.getCurrentBuffer()||!source.equals(buffer.getContent())||revision!=buffer.documentRevision()||dirty!=buffer.isModified()||undo!=buffer.getUndoManager().canUndo()||dot!=area.getCaret().getDot()||mark!=area.getCaret().getMark())throw new AssertionError("Intent changed source or human state");
+            var bounds=area.modelToView2D(ranges[focus].start());if(bounds==null||!area.getVisibleRect().intersects(bounds))throw new AssertionError("Intent target not revealed: "+kind);
+            return null;});
+        intents.add(kind);picture("intent-"+kind+"-"+status+"-"+focus);stage("INTENT: "+agent+" · "+kind+" · "+status,1200);
+    }
+    static AgentEditPresentation.Range span(String source,String word){int start=source.indexOf(word);if(start<0)throw new AssertionError("Intent fixture missing "+word);return new AgentEditPresentation.Range(start,start+word.length());}
+    static boolean compileExample(String source)throws Exception{
+        var compiler=javax.tools.ToolProvider.getSystemJavaCompiler();var diagnostics=new javax.tools.DiagnosticCollector<javax.tools.JavaFileObject>();
+        var file=new javax.tools.SimpleJavaFileObject(java.net.URI.create("string:///Demo.java"),javax.tools.JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignored){return source;}};
+        try(var manager=compiler.getStandardFileManager(diagnostics,null,java.nio.charset.StandardCharsets.UTF_8)){
+            return compiler.getTask(null,manager,diagnostics,List.of("-proc:none","-d",output.toString()),null,List.of(file)).call();
+        }
+    }
+    static void intentDemo()throws Exception{
+        cli("open","Demo.java");ui(()->{editor.toolWindowHost.watchAgentChanges("pause","Demo agent");return null;});
+        String original=Files.readString(project.resolve("Demo.java"));var top=span(original,"demonstration checkpoint 010");var middle=span(original,"demonstration checkpoint 150");var greet=span(original,"greet");var method=span(original,"placeholder1");
+        intent("search","active",1,"Codex",top,middle,greet);intent("navigate","active",0,"Claude Code",greet);intent("target","active",0,"OpenCode",method);
+        intent("move","active",0,"Local agent",top,new AgentEditPresentation.Range(greet.start(),greet.start()));intent("move","active",1,"Local agent",top,new AgentEditPresentation.Range(greet.start(),greet.start()));
+        var names=new ArrayList<AgentEditPresentation.Range>();for(int at=0;(at=original.indexOf("name",at))>=0;at+=4)names.add(new AgentEditPresentation.Range(at,at+4));
+        intent("rename","active",0,"Any harness",names.toArray(AgentEditPresentation.Range[]::new));
+        intent("format","active",0,"Local agent",new AgentEditPresentation.Range(method.start(),original.lastIndexOf('}')));
+        String formatted=original.replace("public static void placeholder1() {}","public static void placeholder1() {\n    }");Files.writeString(project.resolve("Demo.java"),formatted);await(()->editor.getCurrentBuffer().getContent().equals(formatted));
+        intent("undo","active",0,"Local agent",span(formatted,"placeholder1"));Files.writeString(project.resolve("Demo.java"),original);await(()->editor.getCurrentBuffer().getContent().equals(original));
+        intent("verify","checking",0,"Local compiler",greet);if(!compileExample(original))throw new AssertionError("Valid source did not compile");intent("verify","passed",0,"Local compiler",greet);
+        if(compileExample("public class Demo { invalid syntax }"))throw new AssertionError("Invalid compiler control unexpectedly passed");intent("verify","failed",0,"Invalid fixture check",greet);
+        // simulate a newer human draft, then report the conflict without overwriting it
+        ui(()->{editor.writingArea.setCaretPosition(0);editor.writingArea.replaceSelection("// human draft retained\n");return null;});
+        intent("conflict","active",0,"Local agent",new AgentEditPresentation.Range(0,23));
+        ui(()->{editor.getCurrentBuffer().getUndoManager().undo();if(!original.equals(editor.getCurrentBuffer().getContent()))throw new AssertionError("Human draft Undo changed source");editor.getCurrentBuffer().load(editor.configManager);editor.loadBufferIntoEditor(editor.getCurrentBuffer());return null;});
+        if(!intents.containsAll(AgentBufferIntent.KINDS))throw new AssertionError("Missing intent visuals: "+intents);
+    }
     public static void main(String[] args)throws Exception{
         output=Path.of(args[0]).toRealPath();project=Path.of(args[1]).toRealPath();Path fixture=Path.of(System.getenv("SHED_PORTABLE_FIXTURE_ROOT")).toRealPath();
         if(!output.startsWith(fixture.resolve("run"))||!project.startsWith(fixture.resolve("run"))||!Path.of(System.getProperty("user.home")).toRealPath().startsWith(fixture))throw new IllegalArgumentException("Disposable fixture required");
@@ -82,10 +122,10 @@ public class AgentAnimationDesktopProbe {
             read("Notes.txt",0);Files.writeString(project.resolve("Notes.txt"),"Demo notes\n- Greeting handles blank names\n- Five placeholder methods added\n- Helpers.java created\n");stage("MODIFY: Notes.txt",3500);
             read("RenameMe.txt",0);Files.move(project.resolve("RenameMe.txt"),project.resolve("Renamed.txt"));stage("RENAME: RenameMe.txt to Renamed.txt",4000);
             read("DeleteMe.txt",0);Files.delete(project.resolve("DeleteMe.txt"));stage("DELETE: DeleteMe.txt — watch the Explorer badge",4000);
-            measureTyping();ui(()->{editor.toolWindowHost.showTab(ToolWindowHost.Tab.GIT);return null;});stage("GIT: live status and diffs — leaving this visible for 20 seconds",20000);
+            intentDemo();measureTyping();ui(()->{editor.toolWindowHost.showTab(ToolWindowHost.Tab.GIT);return null;});stage("GIT: live status and diffs — leaving this visible for 20 seconds",20000);
             if(!modes.containsAll(Set.of("typing","chunks","deleting")))throw new AssertionError("Missing animation modes: "+modes);
             if(!directions.containsAll(Set.of("left-to-right","right-to-left","top-to-bottom")))throw new AssertionError("Missing motion directions: "+directions);
-            Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("state","PASS","modes",modes.stream().toList(),"directions",directions.stream().toList(),"source_unchanged_by_animation",true,"typing_paint_ms",typingMs,"scope","direct Java/Swing, real authenticated CLI, disposable filesystem writes; no actual model")));
+            Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("state","PASS","modes",modes.stream().toList(),"directions",directions.stream().toList(),"intents",intents.stream().toList(),"intent_client_ms",intentMs,"source_unchanged_by_animation",true,"typing_paint_ms",typingMs,"scope","direct Java/Swing, real authenticated CLI, disposable filesystem writes; no actual model")));
             System.out.println("DEMO_PASS: reads, edits, creation, modification, rename, deletion and Git presentation");
         }finally{if(editor!=null)ui(()->{editor.dispatchEvent(new java.awt.event.WindowEvent(editor,java.awt.event.WindowEvent.WINDOW_CLOSING));return null;});}
         System.exit(0);

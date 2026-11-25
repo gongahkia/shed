@@ -52,6 +52,8 @@ Authentication protects the attachment against clients without its key and binds
 
 ## Named activity and cancellation
 
+For search matches, navigation, edit targets, moves, symbol renames, formatting, reverts, check results and conflicts in the actual source buffer, see [agent buffer intentions](AGENT_BUFFER_INTENTS.md). All harnesses use the same `shed ctl intent` contract; filesystem watching alone cannot infer these semantics.
+
 ```sh
 shed ctl progress --session-id turn-1 --agent Codex --phase thinking --completed 1 --total 3 --start 100 --end 150
 shed ctl activity-state

@@ -1,0 +1,65 @@
+{
+  "boundary": "source-reviewed non-native tests, not general process confinement",
+  "tests": [
+    "AgentBufferIntentTest",
+    "AgentEditPresentationTest",
+    "ShedControlCliTest",
+    "EditorControlTest"
+  ],
+  "fixture": "/private/tmp/shed-native-3bbk990y",
+  "native_benchmarks": "BLOCKED",
+  "phase": "test",
+  "dependency_copy": {
+    "entries": 1808,
+    "bytes": 98080024
+  },
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-3bbk990y/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-3bbk990y/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-3bbk990y/run/config",
+    "-Djava.awt.headless=true",
+    "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed",
+    "-cp",
+    "/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/boot/plexus-classworlds-2.9.0.jar",
+    "org.codehaus.plexus.classworlds.launcher.Launcher",
+    "-B",
+    "-o",
+    "-s",
+    "/private/tmp/shed-native-3bbk990y/run/config/settings.xml",
+    "-gs",
+    "/private/tmp/shed-native-3bbk990y/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-3bbk990y/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-3bbk990y/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-3bbk990y/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-3bbk990y/run/config",
+    "-Djava.awt.headless=true",
+    "-DforkCount=0",
+    "-Dtest=AgentBufferIntentTest,AgentEditPresentationTest,ShedControlCliTest,EditorControlTest",
+    "test"
+  ],
+  "exit": 0,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 27 resources from assets to target/classes/assets\n[INFO] Copying 2 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Nothing to compile - all classes are up to date.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 320 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.ShedControlCliTest\n[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.844 s -- in shed.ShedControlCliTest\n[INFO] Running shed.EditorControlTest\n[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.183 s -- in shed.EditorControlTest\n[INFO] Running shed.AgentBufferIntentTest\n[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.212 s -- in shed.AgentBufferIntentTest\n[INFO] Running shed.AgentEditPresentationTest\n[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in shed.AgentEditPresentationTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 30, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  10.000 s\n[INFO] Finished at: 2026-11-25T07:43:29Z\n[INFO] ------------------------------------------------------------------------\n",
+  "elapsed_s": 13.791040458003408,
+  "fixture_removed": true,
+  "metrics": [
+    {
+      "operation": "creation",
+      "ns": 5070375
+    },
+    {
+      "operation": "guard",
+      "ns": 485375
+    },
+    {
+      "operation": "guard",
+      "ns": 867833
+    },
+    {
+      "operation": "cleanup",
+      "ns": 368181667
+    }
+  ]
+}

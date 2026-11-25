@@ -1,0 +1,45 @@
+{
+  "recorded_at_utc": "2026-11-25T07:52:11.721178+00:00",
+  "starting_head": "ef6195de1c7e6b08e402c788e36b5a18ddf095b7",
+  "implementation_commit": "208d5b0834f8890aa046be0621324b5a6abbb453",
+  "demo_commit": "7d500630cdd506d9636c96038aa1b8f5fb750085",
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "cpu": "Apple M3",
+    "memory_bytes": 17179869184,
+    "jdk": "21.0.13.1+2",
+    "maven": "3.9.11"
+  },
+  "hashes": {
+    "Makefile": "2ba9becc73339f58751e6d7985515c4c6ee789098d656b24e850d88745f210f1",
+    "scripts/test-agent-desktop.py": "738907d4734e911ab7398a6adc206d0850c0a7fcac537eb508f99cd30eb976c1",
+    "scripts/test_native_fixture.py": "39d1d202e43397ab0275a09662a679db37fbafd0acb8df203bcf791ea33643bd",
+    "src/benchmark/java/shed/AgentAnimationDesktopProbe.java": "5d0ec54df506a9e19a2c8260e2f8e2176f328f41b41ae3e69d90fb5e75c28ca1",
+    "src/main/java/shed/AgentBufferIntent.java": "bd9fd1f01461864af1623e327a6508941159c41a315bed2e5e601d1dac6d36e6",
+    "src/main/java/shed/AgentEditPresentation.java": "19714f661d5394c1d642b6ed1f5263f2eb86dc2475c6a52b2262f5fa6931ad44",
+    "src/main/java/shed/AgentWorkspaceController.java": "718da6e943184253a40e33234944cd84fd1b5ec8d80480339d94a0f54b49e7a2",
+    "src/main/java/shed/EditorControl.java": "78f47ae1a7f18747989fb60552251e84c3ecb7a886175f52e28a2638bee1f4e6",
+    "src/main/java/shed/ShedControlCli.java": "1f1d9909a3e1e119c2d62ec122cc56b3df14f8e7aa4b7050de697e5163c384b9",
+    "src/main/java/shed/WorkspaceStatusProtocol.java": "703c4e6da8cd9b26494f50870e930cdac0de2b48079c6b24b5ab757ee146c00c",
+    "src/test/java/shed/AgentBufferIntentTest.java": "e8b36ccad40b1dce3ed704ef210767c0dd071de3949594d3a2f0cdf10f2b9eca",
+    "src/test/resources/shed/portable-fixture-tests.properties": "118c743dac98981403dc116b9cf04aa2f472a60c239e08d189e07e608cac21f8",
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "target/shed-2.0.0.jar": "4664ae5e8ecd6a29c1a7c3f4cdd0e5672f3e3990d8d9815212cc7d0271f61023"
+  },
+  "captures": {
+    "intent-format-active-0.png": "68bf3e023a634f6b202524eda9cb4ce67eda20a535eb38e64d40b933f0427b7f",
+    "intent-search-active-1.png": "bc4b1f4f691284a981b23caf4c607e947178c184a34c01c4c4eb2bcd0d2c2a3f",
+    "intent-navigate-active-0.png": "2415d33e4bb62428a23c72528c89b2b6d00b3c2fe1c4ec7bfcfb316de2c1e7cb",
+    "intent-undo-active-0.png": "d66053b8d5e9dc2408fb599a7abf57dae31e8ec2b1494824249c5a04276b7020",
+    "intent-verify-passed-0.png": "0b54f777a27fce2868442905b28c0d121b09625ef9f93387cd2ecc166d50abec",
+    "intent-move-active-0.png": "0f0c535b716524625b270278985036754229c8496a7d3829c3109b7b171d2014",
+    "intent-verify-checking-0.png": "88b129ab9e87b33e70dffa4ce53b43f9296457242bc8847a2c694cfe686665c4",
+    "intent-move-active-1.png": "990e44c0b9a39c0df1d20813fb8cd442255b498b72b2c67c62e55f122c21bba8",
+    "intent-rename-active-0.png": "bc3b248ee1483c4430d5c06e632fad3b1241aac95a4f5f71dcb6b3f1fa557929",
+    "intent-conflict-active-0.png": "7cca47d2316b84cc5c60e791771ab8bc01d1b1b840e5ae7e5e8c2671feef6412",
+    "intent-verify-failed-0.png": "28608ae39c8233faf1d7ca0c7b1faa942940fc89862ef0fe57ebdc08e0666d78",
+    "intent-target-active-0.png": "d26be672666c29b5966ca3851c87486640f8dc02af2015c5b221514a4043328e"
+  },
+  "note": "Host recorded after measurements; no cold-cache, system-load or native-memory equivalence claim. Original untracked Created.txt preserved without inspection."
+}

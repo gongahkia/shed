@@ -1,0 +1,46 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "087b232bf31e02fceb8da5093ddf9ea40b0e3148c1bd1ec4f8e78e558da2084c",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-2jitxo29",
+  "probe_sha256": "4e58ffc1013fa0996731e4aa481e5b45e5c5044707d2acc199c2fb5ba8f6f098",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-2jitxo29/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-2jitxo29/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-2jitxo29/run/config",
+    "-cp",
+    "/private/tmp/shed-native-2jitxo29/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.ShedVisualizeLaunchProbe",
+    "/private/tmp/shed-native-2jitxo29/run/live",
+    "/private/tmp/shed-native-2jitxo29/run/project"
+  ],
+  "pid": 97342,
+  "exit": 0,
+  "log": "",
+  "result": {
+    "state": "PASS",
+    "native_shell": "NOT_USED",
+    "events": [
+      {
+        "opaque_asset_bytes": 41943040,
+        "ready": true,
+        "phase": "launch_and_authenticated_watch_without_open_source",
+        "elapsed_ms": 2160.790041
+      },
+      {
+        "elapsed_ms": 2474.554791,
+        "code": "WATCH_START_FAILED",
+        "phase": "text_budget_failure_reported_promptly"
+      }
+    ]
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 5.745655333998002
+}

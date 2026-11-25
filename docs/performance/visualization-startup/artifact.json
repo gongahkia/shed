@@ -1,0 +1,7 @@
+{
+  "jar": "target/shed-2.0.0.jar",
+  "sha256": "087b232bf31e02fceb8da5093ddf9ea40b0e3148c1bd1ec4f8e78e558da2084c",
+  "starting_head": "fef08bd38e1e6a0795a7b1d697404126106cdea6",
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e"
+}

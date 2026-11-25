@@ -1,0 +1,7 @@
+{
+  "exit": 0,
+  "stdout": "BASELINE_OK files=2583 opaque_assets=1018\nelapsed_ms=351.112625\n",
+  "probe": "package shed; public final class WatchSnapshotProbe {public static void main(String[] args)throws Exception {long start=System.nanoTime();var files=ExternalChangeSnapshot.capture(java.nio.file.Path.of(args[0]));long opaque=files.values().stream().filter(file->file.digest().startsWith(\"opaque:\")).count();System.out.println(\"BASELINE_OK files=\"+files.size()+\" opaque_assets=\"+opaque);System.out.println(\"elapsed_ms=\"+(System.nanoTime()-start)/1e6);}}",
+  "boundary": "read-only repository snapshot, disposable Java home/temp; no desktop, shell or source writes",
+  "fixture_removed": true
+}

@@ -20,7 +20,10 @@ class LiveAgentToolingTest(unittest.TestCase):
             output = Path(temporary) / 'output'
             for flags in [['--live-codex', '/missing/codex'],
                           ['--qualification', '--replay-payload', '/missing/payload'],
-                          ['--launch-only', '--qualification'], ['--motion']]:
+                          ['--launch-only', '--qualification'], ['--motion'],
+                          ['--animation-demo'], ['--animation-demo', '--git-fixture'],
+                          ['--animation-demo', '--git-fixture', '--visual-only', '--qualification'],
+                          ['--animation-demo', '--git-fixture', '--visual-only', '--live-codex', '/missing/codex']]:
                 result = subprocess.run([sys.executable, str(ROOT / 'scripts/test-agent-desktop.py'),
                                          '--jdk', '/missing/jdk', '--jar', '/missing/jar', '--output', str(output), *flags],
                                         stdin=subprocess.DEVNULL, capture_output=True, timeout=5)

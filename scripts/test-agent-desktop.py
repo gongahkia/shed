@@ -95,8 +95,10 @@ def main():
     parser.add_argument('--visual-only', action='store_true', help='Qualify live external-edit visualization separately from the existing HTML-preview endpoint')
     parser.add_argument('--git-fixture', action='store_true', help='Direct fixed /usr/bin/git in a disposable repository, no shell or personal config')
     parser.add_argument('--launch-only', action='store_true', help='Fixed direct Java launch-and-return acceptance; no shell')
+    parser.add_argument('--animation-demo', action='store_true', help='Paced source-only typing, block deletion/rewrite and directional reading demonstration')
     parser.add_argument('--replay-payload', type=Path, help='Replay a bounded previously generated proposal through the same external CLI')
     args = parser.parse_args()
+    if args.animation_demo and (not args.git_fixture or not args.visual_only or args.launch_only or args.qualification or args.replay_payload or args.live_codex or args.motion):parser.error('Animation demo requires only disposable Git and visual-only execution')
     if args.launch_only and (args.replay_payload or args.qualification or args.live_codex or args.git_fixture): parser.error("Launch-only cannot run editing fixtures")
     if args.qualification and (args.replay_payload or not args.visual_only or not args.git_fixture): parser.error('Watch qualification requires visual-only and disposable Git, independently of proposal replay')
     if args.motion and not args.qualification: parser.error('Motion qualification requires the bounded desktop fixture')
@@ -128,6 +130,11 @@ def main():
         (project / 'AgentOld.txt').write_text('original agent rename fixture\n')
         (project / 'AgentDelete.txt').write_text('agent delete fixture\n')
         (project / 'Demo.java').write_text('public class Demo {\n    public static String greet(String name) {\n        return "Hello, " + name;\n    }\n}\n')
+        if args.animation_demo:
+            markers={5:'CHANGE_TOP',60:'REMOVE_START',89:'REMOVE_END',100:'REWRITE_START',120:'CHANGE_MIDDLE',139:'REWRITE_END',230:'CHANGE_BOTTOM'}
+            source='public class Demo {\n'+''.join('// '+markers[i]+'\n' if i in markers else f'// demonstration checkpoint {i:03d}\n' for i in range(240))+'    public static String greet(String name) {\n        return "Hello, " + name;\n    }\n}\n'
+            (project/'Demo.java').write_text(source)
+            for name,text in {'Notes.txt':'Demo notes\n- Improve greeting\n- Add helper methods\n','RenameMe.txt':'Keep this content when renaming.\n','DeleteMe.txt':'This disposable file will be deleted.\n'}.items():(project/name).write_text(text)
         (f.run_root / 'no-executables').mkdir(mode=0o700)
         env = dict(f.env, PATH=str(f.run_root / 'no-executables'), SHED_PORTABLE_FIXTURE_ROOT=str(f.root))
         if args.git_fixture:
@@ -137,7 +144,8 @@ def main():
             (f.run_root / 'empty-hooks').mkdir(mode=0o700)
             (f.run_root / 'empty-git-config').write_text('')
             env.update(git_environment(f))
-            for arguments in [['init','--quiet'], ['add','--','Welcome.txt','Demo.java','AgentOld.txt','AgentDelete.txt'], ['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Fixture baseline']]:
+            tracked=['Welcome.txt','Demo.java','AgentOld.txt','AgentDelete.txt']+(['Notes.txt','RenameMe.txt','DeleteMe.txt'] if args.animation_demo else [])
+            for arguments in [['init','--quiet'], ['add','--',*tracked], ['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--quiet','-m','Fixture baseline']]:
                 completed=subprocess.run([str(git),*arguments],cwd=project,env=env,stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=10)
                 if completed.returncode: raise UnsafeFixture('Disposable Git setup failed: '+completed.stderr[:1000])
             report['git_fixture']='fixed system git; empty owned config/hooks; terminal prompts and signing disabled'
@@ -147,9 +155,11 @@ def main():
         if args.motion: env['SHED_CONFIG_MOTION']='1'
         props = ['-Duser.home=' + env['HOME'], '-Djava.io.tmpdir=' + env['TMPDIR'],
                  '-Djava.util.prefs.userRoot=' + str(f.run_root / 'config')]
-        report['probe_sha256']=hashlib.sha256((ROOT / ('src/benchmark/java/shed/ShedVisualizeLaunchProbe.java' if args.launch_only else 'src/benchmark/java/shed/AgentWorkflowDesktopProbe.java')).read_bytes()).hexdigest()
+        probe='ShedVisualizeLaunchProbe' if args.launch_only else 'AgentAnimationDesktopProbe' if args.animation_demo else 'AgentWorkflowDesktopProbe'
+        probe_source=ROOT/'src/benchmark/java/shed'/f'{probe}.java'
+        report['probe_sha256']=hashlib.sha256(probe_source.read_bytes()).hexdigest()
         compile_command = [str(jdk / 'bin/javac'), *['-J' + p for p in props], '-proc:none', '-encoding', 'UTF-8',
-                           '-cp', str(jar), '-d', str(classes), str(ROOT / ('src/benchmark/java/shed/ShedVisualizeLaunchProbe.java' if args.launch_only else 'src/benchmark/java/shed/AgentWorkflowDesktopProbe.java'))]
+                           '-cp', str(jar), '-d', str(classes), str(probe_source)]
         compiled = subprocess.run(compile_command, env=env, cwd=f.run_root, stdin=subprocess.DEVNULL,
                                   capture_output=True, text=True, timeout=30)
         report.update(compile_exit=compiled.returncode, compile_output=compiled.stdout + compiled.stderr)
@@ -160,7 +170,7 @@ def main():
                                        'java': str(jdk / 'bin/java'), 'environment': env}))
         session.chmod(0o600)
         command = [str(jdk / 'bin/java'), '-Djava.awt.headless=false', *props, '-cp', str(classes) + ':' + str(jar),
-                   'shed.ShedVisualizeLaunchProbe' if args.launch_only else 'shed.AgentWorkflowDesktopProbe', str(work), str(project)]
+                   f'shed.{probe}', str(work), str(project)]
         report['command'] = command
         with (work / 'stdout.log').open('w') as log:
             process = subprocess.Popen(command, env=env, cwd=project, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)

@@ -22,7 +22,7 @@ shed ctl replace --document DOCUMENT_ID --revision REVISION \
   --text-file /tmp/desired-small-file.txt
 ```
 
-`--text-file -` reads bounded UTF-8 from stdin. A chunk is limited to 8,192 UTF-16 units. `replace` means the entire currently observed small document; use it only when you have read the complete source. `--request-id` supports deliberate retry identification; do not retry an uncertain mutation blindly. Invalid/stale context fails rather than retargeting another buffer. There is no CLI Apply, Save, arbitrary process execution, or automatic acceptance. The human reviews the existing Agents panel, chooses hunks, and presses Apply. Text changes become dirty editor contents; saving remains a separate human action.
+`--text-file -` reads bounded UTF-8 from stdin. A chunk is limited to 8,192 UTF-16 units. `replace` means the entire currently observed small document; use it only when you have read the complete source. `--request-id` supports deliberate retry identification; do not retry an uncertain mutation blindly. Invalid/stale context fails rather than retargeting another buffer. There is no CLI Apply, Save, arbitrary process execution, or automatic acceptance. The human explicitly opens `:agent proposals`, chooses hunks, and presses Apply. Incoming proposals do not open the review panel automatically. Text changes become dirty editor contents; saving remains a separate human action.
 
 You can show a transient distinct agent marker and pulsing source range with:
 
@@ -92,4 +92,4 @@ Capture reads only the current source's existing, showing, revision-current prev
 
 ## Visualize ordinary CLI edits
 
-For a CLI agent that already edits files directly, use `shed visualize .`. The watcher works with any agent or tool writing project files; an optional `--agent "Display name"` only labels the presentation. It opens a watching Shed window and returns; ordinary filesystem changes appear in Agents → Live changes without being converted to proposals. See [the live visualization guide](LIVE_AGENT_VISUALIZATION.md) for baselines, follow/pause, controls and limits.
+For a CLI agent that already edits files directly, use `shed visualize .`. The watcher works with any agent or tool writing project files; an optional `--agent "Display name"` only labels the presentation. It opens a normal editor window with background watching and returns; ordinary filesystem changes appear in Agents → Live changes without being converted to proposals. See [the live visualization guide](LIVE_AGENT_VISUALIZATION.md) for baselines, follow/pause, controls and limits.

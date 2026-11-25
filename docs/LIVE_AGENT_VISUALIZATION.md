@@ -4,7 +4,7 @@ Tell your CLI agent:
 
 > Use Shed to visualize this project's changes. Run `shed visualize .` once, then continue editing files normally. Leave Shed open for me. Do not turn the filesystem edits into review proposals just to visualize them.
 
-The launcher opens a new Shed window, captures a watch baseline, starts its explicitly authorized local attachment, prints JSON with `ready`, `descriptor`, `credential`, `pid`, `project` and `agent`, and returns. It does not run or connect to any particular agent or model. The human can keep using the CLI, and Shed watches ordinary filesystem writes.
+The launcher opens a normal Shed editor window with agent management panels hidden, captures a watch baseline, starts its explicitly authorized local attachment, prints JSON with `ready`, `descriptor`, `credential`, `pid`, `project` and `agent`, and returns. It does not run or connect to any particular agent or model. The human can keep using the CLI, and Shed watches ordinary filesystem writes.
 
 ```sh
 shed visualize .
@@ -25,11 +25,13 @@ shed ctl watch-stop
 shed ctl watch
 ```
 
+Watch commands and incoming proposals do not open or switch the tool dock. Use `:agent changes` to explicitly open the retained Live changes controls, `:agent proposals` for reviewed proposals, or `:agent` / Tools → Agents for the optional built-in assistant. Agent tool panels are not restored visibly on a fresh launch merely because they were open last time. Existing focus-mode restoration within a session still preserves panels you explicitly opened.
+
 For a window already using an explicitly enabled control attachment, `shed ctl watch` starts watching that window's active project. Inside Shed, `:agent watch` or the play icon in Agents → Live changes starts a watch without launching any coding agent; the square icon stops it. `:agent watch stop` also stops it. Launching again creates another window; there is no implicit choice among existing instances.
 
 ## What appears
 
-Agents → Live changes contains a persistent file list and a unified diff. `A`, `M`, `D` and `R` identify added, modified, deleted and observed renamed/moved files. `R?` explicitly identifies a possible move inferred from similar text. A folder move summary groups at least two observed file moves; it does not claim an atomic directory operation. The list shows counts when its snapshot provides exact textual counts. Added and deleted lines use existing theme success/error colors; changed words in adjacent removed/added line pairs receive emphasis. Previous/next arrows move between diff hunks. Enter or double-click opens a surviving file. Deleted contents remain readable in the diff.
+The normal editor shows the followed source file, change marker and animated viewport tour directly. Explorer badges and the existing Git view remain available without opening agent controls. If explicitly opened, Agents → Live changes contains the retained file list and unified diff. `A`, `M`, `D` and `R` identify added, modified, deleted and observed renamed/moved files. `R?` explicitly identifies a possible move inferred from similar text. A folder move summary groups at least two observed file moves; it does not claim an atomic directory operation. The list shows counts when its snapshot provides exact textual counts. Added and deleted lines use existing theme success/error colors; changed words in adjacent removed/added line pairs receive emphasis. Previous/next arrows move between diff hunks. Enter or double-click opens a surviving file. Deleted contents remain readable in the diff.
 
 The baselines have different meanings:
 
@@ -77,3 +79,13 @@ The newest config/move/motion checks are recorded in [the motion evidence index]
 The launcher reports watch-baseline or attachment initialization failures as soon as they are known. A failed watch includes a bounded `error` string in `shed ctl watch-state`; the launcher reports `WATCH_START_FAILED` with that reason instead of waiting for the generic timeout. It still validates the owning child PID/project and never returns connection credentials in a failure response. Genuine stalled startup retains bounded timeouts.
 
 If source contents exceed the unchanged 32 MiB read budget or file/directory limits, choose a smaller project/folder. There is no silent partial baseline or automatic increase to the memory limits. Known binary assets remain visible through metadata-only observation rather than forcing an otherwise supported source project over the read limit. See [the startup correction evidence](performance/visualization-startup/INDEX.md).
+
+## Optional built-in agent connection
+
+The assistant's ACP dropdown is not a list of detected external CLI agents. It lists user-configured ACP-compatible programs from `agent.<id>.command` settings; OpenCode is the default preset. The selector now reflects all such configured programs. A normal Codex/Claude/OpenCode/local CLI workflow needs no connection or dropdown selection: edit project files and the watcher presents them. Configuring an arbitrary CLI command does not make it ACP-compatible. Connect is explicit, and review/approval requirements remain unchanged.
+
+## Smooth scrolling
+
+Standard Swing scroll panes share smooth wheel/trackpad motion, including source tabs/splits, Explorer, lists/pickers, Git/diff panes, settings/dialogs and supported previews. Shift-wheel scrolls horizontally; nested scroll panes hand off at their boundary. Manual navigation, view/document replacement, hiding or disposal cancels pending frames. Keyboard/caret reveals, scrollbar dragging and the agent's source tour retain their own immediate or dedicated behavior. Existing reduced-motion overrides disable interpolated wheel motion.
+
+Terminal grids keep JediTerm's own row/protocol scrolling; their terminal input is not intercepted by the Swing scroll-pane delegate. Native-shell execution remains unqualified, so terminal-grid smoothing was not added under this change. See [editor-first qualification](EDITOR_FIRST_AGENT_VISUALIZATION.md) for evidence and exclusions.

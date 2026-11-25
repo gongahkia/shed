@@ -1,0 +1,19 @@
+{
+  "implementation_head": "16ddc568d122e5472b62e850d7794f376ed74152",
+  "files": {
+    "scripts/test_native_fixture.py": "c8d6781b41a3a8b6916eca2e025958aad0686700212d9a4f3f2210abe94ba40f",
+    "src/benchmark/java/shed/AgentWorkflowDesktopProbe.java": "3b67e526a77988ecdd9119e092d6e3726366673f5a116ebe9d1f8592a373d92a",
+    "src/main/java/shed/AgentEditPresentation.java": "15c4f342d15e63b0bf1b47f858820ccf3c172b1dabc72e2a5acc200119fa905b",
+    "src/main/java/shed/AgentSessionPanel.java": "0f266c025c7e60e35c831afabbf4acca870adf2767ae6506d8f05549d4e2f9f4",
+    "src/main/java/shed/AgentWorkbenchPanel.java": "a11f820d6996d10d94c4f243bd81bb087fb6b7b1bb9b07867031fcfe068920d7",
+    "src/main/java/shed/AgentWorkspaceController.java": "542ba01f75ea80a6e993904dc16d9d806aab014bc01a3e99b3dd7e69e7088673",
+    "src/main/java/shed/ShedVisualize.java": "a05c1031dc2e1955674d298b7bbbc6cfa1bbe55d70057a8b2da957e2b8422bc2",
+    "src/main/java/shed/SmoothScrollPaneUI.java": "7a945dd12ad9805b50ac9eed09a3fd32f7d2caf71381ff41cf8e08b6e961f4aa",
+    "src/main/java/shed/ToolWindowHost.java": "03cc051621d407f889e383f683048e5a8cd64a5156ea2edfccb72fbbe7f2be0d",
+    "src/main/java/shed/WorkbenchStyle.java": "a1248b3e22874f27c0350587acf71eb311b1b258a02425f56aab8da3b0140c45",
+    "src/test/java/shed/AgentEditPresentationTest.java": "112c95b56e9ec0fd2fc75e07dc2bf05606159084953ddefb65870a825cf22368",
+    "src/test/java/shed/AgentReviewPanelTest.java": "25e04a2c51d2b42361ff2bcc0de2f43136d472bfbc778da7e4d231b07de19ece",
+    "src/test/java/shed/SmoothScrollPaneUITest.java": "a21e1b54f05caf18850f1d3a14f5536ab1cc94eecaef23ed98691b2d975128cb",
+    "src/test/resources/shed/portable-fixture-tests.properties": "1fa506d1a6ee57a552f44653968d02e76efeb4913c5d604d489702adc80da3ea"
+  }
+}

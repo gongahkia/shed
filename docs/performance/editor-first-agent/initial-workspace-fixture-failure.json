@@ -1,0 +1,33 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "65d100998f718b06914866e52dea4671de94f8a9fab0cd19240368324e5eedae",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-04nuskir",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "3ea021cb23510111ec4622d3decde06462f315689cba4000968ac3eca387ec81",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-04nuskir/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-04nuskir/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-04nuskir/run/config",
+    "-cp",
+    "/private/tmp/shed-native-04nuskir/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-04nuskir/run/live",
+    "/private/tmp/shed-native-04nuskir/run/project"
+  ],
+  "pid": 19952,
+  "exit": 1,
+  "log": "java.lang.IllegalStateException: Live acceptance phase timed out\n\tat shed.AgentWorkflowDesktopProbe.await(AgentWorkflowDesktopProbe.java:25)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEditorFirst(AgentWorkflowDesktopProbe.java:129)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:367)\n",
+  "result": {
+    "state": "FAIL",
+    "error": "java.lang.IllegalStateException: Live acceptance phase timed out",
+    "events": []
+  },
+  "fixture_removed": true,
+  "elapsed_s": 23.285307583002577
+}

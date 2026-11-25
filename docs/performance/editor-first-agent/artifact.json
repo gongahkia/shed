@@ -1,0 +1,8 @@
+{
+  "jar": "target/shed-2.0.0.jar",
+  "sha256": "b7b9f640bbf84f80a9fea597b5e6182cf94d81f377934d4c2652a3969165ffab",
+  "starting_head": "8ccd8bf032e5da6bb7d49111e58d32bbe73cb6c5",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e"
+}

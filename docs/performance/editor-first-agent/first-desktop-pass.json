@@ -1,0 +1,123 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "65d100998f718b06914866e52dea4671de94f8a9fab0cd19240368324e5eedae",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-8ggau9ml",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "77a69c43c7d6c0554b933f980cebf25d09f080d87e4e7df26ff269942eade207",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-8ggau9ml/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-8ggau9ml/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-8ggau9ml/run/config",
+    "-cp",
+    "/private/tmp/shed-native-8ggau9ml/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-8ggau9ml/run/live",
+    "/private/tmp/shed-native-8ggau9ml/run/project"
+  ],
+  "pid": 21310,
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "live_window": true,
+    "capture": "owned Swing root pane",
+    "state": "PASS",
+    "events": [
+      {
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "baseline_ms": 168.859167,
+        "phase": "5000_file_atomic_burst",
+        "converge_ms": 2637.249417,
+        "changes": 142
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 0.71075,
+        "first_ms": 2.33525,
+        "samples_ms": [
+          2.33525,
+          0.781667,
+          0.71075,
+          0.662542,
+          0.695375,
+          0.626,
+          0.430125,
+          0.401333,
+          0.435583,
+          0.422292,
+          0.407916,
+          0.475,
+          0.584875,
+          0.423792,
+          0.569292,
+          0.421042,
+          0.421375,
+          0.356,
+          0.453917,
+          0.344,
+          0.418708
+        ]
+      },
+      {
+        "phase": "same_file_conflict_view_both_save_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "human_edit_during_delayed_follow",
+        "exact": true
+      },
+      {
+        "phase": "light_dark_narrow_density_focus_three_splits",
+        "exact": true
+      },
+      {
+        "cycles": 24,
+        "exact": true,
+        "phase": "animation_cycles_and_real_expiration"
+      },
+      {
+        "phase": "custom_ui_editor_fonts_hit_testing",
+        "exact": true
+      },
+      {
+        "retained_watchers": 0,
+        "phase": "watch_start_stop_cycles",
+        "heap_after_diagnostic_gc": 17843136,
+        "cycles": 12,
+        "exact": true,
+        "heap_before": 80915672
+      },
+      {
+        "changes": 6,
+        "exact": true,
+        "phase": "safe_configs_moves_tree_badges"
+      },
+      {
+        "phase": "git_same_status_patch_refresh",
+        "exact": true
+      },
+      {
+        "phase": "observation_before_authoritative_reload",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "descendants": 0,
+        "phase": "save_and_attachment_cleanup"
+      }
+    ]
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 29.299238832998526
+}

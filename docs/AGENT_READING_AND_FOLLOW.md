@@ -18,7 +18,7 @@ export SHED_CONTROL=/private/session/status-ATTACHMENT.json
 shed ctl read src/App.java --offset 0 --limit 2048 --agent "My agent"
 ```
 
-The path form explicitly opens an authorized file, returns a bounded chunk of the actual source buffer and presents that chunk in the editor. Continue from the returned `nextOffset`. The pulse uses the existing theme warning color, a slower alpha cycle, an underline marker and a reading label, distinguishing it from the existing success-colored edit cursor. The status line identifies the file being read. Rendering never changes source, revision, Undo history or the human caret. Opening another file retains the normal tab/navigation behavior.
+The path form explicitly opens an authorized file, returns a bounded chunk of the actual source buffer and presents that chunk in the editor. Continue from the returned `nextOffset`. The pulse uses the existing theme warning color, a slower alpha cycle and top-to-bottom sweep, an underline marker and a reading label, distinguishing it from the existing success-colored edit cursor. The status line identifies the file being read. Rendering never changes source, revision, Undo history or the human caret. Opening another file retains the normal tab/navigation behavior.
 
 The animated indicator expires after approximately six seconds. Editing, replacing or hiding its source clears it. Reduced motion retains a static indication until replacement/cleanup with no running animation timer. The existing explicit `progress` reading phase uses the same treatment. Reading does not raise the application's OS window or expose the agent-management dock.
 

@@ -1,0 +1,7 @@
+{
+  "state": "PASS",
+  "exit": 0,
+  "elapsed_s": 73.11648408300243,
+  "log": "READY: watch the Shed window\nREAD: Demo.java at UTF-16 offset 0\nREAD: Demo.java at UTF-16 offset 2200\nREAD: Demo.java at UTF-16 offset 4400\nEDIT: three separated blocks and five new functions; follow the green cursor\nCREATE: Helpers.java\nREAD: Helpers.java at UTF-16 offset 0\nREAD: Notes.txt at UTF-16 offset 0\nMODIFY: Notes.txt\nREAD: RenameMe.txt at UTF-16 offset 0\nRENAME: RenameMe.txt to Renamed.txt\nREAD: DeleteMe.txt at UTF-16 offset 0\nDELETE: DeleteMe.txt \u2014 watch the Explorer badge\nGIT: live status and diffs \u2014 leaving this visible for 20 seconds\nDEMO_PASS: reads, edits, creation, modification, rename, deletion and Git presentation\n",
+  "boundary": "disposable direct Java/Swing and fixed Git; no shell or actual model; actual authenticated CLI reads"
+}

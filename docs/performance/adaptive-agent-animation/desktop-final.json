@@ -1,0 +1,69 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "4739ce10d67f023145fa75a6c756f63982ff6f5b98df95cede86706a96f03a16",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-kye2wngv",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "fe9056ee7962c2e86db56eafdacdba57c7a8115d8d406c4a7e0c238b793af61d",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-kye2wngv/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-kye2wngv/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-kye2wngv/run/config",
+    "-cp",
+    "/private/tmp/shed-native-kye2wngv/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentAnimationDesktopProbe",
+    "/private/tmp/shed-native-kye2wngv/run/live",
+    "/private/tmp/shed-native-kye2wngv/run/project"
+  ],
+  "pid": 49064,
+  "exit": 0,
+  "log": "READY: watch the Shed window\nREAD: Demo.java at UTF-16 offset 0\nREAD: Demo.java at UTF-16 offset 2200\nREAD: Demo.java at UTF-16 offset 4400\nEDIT: quick typing and new functions\nREAD: Demo.java at UTF-16 offset 1600\nDELETE BLOCK: highlight and right-to-left removal\nREAD: Demo.java at UTF-16 offset 2000\nREWRITE: old chunk removed; replacement phases in left-to-right\nREAD INTERRUPTS REPLAY: explicit reading wins without disabling Follow\nCREATE: Helpers.java\nREAD: Helpers.java at UTF-16 offset 0\nREAD: Notes.txt at UTF-16 offset 0\nMODIFY: Notes.txt\nREAD: RenameMe.txt at UTF-16 offset 0\nRENAME: RenameMe.txt to Renamed.txt\nREAD: DeleteMe.txt at UTF-16 offset 0\nDELETE: DeleteMe.txt \u2014 watch the Explorer badge\nTYPING_PAINT first_ms=0.820292 warm_p95_ms=1.382625\nGIT: live status and diffs \u2014 leaving this visible for 20 seconds\nDEMO_PASS: reads, edits, creation, modification, rename, deletion and Git presentation\n",
+  "result": {
+    "modes": [
+      "typing",
+      "deleting",
+      "complete",
+      "chunks"
+    ],
+    "typing_paint_ms": [
+      0.820292,
+      0.638041,
+      0.405167,
+      0.518709,
+      0.487875,
+      0.606417,
+      1.200583,
+      0.60775,
+      0.87725,
+      0.974417,
+      1.164417,
+      1.382625,
+      1.333041,
+      1.245166,
+      0.883417,
+      0.634209,
+      1.588833,
+      1.149709,
+      1.025375,
+      1.272167,
+      1.247791
+    ],
+    "scope": "direct Java/Swing, real authenticated CLI, disposable filesystem writes; no actual model",
+    "state": "PASS",
+    "directions": [
+      "top-to-bottom",
+      "left-to-right",
+      "right-to-left"
+    ],
+    "source_unchanged_by_animation": true
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 98.47325112499675
+}

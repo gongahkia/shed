@@ -1,0 +1,44 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "e89a0a27aebcc54a1e2a9ac4d62ac74dd671d7be008ef33c77b13979ccb198b6",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-szf6r4p9",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "43811e57c3977f1dddfb125d795cfb764bbdf8338b17015e7fab70f6706b5c86",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-szf6r4p9/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-szf6r4p9/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-szf6r4p9/run/config",
+    "-cp",
+    "/private/tmp/shed-native-szf6r4p9/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-szf6r4p9/run/live",
+    "/private/tmp/shed-native-szf6r4p9/run/project"
+  ],
+  "pid": 85931,
+  "replay_payload_sha256": "0e697234c915c14c3d4d4cf9c39cbac7b1599f9b91e1cde3a7bedf9e5727140a",
+  "client_results": [
+    {
+      "operation": "open",
+      "exit": 0,
+      "stdout": "{\"valid\": true, \"protocolVersion\": 2, \"dirty\": false, \"documentRevision\": 1, \"selectionEnd\": 0, \"coordinateUnit\": \"utf-16\", \"capabilities\": [\"status\", \"editor-metadata\", \"editor-navigation\", \"editor-control\"], \"windowId\": \"bfaed5df-e503-4828-b78f-f55cacd749b0\", \"available\": true, \"documentLength\": 107, \"paneId\": \"pane-820841b9-55e5-4860-bb58-d4bdcf17d20d\", \"selectionStart\": 0, \"caretOffset\": 0, \"documentId\": \"buffer-aab66837-341e-409c-9fc6-f93705bdc712\", \"schemaVersion\": 1, \"projectId\": \"project-b1a44d05-3d1d-4f3a-a269-f3ebe782c3cb\", \"instanceId\": \"d5f7cfd5-bd4c-4198-9ef7-200f2e12a8f8\", \"contextRevision\": 48, \"operation\": \"editor/file/open\", \"outcome\": \"applied\"}\n",
+      "stderr": ""
+    },
+    {
+      "operation": "read",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/Users/gongahkia/Desktop/coding/projects/shed/scripts/agent-demo-client.py\", line 118, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/Users/gongahkia/Desktop/coding/projects/shed/scripts/agent-demo-client.py\", line 93, in main\n    response = exchange('editor/source/read', params)\n  File \"/Users/gongahkia/Desktop/coding/projects/shed/scripts/agent-demo-client.py\", line 76, in exchange\n    raise RuntimeError('Bounded CLI operation failed: ' + result.stdout[:2000])\nRuntimeError: Bounded CLI operation failed: {\"jsonrpc\":\"2.0\",\"id\":\"live-agent\",\"error\":{\"data\":{\"code\":\"CONTEXT_CHANGED\",\"outcome\":\"rejected\"},\"message\":\"Navigation request failed\",\"code\":-32000}}\n\n"
+    }
+  ],
+  "exit": 2,
+  "error": "Replayed external client failed",
+  "log": "LIVE_READY\n",
+  "fixture_removed": true,
+  "elapsed_s": 14.557821583999612
+}

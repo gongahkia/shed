@@ -1,0 +1,69 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "01eafcf47bc04819fe9ca57e4121296099b3aceec91706947f67aaad2b8e8965",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-tdk8_3o4",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "7f78db4838561529ad2eeba3adc0a0760ac108206bb23be778ee210ad9c9f0b3",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-tdk8_3o4/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-tdk8_3o4/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-tdk8_3o4/run/config",
+    "-cp",
+    "/private/tmp/shed-native-tdk8_3o4/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentAnimationDesktopProbe",
+    "/private/tmp/shed-native-tdk8_3o4/run/live",
+    "/private/tmp/shed-native-tdk8_3o4/run/project"
+  ],
+  "pid": 30614,
+  "exit": 0,
+  "log": "READY: watch the Shed window\nREAD: Demo.java at UTF-16 offset 0\nREAD: Demo.java at UTF-16 offset 2200\nREAD: Demo.java at UTF-16 offset 4400\nEDIT: quick typing and new functions\nREAD: Demo.java at UTF-16 offset 1600\nDELETE BLOCK: highlight and right-to-left removal\nREAD: Demo.java at UTF-16 offset 2000\nREWRITE: old chunk removed; replacement phases in left-to-right\nCREATE: Helpers.java\nREAD: Helpers.java at UTF-16 offset 0\nREAD: Notes.txt at UTF-16 offset 0\nMODIFY: Notes.txt\nREAD: RenameMe.txt at UTF-16 offset 0\nRENAME: RenameMe.txt to Renamed.txt\nREAD: DeleteMe.txt at UTF-16 offset 0\nDELETE: DeleteMe.txt \u2014 watch the Explorer badge\nTYPING_PAINT first_ms=0.885334 warm_p95_ms=0.638084\nGIT: live status and diffs \u2014 leaving this visible for 20 seconds\nDEMO_PASS: reads, edits, creation, modification, rename, deletion and Git presentation\n",
+  "result": {
+    "typing_paint_ms": [
+      0.885334,
+      0.457709,
+      0.547125,
+      0.565834,
+      0.470292,
+      0.558334,
+      0.45725,
+      0.504542,
+      0.638084,
+      0.460417,
+      0.428042,
+      0.441291,
+      0.441584,
+      0.609666,
+      0.44175,
+      0.452833,
+      0.65575,
+      0.634458,
+      0.541,
+      0.52,
+      0.541833
+    ],
+    "scope": "direct Java/Swing, real authenticated CLI, disposable filesystem writes; no actual model",
+    "state": "PASS",
+    "directions": [
+      "top-to-bottom",
+      "left-to-right",
+      "right-to-left"
+    ],
+    "source_unchanged_by_animation": true,
+    "modes": [
+      "typing",
+      "deleting",
+      "complete",
+      "chunks"
+    ]
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 93.3725796669969
+}

@@ -1,0 +1,45 @@
+{
+  "recorded_at_utc": "2026-11-25T07:21:08.972731+00:00",
+  "starting_head": "cd7028a35edacd6e37107d7053091d827133e920",
+  "implementation_commit": "5857344fd9f07b2e357c6d07399a0f41d90d50d3",
+  "tooling_commit": "1cf72128495b8599b52fc24afb81a5b748923717",
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "cpu": "Apple M3",
+    "memory_bytes": 17179869184,
+    "jdk": "21.0.13.1+2",
+    "maven": "3.9.11"
+  },
+  "hashes": {
+    "scripts/test-agent-desktop.py": "26ffe0e9b8465f0acd3feaa975797e89b9a05c78c5e399428ff57c16fce216e6",
+    "scripts/test_live_agent_tooling.py": "c5c47ef75f363fdd0d8ee762cce0b8fa7c18a13325fb53fedabef02fc316b25d",
+    "src/benchmark/java/shed/AgentAnimationDesktopProbe.java": "fe9056ee7962c2e86db56eafdacdba57c7a8115d8d406c4a7e0c238b793af61d",
+    "src/main/java/shed/AgentChangePlayback.java": "dd6cff2370db44ddbbf8fbb835d338728e39f8840602063df4bc3b26efba0321",
+    "src/main/java/shed/AgentChangeTour.java": "d5e624a364ea0dfb0b1dd595099504bcf8523f8c9f3aa83259f54e097e06a97a",
+    "src/main/java/shed/AgentEditPresentation.java": "f9c73605e7486f0465ed7a36f99a6ad09283f42fcd431fca6d856466c1eec3d8",
+    "src/main/java/shed/AgentWorkbenchPanel.java": "63fae05539fa8a4564b7d7661e41b91e91082b782dda86c85963e2e5ac5c343a",
+    "src/main/java/shed/AgentWorkspaceController.java": "db1836fbda7a8592fc06ba3afe71b583112fb45ce25660cc1f917686ac40689d",
+    "src/main/java/shed/EditorUiController.java": "ade420b2aa3637268533974691997b927e593270f63c36f47b7d9e3ec40dc1c8",
+    "src/main/java/shed/LiveChangesPanel.java": "681697c4801107f42bae8f33050e8a48ac1bc4fc58626398e17b58f1c2e1a65c",
+    "src/main/java/shed/ToolWindowHost.java": "9aa6f3db624667a0b44d25aa36d867360219e01243f9fd77517e2dc381a038bb",
+    "src/test/java/shed/AgentChangeTourTest.java": "c50652aa265118b32b01b2e6e276a6a20fca964a180e5e12baa85e3e523b6a88",
+    "src/test/java/shed/AgentEditPresentationTest.java": "49054e184213f44e48f9603e15c8b59542d5a7d56260b58232947266a6fa6563",
+    "src/test/resources/shed/portable-fixture-tests.properties": "40d85789454881e92a30f04f2bee04634606d268422896bab52a6363a5cd29b1",
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "target/shed-2.0.0.jar": "4739ce10d67f023145fa75a6c756f63982ff6f5b98df95cede86706a96f03a16"
+  },
+  "caveat": "Host identity recorded after measurements. Concurrent system load/native RSS not measured; no cold-cache or cross-version speedup claim.",
+  "readme_before_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "preexisting_work": "Untracked Created.txt preserved without inspection or staging.",
+  "selected_captures_sha256": {
+    "reading-1-down.png": "8395032b26343f550c3f92d11f53e1daccd174403e20c7ec707722972be55f2e",
+    "reading-1-top.png": "5057c17d40fa20596f8274251b7133b7d1c4a94883d9dec139707e4b225cb96e",
+    "deleting-4.png": "957ecb7f81cc7f1955f1748b0663f689446335325f0c3449e71a6d88009ef6ef",
+    "rewriting-12.png": "cb34553cf28d4c0e79f6cda9574138a5fff83f12a233ecd5d3e29e3cd6b6a30b",
+    "deleting-2.png": "fe68a2acbb8e0acad65d4bf3e1f4edbe4ad270c7c5079e6729da2b7d12217f1e",
+    "rewriting-6.png": "d06efbd4fad9a37a3af03bf174ea3595681b1c75acaed4ef0f78b11e958bf6e6",
+    "typing-2.png": "5d80947ec50519916dd06269dac01a61e802d7ae6ab4f784ed3f1a83647410c1"
+  }
+}

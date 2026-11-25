@@ -1,0 +1,36 @@
+from pathlib import Path
+import sys, subprocess, json, time
+sys.dont_write_bytecode=True
+root=Path('/Users/gongahkia/Desktop/coding/projects/shed')
+sys.path.insert(0,str(root/'scripts'))
+from native_fixture import Fixture
+f=Fixture(); child=None; started=time.monotonic()
+try:
+    f.validate();work=f.run_root/'friend-demo';work.mkdir(mode=0o700);project=work/'project';project.mkdir(mode=0o700)
+    source='public class Demo {\n'+''.join('// CHANGE_TOP\n' if i==5 else '// CHANGE_MIDDLE\n' if i==120 else '// CHANGE_BOTTOM\n' if i==230 else f'// demonstration checkpoint {i:03d}\n' for i in range(240))+'    public static String greet(String name) {\n        return "Hello, " + name;\n    }\n}\n'
+    for name,text in {'Demo.java':source,'Notes.txt':'Demo notes\n- Improve greeting\n- Add helper methods\n','RenameMe.txt':'Keep this content when renaming.\n','DeleteMe.txt':'This disposable file will be deleted.\n'}.items():(project/name).write_text(text)
+    bins=work/'bin';bins.mkdir();(bins/'git').symlink_to('/usr/bin/git');hooks=work/'hooks';hooks.mkdir();config=work/'empty-git-config';config.touch()
+    env=dict(f.env,PATH=str(bins),SHED_PORTABLE_FIXTURE_ROOT=str(f.root),SHED_VISUAL_GIT_FIXTURE='1',GIT_CONFIG_GLOBAL=str(config),GIT_CONFIG_SYSTEM=str(config),GIT_CONFIG_NOSYSTEM='1',GIT_TERMINAL_PROMPT='0',GIT_CONFIG_COUNT='3',GIT_CONFIG_KEY_0='core.hooksPath',GIT_CONFIG_VALUE_0=str(hooks),GIT_CONFIG_KEY_1='core.fsmonitor',GIT_CONFIG_VALUE_1='false',GIT_CONFIG_KEY_2='commit.gpgsign',GIT_CONFIG_VALUE_2='false')
+    for command in [['/usr/bin/git','init','-q','-b','main'],['/usr/bin/git','add','Demo.java','Notes.txt','RenameMe.txt','DeleteMe.txt'],['/usr/bin/git','-c','user.name=Demo','-c','user.email=demo@localhost','commit','-qm','Disposable baseline']]:subprocess.run(command,cwd=project,env=env,check=True,timeout=10,stdin=subprocess.DEVNULL,capture_output=True)
+    jdk=Path('/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home');jar=root/'target/shed-2.0.0.jar';classes=work/'classes';classes.mkdir();prefs=work/'preferences';prefs.mkdir()
+    props=['-Duser.home='+f.env["HOME"],'-Djava.io.tmpdir='+str(work),'-Djava.util.prefs.userRoot='+str(prefs)]
+    subprocess.run([str(jdk/'bin/javac'),*['-J'+p for p in props],'-cp',str(jar),'-d',str(classes),str(root/'target/friend-paced-demo/FriendDemo.java')],cwd=project,env=env,check=True,timeout=30,capture_output=True)
+    child=subprocess.Popen([str(jdk/'bin/java'),'-Djava.awt.headless=false',*props,'-cp',str(classes)+':'+str(jar),'shed.FriendDemo',str(project)],cwd=project,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+    lines=[];deadline=time.monotonic()+150
+    import selectors
+    selector=selectors.DefaultSelector();selector.register(child.stdout,selectors.EVENT_READ)
+    while child.poll() is None:
+        if time.monotonic()>deadline:raise TimeoutError('Demo deadline')
+        for key,_ in selector.select(timeout=.5):
+            line=key.fileobj.readline()
+            if line:lines.append(line);print(line,end='',flush=True)
+    rest=child.stdout.read();lines.append(rest);print(rest,end='',flush=True);selector.close()
+    (root/'target/friend-paced-demo/result.json').write_text(json.dumps({'state':'PASS' if child.returncode==0 and 'DEMO_PASS:' in ''.join(lines) else 'INCOMPLETE','exit':child.returncode,'elapsed_s':time.monotonic()-started,'log':''.join(lines),'boundary':'disposable direct Java/Swing and fixed Git; no shell or actual model; actual authenticated CLI reads'},indent=2))
+finally:
+    if child is not None:
+        if child.poll() is None:
+            child.terminate()
+            try:child.wait(timeout=3)
+            except subprocess.TimeoutExpired:child.kill();child.wait(timeout=3)
+        if child.stdout:child.stdout.close()
+    f.close()

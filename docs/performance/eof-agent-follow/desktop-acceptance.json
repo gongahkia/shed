@@ -1,0 +1,139 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "b7b9f640bbf84f80a9fea597b5e6182cf94d81f377934d4c2652a3969165ffab",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-s41maa7p",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "a14712400921e544b0622cb3685ae1f13777553d664f0ebfb2fd1f46cc70954c",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-s41maa7p/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-s41maa7p/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-s41maa7p/run/config",
+    "-cp",
+    "/private/tmp/shed-native-s41maa7p/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-s41maa7p/run/live",
+    "/private/tmp/shed-native-s41maa7p/run/project"
+  ],
+  "pid": 91091,
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "events": [
+      {
+        "standard_scrollpanes": 64,
+        "exact": true,
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls"
+      },
+      {
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 177.0995,
+        "phase": "5000_file_atomic_burst",
+        "converge_ms": 2656.995583
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 1.074625,
+        "first_ms": 2.802833,
+        "samples_ms": [
+          2.802833,
+          0.891792,
+          0.800708,
+          1.100417,
+          0.627334,
+          0.935583,
+          0.756,
+          0.723833,
+          0.575542,
+          1.074625,
+          0.598292,
+          0.522708,
+          0.446833,
+          0.363583,
+          0.411792,
+          0.3385,
+          0.578,
+          0.342541,
+          0.348292,
+          0.432667,
+          0.323458
+        ]
+      },
+      {
+        "phase": "same_file_conflict_view_both_save_undo_redo",
+        "exact": true
+      },
+      {
+        "phase": "human_edit_during_delayed_follow",
+        "exact": true
+      },
+      {
+        "phase": "light_dark_narrow_density_focus_three_splits",
+        "exact": true
+      },
+      {
+        "cycles": 24,
+        "exact": true,
+        "phase": "animation_cycles_and_real_expiration"
+      },
+      {
+        "phase": "custom_ui_editor_fonts_hit_testing",
+        "exact": true
+      },
+      {
+        "retained_watchers": 0,
+        "phase": "watch_start_stop_cycles",
+        "heap_after_diagnostic_gc": 17578576,
+        "cycles": 12,
+        "exact": true,
+        "heap_before": 80694464
+      },
+      {
+        "changes": 6,
+        "exact": true,
+        "phase": "safe_configs_moves_tree_badges"
+      },
+      {
+        "phase": "git_same_status_patch_refresh",
+        "exact": true
+      },
+      {
+        "phase": "observation_before_authoritative_reload",
+        "exact": true
+      },
+      {
+        "source_units": 5559,
+        "selection_after_reload": [
+          6,
+          6
+        ],
+        "exact": true,
+        "caret_preserved": true,
+        "phase": "append_five_functions_reveals_eof",
+        "scroll_y": 4871,
+        "selection_before_reload": [
+          2,
+          6
+        ]
+      },
+      {
+        "exact": true,
+        "descendants": 0,
+        "phase": "save_and_attachment_cleanup"
+      }
+    ],
+    "live_window": true,
+    "capture": "owned Swing root pane",
+    "state": "PASS"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 34.03601770899695
+}

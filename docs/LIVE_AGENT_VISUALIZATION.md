@@ -29,6 +29,20 @@ Watch commands and incoming proposals do not open or switch the tool dock. Use `
 
 For a window already using an explicitly enabled control attachment, `shed ctl watch` starts watching that window's active project. Inside Shed, `:agent watch` or the play icon in Agents → Live changes starts a watch without launching any coding agent; the square icon stops it. `:agent watch stop` also stops it. Launching again creates another window; there is no implicit choice among existing instances.
 
+### If additions do not scroll into view
+
+Launch visualization for the folder the agent is actually editing. For example, from the Shed repository, `./scripts/shed visualize /absolute/path/to/demo` watches the demo; `./scripts/shed visualize .` watches the Shed repository. Opening an unrelated file does not extend the watch outside its selected project. Check the launch reply's `project` field rather than assuming that a visible Shed window is watching the agent's working directory.
+
+Follow pauses after human source clicks, typing, manual scrolling or Explorer interaction. With the matching live attachment selected, `shed ctl watch-state` reports `watching`, `ready` and `following`; `shed ctl follow` resumes it. Alternatively, explicitly open `:agent changes` and press Follow. If the attachment expired, use the in-app control or launch a new visualization for the intended folder. Files over 64 Ki UTF-16 units are not automatically followed.
+
+The EOF-append regression covers five functions appended after 240 comment lines, including the viewport after the animation ends. See [the evidence](performance/eof-agent-follow/INDEX.md). The tour preserves the installed human caret/selection. The existing disk-reload path separately restores only the caret, collapsing a previously nonempty selection; that limitation is not corrected by the tour.
+
+### Reading activity
+
+Filesystem observation does not report reads. It cannot establish that a CLI agent is reading a particular file, and content access times are not a reliable substitute. The existing authenticated `shed ctl progress --session-id <id> --agent <label> --phase reading --start <offset> --end <offset>` operation can explicitly display a reading phase in the status line with a bounded source marker in the active editor. Ordinary `shed ctl read` and an agent's own filesystem reads do not automatically send that signal.
+
+A future opt-in integration could report project-relative read targets for a brief tree/tab indicator and a `Reading filename` status. Such signals should be identified as agent-reported, should not move the human caret or steal focus, and should expire or finish explicitly. No automatic read detection or new reading UI is implemented here.
+
 ## What appears
 
 The normal editor shows the followed source file, change marker and animated viewport tour directly. Explorer badges and the existing Git view remain available without opening agent controls. If explicitly opened, Agents → Live changes contains the retained file list and unified diff. `A`, `M`, `D` and `R` identify added, modified, deleted and observed renamed/moved files. `R?` explicitly identifies a possible move inferred from similar text. A folder move summary groups at least two observed file moves; it does not claim an atomic directory operation. The list shows counts when its snapshot provides exact textual counts. Added and deleted lines use existing theme success/error colors; changed words in adjacent removed/added line pairs receive emphasis. Previous/next arrows move between diff hunks. Enter or double-click opens a surviving file. Deleted contents remain readable in the diff.

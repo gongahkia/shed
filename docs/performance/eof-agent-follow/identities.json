@@ -1,0 +1,7 @@
+{
+  "src/test/java/shed/AgentChangeTourTest.java": "efd3660a9a415f01ec63bf2100c862fe186896a84fee25add706b48c0b47cf60",
+  "src/benchmark/java/shed/AgentWorkflowDesktopProbe.java": "a14712400921e544b0622cb3685ae1f13777553d664f0ebfb2fd1f46cc70954c",
+  "src/test/resources/shed/portable-fixture-tests.properties": "bd09dedd6104effe6436b06d89b0c4feaba649de302fccb8acc41b24d5d476ce",
+  "target/shed-2.0.0.jar": "b7b9f640bbf84f80a9fea597b5e6182cf94d81f377934d4c2652a3969165ffab",
+  "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e"
+}

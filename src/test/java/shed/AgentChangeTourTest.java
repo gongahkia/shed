@@ -47,6 +47,30 @@ class AgentChangeTourTest {
             }return null;
         });
     }
+    @Test void appendedBlockRevealsEofAndStaysVisibleAfterTourWithoutMovingHumanCaret()throws Exception {
+        EditorControlTest.edt(()->{
+            String before="// demonstration line\n".repeat(240);
+            String appended="\npublic class Demo {\n"+"    public static void placeholder() {}\n".repeat(5)+"}\n";
+            String source=before+appended;
+            var area=new JTextArea(source){@Override public boolean isShowing(){return true;}};
+            area.setFont(new java.awt.Font("Monospaced",0,16));
+            var scroll=new JScrollPane(area);scroll.setSize(500,200);scroll.doLayout();area.setSize(area.getPreferredSize());
+            var undo=new UndoManager();area.getDocument().addUndoableEditListener(undo);area.select(2,6);
+            scroll.getViewport().setViewPosition(new java.awt.Point(0,0));
+            try(var presentation=new AgentEditPresentation(area);
+                    var tour=new AgentChangeTour(area,presentation,List.of(new AgentEditPresentation.Range(before.length(),source.length())),source,"Agent",()->true,()->fail("Unexpected pause"),()->{})){
+                tour.start();long now=System.nanoTime();tour.advance(now+350_000_000L);
+                assertTrue(scroll.getViewport().getViewPosition().y>1000);
+                tour.advance(now+1_100_000_000L);assertFalse(tour.running());
+                var eof=area.modelToView2D(source.length());var visible=scroll.getViewport().getViewRect();
+                assertNotNull(eof);assertTrue(visible.contains(eof.getX(),eof.getY()),"EOF must remain visible after the appended block finishes");
+                var settled=scroll.getViewport().getViewPosition();tour.advance(now+3_000_000_000L);
+                assertEquals(settled,scroll.getViewport().getViewPosition());
+            }
+            assertEquals(source,area.getText());assertEquals(2,area.getSelectionStart());assertEquals(6,area.getSelectionEnd());assertFalse(undo.canUndo());
+            return null;
+        });
+    }
     @Test void reducedMotionAndDocumentReplacementReleaseTheTour()throws Exception {
         EditorControlTest.edt(()->{
             try(var view=new View()){

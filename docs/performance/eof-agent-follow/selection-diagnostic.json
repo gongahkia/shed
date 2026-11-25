@@ -1,0 +1,116 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "b7b9f640bbf84f80a9fea597b5e6182cf94d81f377934d4c2652a3969165ffab",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-a5zke8hk",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "fcde01c8f496f16fc7102024f0ac44d000249b69e8a64046c02eb59ee3240c7f",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-a5zke8hk/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-a5zke8hk/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-a5zke8hk/run/config",
+    "-cp",
+    "/private/tmp/shed-native-a5zke8hk/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-a5zke8hk/run/live",
+    "/private/tmp/shed-native-a5zke8hk/run/project"
+  ],
+  "pid": 90124,
+  "exit": 1,
+  "log": "LIVE_READY\njava.util.concurrent.ExecutionException: java.lang.AssertionError: Append integrity: same buffer=true, source=true, revision=3/3, dirty=false, undo=false/false, selection=6..6\n\tat java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)\n\tat java.base/java.util.concurrent.FutureTask.get(FutureTask.java:205)\n\tat shed.AgentWorkflowDesktopProbe.edt(AgentWorkflowDesktopProbe.java:20)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEofAppend(AgentWorkflowDesktopProbe.java:189)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:304)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:422)\nCaused by: java.lang.AssertionError: Append integrity: same buffer=true, source=true, revision=3/3, dirty=false, undo=false/false, selection=6..6\n\tat shed.AgentWorkflowDesktopProbe.check(AgentWorkflowDesktopProbe.java:28)\n\tat shed.AgentWorkflowDesktopProbe.lambda$qualifyEofAppend$48(AgentWorkflowDesktopProbe.java:193)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:308)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)\n\tat java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)\n",
+  "result": {
+    "events": [
+      {
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls",
+        "exact": true,
+        "standard_scrollpanes": 64
+      },
+      {
+        "baseline_ms": 171.583042,
+        "exact": true,
+        "changes": 142,
+        "converge_ms": 2652.409417,
+        "phase": "5000_file_atomic_burst"
+      },
+      {
+        "first_ms": 3.357459,
+        "warm_p95_ms": 1.255791,
+        "phase": "5000_file_watch_typing",
+        "samples_ms": [
+          3.357459,
+          1.255791,
+          0.969708,
+          1.084541,
+          2.3825,
+          0.86325,
+          0.676584,
+          0.558916,
+          0.664833,
+          0.534417,
+          0.893667,
+          0.50325,
+          0.580167,
+          0.499791,
+          0.369583,
+          0.526208,
+          0.460375,
+          0.416625,
+          0.3295,
+          0.5965,
+          0.343291
+        ]
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "cycles": 24,
+        "phase": "animation_cycles_and_real_expiration",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "heap_after_diagnostic_gc": 17516304,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0,
+        "heap_before": 79679120,
+        "exact": true,
+        "cycles": 12
+      },
+      {
+        "changes": 6,
+        "phase": "safe_configs_moves_tree_badges",
+        "exact": true
+      },
+      {
+        "exact": true,
+        "phase": "git_same_status_patch_refresh"
+      },
+      {
+        "exact": true,
+        "phase": "observation_before_authoritative_reload"
+      }
+    ],
+    "error": "java.util.concurrent.ExecutionException: java.lang.AssertionError: Append integrity: same buffer=true, source=true, revision=3/3, dirty=false, undo=false/false, selection=6..6",
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 32.57463574999565
+}

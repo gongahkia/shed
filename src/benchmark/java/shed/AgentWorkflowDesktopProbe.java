@@ -171,6 +171,39 @@ public final class AgentWorkflowDesktopProbe {
     private static boolean tourSettled(JTextArea area,String marker){
         try{var bounds=area.modelToView2D(area.getText().indexOf(marker));var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);if(bounds==null||viewport==null)return false;int target=Math.max(0,Math.min(area.getHeight()-viewport.getExtentSize().height,(int)bounds.getY()-viewport.getExtentSize().height/3));return Math.abs(viewport.getViewPosition().y-target)<3;}catch(javax.swing.text.BadLocationException unavailable){return false;}
     }
+    private static void qualifyEofAppend(Path project)throws Exception {
+        Path file=project.resolve("AppendDemo.java");String before="// demonstration line\n".repeat(240);
+        String after=before+"\npublic class AppendDemo {\n";
+        for(int i=1;i<=5;i++)after+="    public static void placeholderFunction"+i+"() {}\n\n";
+        after+="}\n";String expected=after;
+        edt(()->{editor.toolWindowHost.watchAgentChanges("stop","Agent");return null;});Files.writeString(file,before);
+        edt(()->{editor.hideToolWindow();editor.openFileAsync(file.toFile());return null;});
+        await(()->file.toFile().equals(editor.getCurrentBuffer().getFile())&&editor.getCurrentBuffer().getContent().equals(before),10);
+        var area=edt(()->editor.writingArea);var buffer=edt(editor::getCurrentBuffer);
+        var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);
+        edt(()->{area.select(2,6);viewport.setViewPosition(new Point(0,0));area.requestFocusInWindow();editor.toolWindowHost.watchAgentChanges("start","Agent");editor.toolWindowHost.watchAgentChanges("follow","Agent");return null;});
+        await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Agent").get("ready")),20);
+        Files.writeString(file,expected);await(()->area.getClientProperty("shed.agentTour")!=null,12);
+        long revision=edt(buffer::documentRevision);boolean undo=edt(()->buffer.getUndoManager().canUndo());
+        // external reload currently restores the caret, collapsing the old selection; the tour must preserve that installed state
+        int dot=edt(area::getCaretPosition),mark=edt(()->area.getCaret().getMark());
+        check(dot==6,"External append moved the human caret");
+        await(()->area.getClientProperty("shed.agentTour")==null,5);
+        int y=edt(()->{
+            var eof=area.modelToView2D(expected.length());var visible=viewport.getViewRect();
+            check(eof!=null&&visible.contains(eof.getX(),eof.getY()),"Appended EOF is outside the source viewport");
+            check(viewport.getViewPosition().y>1000,"Append did not scroll down");
+            check(editor.getCurrentBuffer()==buffer&&buffer.getContent().equals(expected)&&buffer.documentRevision()==revision&&!buffer.isModified()&&buffer.getUndoManager().canUndo()==undo&&area.getCaretPosition()==dot&&area.getCaret().getMark()==mark,"Append tour changed installed source, history or human caret/selection");
+            check(!editor.toolWindowHost.isVisible(),"Append reopened management tools");return viewport.getViewPosition().y;
+        });
+        capture("21-appended-eof-visible");
+        // check subsequent event-loop turns too, so a late caret restoration cannot pass unnoticed
+        long until=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(500);
+        await(()->{check(viewport.getViewPosition().y==y,"Late callback moved viewport away from appended EOF");return System.nanoTime()>=until;},2);
+        events.add(Map.of("phase","append_five_functions_reveals_eof","exact",true,"scroll_y",y,"source_units",expected.length(),"caret_preserved",true,"selection_before_reload",List.of(2,6),"selection_after_reload",List.of(Math.min(dot,mark),Math.max(dot,mark))));
+        edt(()->{editor.toolWindowHost.watchAgentChanges("stop","Agent");editor.openFileAsync(project.resolve("ModelBlocks.java").toFile());return null;});
+        await(()->project.resolve("ModelBlocks.java").toFile().equals(editor.getCurrentBuffer().getFile()),10);
+    }
     private static void qualifyModelTour(Path project)throws Exception {
         var area=edt(()->editor.writingArea);var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);
         try{await(()->Integer.valueOf(1).equals(area.getClientProperty("shed.agentTour")),100);}catch(Exception failure){System.out.println(edt(()->editor.toolWindowHost.watchAgentChanges("state","Codex")+" active="+editor.getCurrentBuffer().getFile()+" loaded="+area.getText().contains("AFTER_GAMMA")+" activity="+area.getClientProperty("shed.agentActivity")));throw failure;}check(edt(()->!editor.toolWindowHost.isVisible()),"Model edits reopened management tools");String expected=edt(area::getText);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);boolean dirty=edt(buffer::isModified),undo=edt(()->buffer.getUndoManager().canUndo());int caret=edt(area::getCaretPosition),selection=edt(area::getSelectionStart);await(()->tourSettled(area,"AFTER_ALPHA"),2);int first=edt(()->viewport.getViewPosition().y);capture("18-model-tour-first-block");
@@ -271,7 +304,7 @@ public final class AgentWorkflowDesktopProbe {
         for(int i=0;i<12&&watches.stream().anyMatch(ref->ref.get()!=null);i++){System.gc();Thread.sleep(50);edt(()->null);}
         long retained=watches.stream().filter(ref->ref.get()!=null).count();check(retained==0,"Stopped watcher retained after bounded diagnostic GC: "+retained);
         events.add(Map.of("phase","watch_start_stop_cycles","cycles",12,"retained_watchers",retained,"heap_before",heapBefore,"heap_after_diagnostic_gc",usedHeap(),"exact",true));
-        boolean motion="1".equals(System.getenv("SHED_CONFIG_MOTION"));if(motion){qualifyMotion(project);qualifyDelayedTourReload(project);}
+        boolean motion="1".equals(System.getenv("SHED_CONFIG_MOTION"));if(motion){qualifyMotion(project);qualifyDelayedTourReload(project);qualifyEofAppend(project);}
         if("1".equals(System.getenv("SHED_LIVE_CODEX"))){
             edt(()->{if(!motion){human.load(editor.configManager);editor.loadBufferIntoEditor(human);}editor.toolWindowHost.watchAgentChanges("start","Codex");editor.toolWindowHost.watchAgentChanges("follow","Codex");return null;});
             await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")),20);

@@ -42,3 +42,5 @@ The launch probe creates its bounded 40 MiB opaque / 33 MiB text fixtures inside
 Native interactive-shell admission remains BLOCKED. No real language server, shell history, credentials, personal terminal config, user Git config, new dependencies or new production workers were used. Normal UI/design, themes/fonts and document/Undo ownership are unchanged.
 
 README SHA-256 before/after: `48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`. Local commits only; no push.
+
+An external commit, `cb1c61363` (`recentcahnges`), captured the implementation and test changes while verification was in progress. It was preserved unchanged rather than rewritten or split. This agent issued no push command. Documentation/evidence was committed separately.

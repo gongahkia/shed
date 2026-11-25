@@ -176,6 +176,7 @@ final class AgentWorkspaceController implements AutoCloseable {
             public EditorNavigation.State openingState(){return owner().captureEditorOpening();}
             public EditorNavigation.State prepareOpening(){
                 var app=owner();
+                app.toolWindowHost.retireAgentPresentation();
                 if(app.isTreePaneActive()){
                     var source=app.resolveTreeContentPaneForOpen();app.activateEditorPane(source);
                 }

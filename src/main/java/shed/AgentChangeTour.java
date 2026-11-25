@@ -20,6 +20,8 @@ final class AgentChangeTour implements AutoCloseable {
     private final Runnable pause,finished;
     private final javax.swing.text.Document document;
     private final Timer timer;
+    private final List<AgentChangePlayback.Edit> playbackEdits;
+    private AgentChangePlayback playback;
     private boolean closed;
     private int index,fromY;
     private long started,version;
@@ -30,9 +32,13 @@ final class AgentChangeTour implements AutoCloseable {
     private final DocumentListener edits=new DocumentListener(){public void insertUpdate(DocumentEvent e){end(true);}public void removeUpdate(DocumentEvent e){end(true);}public void changedUpdate(DocumentEvent e){end(true);}};
 
     AgentChangeTour(JTextArea area,AgentEditPresentation presentation,List<AgentEditPresentation.Range> ranges,String source,String name,BooleanSupplier current,Runnable pause,Runnable finished){
+        this(area,presentation,ranges,source,name,current,pause,finished,null);
+    }
+    AgentChangeTour(JTextArea area,AgentEditPresentation presentation,List<AgentEditPresentation.Range> ranges,String source,String name,BooleanSupplier current,Runnable pause,Runnable finished,List<AgentChangePlayback.Edit> edits){
         if(!SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Change tour belongs to the EDT");
         this.area=area;this.presentation=presentation;this.ranges=List.copyOf(ranges);this.source=source;this.name=name;this.current=current;this.pause=pause;this.finished=finished;
-        this.document=area.getDocument();
+        this.document=area.getDocument();this.playbackEdits=edits==null?null:List.copyOf(edits);
+        if(this.playbackEdits!=null&&(this.playbackEdits.size()!=ranges.size()||!this.playbackEdits.stream().map(AgentChangePlayback.Edit::range).toList().equals(this.ranges)))throw new IllegalArgumentException("Playback ranges do not match tour");
         if(ranges.size()>32||source.length()>65536||source.length()!=document.getLength())throw new IllegalArgumentException("Change tour exceeds source bounds");
         for(var range:ranges)if(range.start()<0||range.end()<range.start()||range.end()>source.length())throw new IllegalArgumentException("Invalid tour range");
         this.viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);this.scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,area);
@@ -47,19 +53,25 @@ final class AgentChangeTour implements AutoCloseable {
         begin(System.nanoTime());timer.start();
     }
     private boolean animated(){return !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"))&&!Boolean.FALSE.equals(area.getClientProperty("shed.caretAnimation"));}
-    private void begin(long now){started=now;fromY=viewport.getViewPosition().y;presentation.showApplied(ranges);presentation.setAgentName(name);version=presentation.version();presentation.moveMarker(index,ranges.get(index).start());area.putClientProperty("shed.agentTour",index+1);}
+    private void begin(long now){
+        started=now;fromY=viewport.getViewPosition().y;presentation.showApplied(ranges);presentation.setAgentName(name);version=presentation.version();
+        if(playbackEdits!=null){playback=new AgentChangePlayback(area,source,playbackEdits,presentation::agentColor);playback.frame(index,0);}
+        presentation.moveMarker(index,ranges.get(index).start());area.putClientProperty("shed.agentTour",index+1);
+    }
     void advance(long now){
         if(closed)return;
         if(!area.isShowing()||area.getDocument()!=document||!current.getAsBoolean()||presentation.version()!=version){end(true);return;}
         if(!animated()){reveal(ranges.get(index).start(),1);end(false);return;}
         long elapsed=Math.max(0,now-started);double progress=Math.min(1,elapsed/(double)MOVE);var range=ranges.get(index);
+        long dwell=playback==null?DWELL:playback.durationMillis(index)*1_000_000L;
         if(elapsed<MOVE)reveal(range.start(),1-Math.pow(1-progress,3));
         else{
-            double moving=Math.min(1,(elapsed-MOVE)/(double)DWELL);
+            double moving=Math.min(1,(elapsed-MOVE)/(double)Math.max(1,dwell));
             int offset=range.start()+(int)((range.end()-range.start())*moving);
+            if(playback!=null){offset=playback.frame(index,moving);presentation.setAgentName(name+("deleting".equals(area.getClientProperty("shed.agentAnimation"))?" deleting":" writing"));}
             offset=Math.max(range.start(),GraphemeBoundary.floor(source,offset));reveal(offset,1);presentation.moveMarker(index,offset);
         }
-        if(elapsed>=MOVE+DWELL){if(++index>=ranges.size())end(false);else begin(now);}
+        if(elapsed>=MOVE+dwell){if(++index>=ranges.size())end(false);else begin(now);}
     }
     private void reveal(int offset,double amount){
         try{
@@ -72,6 +84,7 @@ final class AgentChangeTour implements AutoCloseable {
     private void user(){if(!closed){end(true);pause.run();}}
     private void end(boolean clear){
         if(closed)return;closed=true;timer.stop();
+        if(playback!=null){playback.close();playback=null;}
         area.removeKeyListener(key);area.removeMouseListener(mouse);area.removeFocusListener(focus);document.removeDocumentListener(edits);
         if(scroll!=null){scroll.removeMouseWheelListener(mouse);scroll.getVerticalScrollBar().removeMouseListener(mouse);scroll.getHorizontalScrollBar().removeMouseListener(mouse);}
         if(clear&&presentation.version()==version)presentation.clear();area.putClientProperty("shed.agentTour",null);finished.run();

@@ -438,6 +438,7 @@ final class EditorUiController {
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
                 paintExplorerFileDropPreview(g, this);
+                AgentChangePlayback.paint(this,g);
                 editorPainted(this, paintStartedAt);
             }
         };

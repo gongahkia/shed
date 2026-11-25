@@ -133,6 +133,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     }
     void observedSourceReady(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.observedSourceReady();}
     void pauseAgentFollowing(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.pauseFollowing();}
+    void retireAgentPresentation(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.retirePresentation();}
     void showObservedChange(java.nio.file.Path path){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents&&agents.selectObserved(path))showTab(Tab.AGENT);}
     void decorateExplorer(FileTreePanel tree){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.decorateExplorer(tree);}
     void showAgentReview() {

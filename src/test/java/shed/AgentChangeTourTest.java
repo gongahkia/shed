@@ -8,6 +8,70 @@ import javax.swing.undo.UndoManager;
 import org.junit.jupiter.api.Test;
 
 class AgentChangeTourTest {
+    private static JTextArea playbackArea(String source){
+        var area=new JTextArea(source){@Override public boolean isShowing(){return true;}@Override protected void paintComponent(java.awt.Graphics g){super.paintComponent(g);AgentChangePlayback.paint(this,g);}};
+        area.setFont(new java.awt.Font("Monospaced",0,16));area.setBackground(java.awt.Color.WHITE);area.setForeground(java.awt.Color.BLACK);area.setCaretColor(java.awt.Color.BLUE);area.setSize(600,240);return area;
+    }
+    private static java.awt.image.BufferedImage image(JTextArea area){var image=new java.awt.image.BufferedImage(600,240,java.awt.image.BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();try{area.paint(g);}finally{g.dispose();}return image;}
+    private static int ink(java.awt.image.BufferedImage image,int top,int bottom,boolean red){int found=0;for(int y=top;y<bottom;y++)for(int x=5;x<350;x++){var c=new java.awt.Color(image.getRGB(x,y));if(red?c.getRed()>c.getGreen()*1.5&&c.getRed()>c.getBlue()*1.3:c.getRed()<90&&c.getGreen()<90&&c.getBlue()<90)found++;}return found;}
+    @Test void smallChangesRevealCharactersWithoutChangingTheDocument()throws Exception {
+        EditorControlTest.edt(()->{
+            var area=playbackArea("alpha beta\n");var undo=new UndoManager();area.getDocument().addUndoableEditListener(undo);var events=new int[1];
+            area.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){events[0]++;}public void removeUpdate(javax.swing.event.DocumentEvent e){events[0]++;}public void changedUpdate(javax.swing.event.DocumentEvent e){events[0]++;}});
+            var range=new AgentEditPresentation.Range(0,10);
+            try(var playback=new AgentChangePlayback(area,area.getText(),List.of(new AgentChangePlayback.Edit(range,"")),()->java.awt.Color.GREEN)){
+                assertEquals(0,playback.frame(0,0));int empty=ink(image(area),0,20,false);
+                assertEquals(5,playback.frame(0,.5));int half=ink(image(area),0,20,false);
+                assertEquals(10,playback.frame(0,1));int full=ink(image(area),0,20,false);
+                assertTrue(empty<half&&half<full,"Glyphs must appear progressively");assertEquals("typing",area.getClientProperty("shed.agentAnimation"));assertEquals("left-to-right",area.getClientProperty("shed.agentDirection"));
+                assertEquals("alpha beta\n",area.getText());assertEquals(0,area.getCaretPosition());assertEquals(0,events[0]);assertFalse(undo.canUndo());
+            }
+            assertNull(area.getClientProperty(AgentChangePlayback.KEY));return null;
+        });
+    }
+    @Test void deletionPreviewErasesRightToLeftAndLargeWritesUseWholeLines()throws Exception {
+        EditorControlTest.edt(()->{
+            var area=playbackArea("remaining\n");int height=area.getFontMetrics(area.getFont()).getHeight();
+            try(var playback=new AgentChangePlayback(area,area.getText(),List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,0),"old first line\nold second line\n")),()->java.awt.Color.GREEN)){
+                playback.frame(0,0);int before=ink(image(area),height,height*3,true);assertTrue(before>0);
+                playback.frame(0,.7);int during=ink(image(area),height,height*3,true);assertTrue(during<before,"Removed glyphs must be erased");assertEquals("right-to-left",area.getClientProperty("shed.agentDirection"));
+                playback.frame(0,1);assertEquals(0,ink(image(area),height,height*3,true));assertEquals("remaining\n",area.getText());
+            }
+            String source="long replacement line\n".repeat(20);area.setText(source);
+            try(var playback=new AgentChangePlayback(area,source,List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"")),()->java.awt.Color.GREEN)){
+                int revealed=playback.frame(0,.43);assertTrue(revealed>0&&revealed<source.length());assertEquals('\n',source.charAt(revealed-1));assertEquals("chunks",area.getClientProperty("shed.agentAnimation"));
+            }
+            area.setText("");
+            try(var playback=new AgentChangePlayback(area,"",List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,0),"removed whole document\n")),()->java.awt.Color.GREEN)){
+                playback.frame(0,0);assertTrue(ink(image(area),height,height*2,true)>0);playback.frame(0,1);assertEquals("",area.getText());assertEquals(0,area.getDocument().getLength());
+            }
+            return null;
+        });
+    }
+    @Test void playbackOffsetsRespectGraphemesAndInterruptionsRevealActualSource()throws Exception {
+        EditorControlTest.edt(()->{
+            String source="a😀e\u0301z";var area=playbackArea(source);
+            try(var playback=new AgentChangePlayback(area,source,List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"")),()->java.awt.Color.GREEN)){
+                for(int i=0;i<=20;i++)assertTrue(GraphemeBoundary.isBoundary(source,playback.frame(0,i/20.0)));assertEquals(source,area.getText());
+            }
+            // exercise the boundary guard independently of the JDK complex-layout flag
+            area.getDocument().putProperty("i18n",false);var unchanged=image(area);
+            try(var playback=new AgentChangePlayback(area,source,List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(2,3),"")),()->java.awt.Color.GREEN)){
+                playback.frame(0,.5);assertArrayEquals(unchanged.getRGB(0,0,600,240,null,0,600),image(area).getRGB(0,0,600,240,null,0,600),"Partial-cluster ranges must not mask glyphs");
+            }
+            area.setText("alpha beta\n");var scroll=new JScrollPane(area);scroll.setSize(600,240);scroll.doLayout();area.setSize(580,500);
+            try(var presentation=new AgentEditPresentation(area);var tour=new AgentChangeTour(area,presentation,List.of(new AgentEditPresentation.Range(0,5)),area.getText(),"Agent",()->true,()->{},()->{},List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,5),"")))){
+                tour.start();assertNotNull(area.getClientProperty(AgentChangePlayback.KEY));
+                scroll.dispatchEvent(new MouseWheelEvent(scroll,MouseWheelEvent.MOUSE_WHEEL,System.currentTimeMillis(),0,10,10,0,false,MouseWheelEvent.WHEEL_UNIT_SCROLL,3,1));
+                assertNull(area.getClientProperty(AgentChangePlayback.KEY));assertFalse(tour.running());tour.advance(System.nanoTime()+9_000_000_000L);assertNull(area.getClientProperty(AgentChangePlayback.KEY));assertEquals("alpha beta\n",area.getText());
+            }
+            area.putClientProperty("shed.caretAnimation",false);
+            try(var presentation=new AgentEditPresentation(area);var tour=new AgentChangeTour(area,presentation,List.of(new AgentEditPresentation.Range(0,5)),area.getText(),"Agent",()->true,()->{},()->{},List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,5),"")))){
+                tour.start();assertFalse(tour.running());assertNull(area.getClientProperty(AgentChangePlayback.KEY));assertEquals("alpha beta\n",area.getText());
+            }
+            return null;
+        });
+    }
     private static final class View implements AutoCloseable {
         final String source=java.util.stream.IntStream.range(0,200).mapToObj(i->"line "+i+"\n").collect(java.util.stream.Collectors.joining());
         final JTextArea area=new JTextArea(source){@Override public boolean isShowing(){return true;}};

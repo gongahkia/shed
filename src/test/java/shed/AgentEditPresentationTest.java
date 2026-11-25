@@ -15,7 +15,7 @@ class AgentEditPresentationTest {
             try(var presentation=new AgentEditPresentation(area)){
                 presentation.showApplied(0,5);var editing=paint(area);var editingColor=presentation.agentColor();
                 presentation.showReading(0,5,"Agent");var reading=paint(area);
-                assertEquals("Agent reading",area.getClientProperty("shed.agentActivity"));assertNotEquals(editingColor,presentation.agentColor());
+                assertEquals("Agent reading",area.getClientProperty("shed.agentActivity"));assertEquals("top-to-bottom",area.getClientProperty("shed.agentDirection"));assertNotEquals(editingColor,presentation.agentColor());
                 int changed=0;for(int y=0;y<100;y++)for(int x=0;x<600;x++)if(editing.getRGB(x,y)!=reading.getRGB(x,y))changed++;
                 assertTrue(changed>0,"Reading must look different from an applied edit");
                 var tick=AgentEditPresentation.class.getDeclaredMethod("advance");tick.setAccessible(true);

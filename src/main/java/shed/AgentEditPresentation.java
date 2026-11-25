@@ -46,6 +46,7 @@ final class AgentEditPresentation implements AutoCloseable {
     void showReading(int start,int end,String name) {
         show(List.of(new Range(start,end)),true);if(ranges.isEmpty())return;
         reading=true;markerOffset=start;maximumTicks=120;setAgentName(name+" reading");
+        area.putClientProperty("shed.agentDirection","top-to-bottom");
         if(!ranges.isEmpty())area.putClientProperty("shed.agentActivity","Agent reading");
     }
     void showPending(int start, int end) { show(List.of(new Range(start, end)), true); }
@@ -92,8 +93,9 @@ final class AgentEditPresentation implements AutoCloseable {
         document = area.getDocument(); document.addDocumentListener(edits);
     }
     Color agentColor() {
-        Color base = UIManager.getColor(reading?"shed.warning":"shed.success");
-        if (base == null) base = new Color(reading?0xA87808:0x27815C);
+        boolean deleting="deleting".equals(area.getClientProperty("shed.agentAnimation"));
+        Color base = UIManager.getColor(reading?"shed.warning":deleting?"shed.error":"shed.success");
+        if (base == null) base = new Color(reading?0xA87808:deleting?0xCC4855:0x27815C);
         Color human = area.getCaretColor();
         if (human != null && distance(base, human) < 100) base = new Color(0x8B52C7);
         return AccessibilitySupport.readableText(base, area.getBackground());
@@ -119,6 +121,8 @@ final class AgentEditPresentation implements AutoCloseable {
     }
     void clear() {
         checkEdt(); version++;timer.stop(); repaintRanges();
+        if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)playback.close();
+        area.putClientProperty("shed.agentDirection",null);
         if (highlighter != null) for (Object tag : tags) highlighter.removeHighlight(tag);
         tags.clear();touring=false;reading=false; ranges = List.of(); highlighter = null; ticks = 0; agentName = "Agent";
         area.putClientProperty("shed.agentActivity", null);
@@ -145,6 +149,21 @@ final class AgentEditPresentation implements AutoCloseable {
                     int alpha = !animated() ? 48 : reading ? 30+(int)(12*Math.sin(ticks*.18)) : (pending||touring&&range.equals(ranges.get(activeRange))) ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
                     copy.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
                     copy.fill(line);
+                    if(animated()){
+                        var sweep=(Graphics2D)copy.create();
+                        try{
+                            sweep.clip(line);sweep.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),38));
+                            double phase=(ticks%40)/40.0;
+                            if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)phase=playback.directionalProgress();
+                            if(reading){
+                                var first=area.modelToView2D(range.start());var last=area.modelToView2D(range.end());
+                                if(first!=null&&last!=null){int y=(int)(first.getY()+phase*(last.getMaxY()-first.getY()));sweep.fillRect(line.x,y,line.width,Math.max(2,area.getFontMetrics(area.getFont()).getHeight()/2));}
+                            }else{
+                                int x=line.x+(int)(phase*line.width);if("right-to-left".equals(area.getClientProperty("shed.agentDirection")))x=line.x+line.width-(int)(phase*line.width);
+                                sweep.fillRect(x,line.y,Math.max(3,line.width/12),line.height);
+                            }
+                        }finally{sweep.dispose();}
+                    }
                     if (range.equals(ranges.get(activeRange))&&start<=markerOffset&&markerOffset<=end) {
                         Rectangle2D caret = area.modelToView2D(markerOffset);
                         if (caret != null) {

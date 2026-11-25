@@ -14,7 +14,7 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch");
     static boolean mutation(String method) {
         return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
@@ -22,9 +22,12 @@ final class EditorControl implements AutoCloseable {
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
         "documentRevision", "contextRevision", "caretOffset", "selectionStart", "selectionEnd");
     interface Host extends EditorNavigation.Host {
+        default EditorNavigation.State openingState(){return state();}
+        default EditorNavigation.State prepareOpening(){return openingState();}
         ProjectFileOpen.Request open(ProjectBoundFileAcquisition.RootPin root, String path, EditorNavigation.State expected,
                                      BooleanSupplier current, Consumer<ProjectDocumentInstall.Result> completed);
         void activity(int start, int end);
+        default void reading(int start, int end, String agent) { activity(start,end); }
         default void progress(AgentActivityState.State state, int start, int end) { if (state.terminal()) clearActivity(); else activity(start,end); }
         default WatchRoot watchRoot(){var s=state().metadata();return new WatchRoot(s.activeRoot(),s.generation());}
         default Map<String,Object> watch(String action,String agent){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
@@ -49,6 +52,7 @@ final class EditorControl implements AutoCloseable {
         root = ProjectBoundFileAcquisition.pinAuthorizedRoot(workspace.root());
     }
     private final class Lease implements AutoCloseable {
+        boolean opening;
         final AtomicBoolean live = new AtomicBoolean(true);
         final AtomicReference<ProjectFileOpen.Request> open = new AtomicReference<>();
         final BooleanSupplier connection;
@@ -64,10 +68,12 @@ final class EditorControl implements AutoCloseable {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Control dispatch belongs off the EDT");
         if (!OPERATIONS.contains(method)) throw fail(WorkspaceApiException.Code.UNSUPPORTED);
         if(method.equals("editor/watch"))return watch(params,connection);
-        var fields = new java.util.HashSet<>(CONTEXT);
+        boolean initialOpen=method.equals("editor/file/open")&&params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","path"));
+        var fields = new java.util.HashSet<>(initialOpen?Set.of("schemaVersion","instanceId","windowId","projectId"):CONTEXT);
         fields.addAll(switch (method) {
             case "editor/file/open" -> Set.of("path");
             case "editor/source/read" -> Set.of("offset", "limit");
+            case "editor/source/read-visible" -> Set.of("offset", "limit", "agent");
             case "editor/edits/propose" -> Set.of("start", "end", "text", "requestId");
             case "editor/watch" -> Set.of("action","agent");
             case "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture" -> Set.of();
@@ -84,13 +90,20 @@ final class EditorControl implements AutoCloseable {
         if (!grant.projectId.equals(text(params, "projectId", 64))) throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
         grant.requireIdentity(text(params, "instanceId", 64), text(params, "windowId", 64));
         Lease lease = new Lease(connection);
+        lease.opening=initialOpen;
         if (!active.compareAndSet(null, lease)) throw fail(WorkspaceApiException.Code.BUSY);
         try (lease) {
             lease.require();
-            EditorNavigation.State before = ui(lease, () -> owner().state());
-            verify(params, before); grant.authorize(before.metadata());
             Services current = services.get();
             if (current == null) throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+            if(initialOpen){
+                var project=ui(lease,()->owner().watchRoot());grant.authorizeProject(project.root(),project.generation());
+                try{current.workspace().policy().checkPath(ProjectBoundFileAcquisition.checkedRelativePath(text(params,"path",4096)),AgentPolicy.Capability.READ);}
+                catch(java.io.IOException invalid){throw fail(WorkspaceApiException.Code.PROTECTED_PATH);}
+            }
+            EditorNavigation.State before = ui(lease, () -> initialOpen?owner().prepareOpening():owner().state());
+            if(initialOpen)grant.authorizeProject(before.metadata().activeRoot(),before.metadata().generation());
+            else{verify(params, before); grant.authorize(before.metadata());}
             if (method.equals("editor/file/open")) return open(lease, params, before, current);
             if (method.equals("editor/diagnostics")||method.equals("editor/feedback")||method.startsWith("editor/preview/")) {
                 Map<String,Object> observation;
@@ -119,13 +132,19 @@ final class EditorControl implements AutoCloseable {
             if (source.source() != WorkspaceDocument.Source.EDITOR || !source.documentId().equals(before.metadata().documentId()) || !source.complete())
                 throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
             check(lease, before);
-            if (method.equals("editor/source/read")) {
+            if (method.equals("editor/source/read")||method.equals("editor/source/read-visible")) {
                 int offset = offset(params, "offset"), limit = offset(params, "limit");
                 if (limit < 1 || limit > MAX_READ || offset > source.content().length()) throw fail(WorkspaceApiException.Code.INVALID_OFFSET);
                 int end = Math.min(source.content().length(), offset + limit);
                 if (!GraphemeBoundary.isBoundary(source.content(), offset)) throw fail(WorkspaceApiException.Code.INVALID_OFFSET);
                 while (end > offset && !GraphemeBoundary.isBoundary(source.content(), end)) end--;
                 if (end == offset && offset < source.content().length()) throw fail(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                if(method.equals("editor/source/read-visible")){
+                    String agent=text(params,"agent",40);
+                    if(agent.isBlank()||agent.codePoints().anyMatch(Character::isISOControl))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+                    int readEnd=end;
+                    ui(lease,()->{requireState(lease,before);owner().reading(offset,readEnd,agent);return null;});
+                }
                 var result = result(method, before, "read"); result.put("offset", offset); result.put("nextOffset", end);
                 result.put("content", source.content().substring(offset, end)); result.put("truncated", end < source.content().length());
                 return result;
@@ -229,7 +248,8 @@ final class EditorControl implements AutoCloseable {
             default -> WorkspaceApiException.Code.OUTCOME_UNKNOWN;
         });
         try {
-            var state = ui(lease, () -> owner().state()); grant.authorize(state.metadata());
+            var state = ui(lease, () -> state(lease)); grant.authorize(state.metadata());
+            if(!state.metadata().paneId().equals(before.metadata().paneId())||!root.path().resolve(path).equals(state.metadata().path()))throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
             return result("editor/file/open", state, "applied");
         } catch (RuntimeException changed) { throw fail(WorkspaceApiException.Code.OUTCOME_UNKNOWN); }
     }
@@ -248,8 +268,9 @@ final class EditorControl implements AutoCloseable {
         ui(lease, () -> { requireState(lease, expected); return null; });
     }
     private void requireState(Lease lease, EditorNavigation.State expected) {
-        lease.require(); if (!expected.equals(owner().state())) throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
+        lease.require(); if (!expected.equals(state(lease))) throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
     }
+    private EditorNavigation.State state(Lease lease){return lease.opening?owner().openingState():owner().state();}
     private Host owner() { var value = host.get(); if (value == null) throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED); return value; }
     private <T> T ui(Lease lease, Callable<T> action) {
         lease.require();

@@ -72,12 +72,19 @@ final class EditorMetadata implements AutoCloseable {
     }
 
     static Context capture(EditorPane pane, EditorWorkspaceDocuments documents, Path activeRoot, List<Path> roots, long generation) {
+        return capture(pane,documents,activeRoot,roots,generation,false);
+    }
+    /** Internal open precondition only; an untitled buffer's nullable path is never an observation grant. */
+    static Context captureForOpen(EditorPane pane,EditorWorkspaceDocuments documents,Path activeRoot,List<Path> roots,long generation){
+        return capture(pane,documents,activeRoot,roots,generation,true);
+    }
+    private static Context capture(EditorPane pane,EditorWorkspaceDocuments documents,Path activeRoot,List<Path> roots,long generation,boolean opening){
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor metadata belongs to the EDT");
         if (roots.size() > MAX_ROOTS) throw failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
         if (pane == null) throw failure(WorkspaceApiException.Code.NO_ACTIVE_EDITOR);
         if (pane.isDisposed()) throw failure(WorkspaceApiException.Code.PANE_UNAVAILABLE);
         FileBuffer buffer = pane.getBuffer();
-        if (buffer == null || buffer.isScratch() || !buffer.hasFilePath() || buffer.isLargeFile()
+        if (buffer == null || buffer.isScratch() || !opening&&!buffer.hasFilePath() || buffer.isLargeFile()
             || pane.getTerminalPane() != null || pane.isMarkdownPreview() || pane.getAlternateComponent() != null)
             throw failure(WorkspaceApiException.Code.NO_ACTIVE_EDITOR);
         var area = pane.getTextArea();
@@ -86,8 +93,8 @@ final class EditorMetadata implements AutoCloseable {
         int length = buffer.getDocument().getLength();
         int caret = area.getCaretPosition(), start = area.getSelectionStart(), end = area.getSelectionEnd();
         validateCoordinates(length, revision, caret, start, end);
-        Path path = buffer.getFile().toPath().toAbsolutePath().normalize();
-        if (path.toString().length() > 8192) throw failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        Path path = buffer.hasFilePath()?buffer.getFile().toPath().toAbsolutePath().normalize():null;
+        if (path!=null&&path.toString().length() > 8192) throw failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
         return new Context(activeRoot, List.copyOf(roots), generation, pane.observationId(), documents.metadataIdentity(buffer),
             path, length, revision, buffer.isModified(), caret, start, end);
     }

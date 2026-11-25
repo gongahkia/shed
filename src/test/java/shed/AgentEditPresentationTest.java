@@ -7,6 +7,30 @@ import javax.swing.undo.UndoManager;
 import org.junit.jupiter.api.Test;
 
 class AgentEditPresentationTest {
+    @Test void readingHasDistinctPulseAndMarkerAndExpiresWithoutChangingHumanState()throws Exception {
+        SwingUtilities.invokeAndWait(()->{
+            var area=new JTextArea("class Example {}\nsecond line\n"){@Override public boolean isShowing(){return true;}};
+            area.setFont(new java.awt.Font(java.awt.Font.MONOSPACED,0,16));area.setSize(600,100);area.select(2,6);
+            var undo=new UndoManager();area.getDocument().addUndoableEditListener(undo);
+            try(var presentation=new AgentEditPresentation(area)){
+                presentation.showApplied(0,5);var editing=paint(area);var editingColor=presentation.agentColor();
+                presentation.showReading(0,5,"Agent");var reading=paint(area);
+                assertEquals("Agent reading",area.getClientProperty("shed.agentActivity"));assertNotEquals(editingColor,presentation.agentColor());
+                int changed=0;for(int y=0;y<100;y++)for(int x=0;x<600;x++)if(editing.getRGB(x,y)!=reading.getRGB(x,y))changed++;
+                assertTrue(changed>0,"Reading must look different from an applied edit");
+                var tick=AgentEditPresentation.class.getDeclaredMethod("advance");tick.setAccessible(true);
+                tick.invoke(presentation);assertFalse(java.util.Arrays.equals(reading.getRGB(0,0,600,100,null,0,600),paint(area).getRGB(0,0,600,100,null,0,600)),"Reading pulse did not advance");
+                for(int i=1;i<120;i++)tick.invoke(presentation);
+                var field=AgentEditPresentation.class.getDeclaredField("timer");field.setAccessible(true);assertFalse(((Timer)field.get(presentation)).isRunning());assertNull(area.getClientProperty("shed.agentActivity"));
+                area.putClientProperty("shed.caretAnimation",false);presentation.showReading(0,5,"Agent");assertFalse(((Timer)field.get(presentation)).isRunning());
+                assertEquals("class Example {}\nsecond line\n",area.getText());assertEquals(2,area.getSelectionStart());assertEquals(6,area.getSelectionEnd());assertFalse(undo.canUndo());
+                area.append("edit");assertNull(area.getClientProperty("shed.agentActivity"));
+            }catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
+        });
+    }
+    private static java.awt.image.BufferedImage paint(JTextArea area){
+        var image=new java.awt.image.BufferedImage(600,100,java.awt.image.BufferedImage.TYPE_INT_RGB);var graphics=image.createGraphics();try{area.paint(graphics);}finally{graphics.dispose();}return image;
+    }
     @Test void firstLineLabelUsesFreeSpaceInsteadOfCoveringSource()throws Exception {
         SwingUtilities.invokeAndWait(()->{
             var area=new JTextArea("class Example {}\n");area.setFont(new java.awt.Font(java.awt.Font.MONOSPACED,0,16));area.setSize(600,100);

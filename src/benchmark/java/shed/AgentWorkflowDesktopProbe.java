@@ -178,6 +178,58 @@ public final class AgentWorkflowDesktopProbe {
     private static boolean tourSettled(JTextArea area,String marker){
         try{var bounds=area.modelToView2D(area.getText().indexOf(marker));var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);if(bounds==null||viewport==null)return false;int target=Math.max(0,Math.min(area.getHeight()-viewport.getExtentSize().height,(int)bounds.getY()-viewport.getExtentSize().height/3));return Math.abs(viewport.getViewPosition().y-target)<3;}catch(javax.swing.text.BadLocationException unavailable){return false;}
     }
+    private static Map<String,Object> externalRead(Path project,String path,int offset,int limit)throws Exception {
+        Path fixture=Path.of(System.getenv("SHED_PORTABLE_FIXTURE_ROOT")).toRealPath();
+        Path home=Path.of(System.getProperty("user.home")).toRealPath();
+        check(project.toRealPath().startsWith(fixture.resolve("run"))&&home.startsWith(fixture),"External read requires disposable project and home");
+        var command=List.of(Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString(),
+            "-Duser.home="+home,"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir"),"-cp",ShedVisualize.absoluteClassPath(System.getProperty("java.class.path"),Path.of(System.getProperty("user.dir"))),
+            "shed.Texteditor","ctl","--connect",edt(AgentWorkflowDesktopProbe::attachment).descriptor().toString(),"read",path,"--offset",Integer.toString(offset),"--limit",Integer.toString(limit),"--agent","Local agent");
+        var child=new ProcessBuilder(command).directory(project.toFile()).redirectErrorStream(true).start();
+        try{
+            child.getOutputStream().close();check(child.waitFor(8,TimeUnit.SECONDS),"External reading client timed out");
+            byte[] bytes=child.getInputStream().readNBytes(32769);check(bytes.length<=32768,"External reading reply exceeded bounds");
+            String response=new String(bytes,java.nio.charset.StandardCharsets.UTF_8);
+            if(child.exitValue()!=0)System.out.println(edt(()->{
+                var gate=Texteditor.class.getDeclaredMethod("allowsMachineNavigation");gate.setAccessible(true);
+                var focused=KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                return "READ_OPEN_DIAGNOSTIC mode="+editor.editorState.mode+" allowed="+gate.invoke(editor)+" focused="+editor.isFocused()+" focus="+(focused==null?"none":focused.getClass().getName())+" sourceFocused="+(focused==editor.writingArea)+" state="+editor.captureEditorOpening();
+            }));
+            check(child.exitValue()==0,"External reading failed: "+response);
+            return ShedControlCli.result(response);
+        }finally{
+            if(child.isAlive()){child.destroy();if(!child.waitFor(2,TimeUnit.SECONDS)){child.destroyForcibly();check(child.waitFor(2,TimeUnit.SECONDS),"Reading client retained after cleanup");}}
+            child.getInputStream().close();child.getErrorStream().close();
+        }
+    }
+    private static void qualifyVisibleReading(Path project)throws Exception {
+        StringBuilder text=new StringBuilder();for(int i=0;i<260;i++)text.append("// reading checkpoint ").append(i).append('\n');String source=text.toString();
+        Files.writeString(project.resolve("ReadFirst.java"),source);Files.writeString(project.resolve("ReadSecond.java"),"class ReadSecond {}\n");
+        edt(()->{
+            editor.hideToolWindow();editor.activateEditorPane(editor.resolveTreeContentPaneForOpen());editor.openEmptyBuffer();
+            editor.treeGitController.showFileTree(project.toString());editor.setMode(EditorMode.INSERT);
+            check(editor.isTreePaneActive(),"Reading fixture must start with the tree active");return null;
+        });
+        int offset=source.indexOf("// reading checkpoint 220\n");
+        long started=System.nanoTime();var reply=externalRead(project,"ReadFirst.java",offset,100);double first=(System.nanoTime()-started)/1e6;
+        check(source.substring(offset,offset+100).equals(reply.get("content")),"Visible read returned different source");
+        var area=edt(()->editor.writingArea);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);
+        edt(()->{
+            check(buffer.getFile().getName().equals("ReadFirst.java")&&buffer.getContent().equals(source)&&!buffer.isModified()&&!buffer.getUndoManager().canUndo(),"Reading did not open the exact clean authoritative file");
+            check(area.getCaretPosition()==0&&area.getSelectionStart()==0&&area.getSelectionEnd()==0,"Reading moved the human caret");
+            check("Agent reading".equals(area.getClientProperty("shed.agentActivity")),"Reading presentation missing");
+            var tags=area.getHighlighter().getHighlights();check(tags.length==1&&tags[0].getStartOffset()==offset&&tags[0].getEndOffset()==offset+100,"Wrong reading range highlighted");
+            var position=area.modelToView2D(offset);check(position!=null&&area.getVisibleRect().intersects(position),"Reading range not revealed");
+            var end=area.modelToView2D(offset+100);check(end!=null&&area.getVisibleRect().intersects(end),"Reading chunk is clipped below the viewport");
+            check(!editor.toolWindowHost.isVisible(),"Reading exposed agent management panels");return null;
+        });capture("22-agent-reading-first-file");
+        started=System.nanoTime();var second=externalRead(project,"ReadSecond.java",0,100);double next=(System.nanoTime()-started)/1e6;
+        check("class ReadSecond {}\n".equals(second.get("content")),"Second read mismatch");
+        edt(()->{check(editor.getCurrentBuffer().getFile().getName().equals("ReadSecond.java"),"Reading failed to switch files");check(buffer.getContent().equals(source)&&buffer.documentRevision()==revision&&!buffer.isModified(),"Reading another file changed previous source");return null;});capture("23-agent-reading-second-file");
+        await(()->area.getClientProperty("shed.agentActivity")==null,8);
+        edt(()->{check(area.getHighlighter().getHighlights().length==0,"Reading decoration did not expire");return null;});
+        events.add(Map.of("phase","external_cli_visible_read_two_files","exact",true,"first_client_ms",first,"second_client_ms",next,"source_and_caret_preserved",true,"expired",true));
+    }
     private static void qualifyEofAppend(Path project)throws Exception {
         Path file=project.resolve("AppendDemo.java");String before="// demonstration line\n".repeat(240);
         String after=before+"\npublic class AppendDemo {\n";
@@ -272,11 +324,12 @@ public final class AgentWorkflowDesktopProbe {
         events.add(Map.of("phase","same_file_conflict_view_both_save_undo_redo","exact",true));
         delayedFollow(project,human);
         String source=edt(human::getContent);long sourceRevision=edt(human::documentRevision);boolean dirtyBeforeVisuals=edt(human::isModified);
+        var treeBuffer=edt(()->editor.treePane==null?null:editor.treePane.getBuffer());
         edt(()->{editor.splitWindow(true);editor.splitWindow(false);return null;});
         for(String theme:List.of("shed-light","dracula")){
             edt(()->{editor.setThemeFromCommand(theme);editor.setSize(theme.equals("dracula")?850:1400,900);editor.configManager.set("ui.density",theme.equals("dracula")?"compact":"comfortable");editor.sessionConfigController.applySetting("ui.density");return null;});
             edt(()->null);capture(theme.equals("dracula")?"12-dark-narrow-splits":"11-light-comfortable-splits");
-            edt(()->{check(human.getContent().equals(source)&&human.documentRevision()==sourceRevision&&human.isModified()==dirtyBeforeVisuals,"Visual changes modified source");for(var pane:editor.editorPanes)check(pane.getBuffer()==human,"Split lost document owner");return null;});
+            edt(()->{check(human.getContent().equals(source)&&human.documentRevision()==sourceRevision&&human.isModified()==dirtyBeforeVisuals,"Visual changes modified source");int sources=0;for(var pane:editor.editorPanes){if(pane==editor.treePane)check(pane.getBuffer()==treeBuffer&&pane.getAlternateComponent() instanceof FileTreePanel,"Explorer lost its own document/surface");else{sources++;check(pane.getBuffer()==human,"Split lost document owner");}}check(sources==3,"Expected three shared source splits");return null;});
         }
         edt(()->{editor.commandHandler.execute("focus on");editor.commandHandler.execute("center on");return null;});
         capture("13-focus-centered-live-changes");
@@ -422,6 +475,7 @@ public final class AgentWorkflowDesktopProbe {
             long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);WorkspaceBridgeServer server;
             while((server=edt(AgentWorkflowDesktopProbe::attachment))==null){if(System.nanoTime()>deadline)throw new IllegalStateException("Control attachment unavailable");Thread.sleep(25);}
             check(server.controlEnabled(),"Wrong attachment scope");
+            qualifyVisibleReading(project);
             Path ready=folder.resolve("ready.json");
             Files.writeString(ready,MiniJson.stringify(Map.of("descriptor",server.descriptor().toString(),"credential",server.credential().toString())));
             if(!"1".equals(System.getenv("SHED_WATCH_QUALIFICATION")))edt(()->{editor.hideToolWindow();return null;});

@@ -41,6 +41,20 @@ final class ShedControlCli {
                     mutationSent=!command.equals("watch-state");
                     return emit(client.exchange(request("editor/watch",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"action",action,"agent",name==null?"Agent":name))),out);
                 }
+                if(command.equals("open")||command.equals("read")&&path!=null){
+                    if(path==null)throw new IllegalArgumentException();
+                    long offset=command.equals("read")?number(options,"--offset",0):0,limit=command.equals("read")?number(options,"--limit",EditorControl.MAX_READ):1;
+                    String agent=command.equals("read")?options.remove("--agent"):null;if(agent==null)agent="Agent";
+                    if(!options.isEmpty()||offset>Integer.MAX_VALUE||limit<1||limit>EditorControl.MAX_READ||agent.isBlank()||agent.length()>40||agent.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException();
+                    var opening=new LinkedHashMap<String,Object>(Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"path",path));
+                    mutationSent=true;String response=client.exchange(request("editor/file/open",opening));
+                    if(command.equals("open"))return emit(response,out);
+                    var opened=result(response);var settled=result(client.exchange(client.navigationContextRequest()));
+                    for(String field:List.of("paneId","documentId","documentRevision","caretOffset","selectionStart","selectionEnd","dirty"))
+                        if(!Objects.equals(opened.get(field),settled.get(field)))throw new WorkspaceApiException(WorkspaceApiException.Code.CONTEXT_CHANGED,"Opened source changed before reading");
+                    var visible=context(settled);visible.put("offset",offset);visible.put("limit",limit);visible.put("agent",agent);
+                    return emit(client.exchange(request("editor/source/read-visible",visible)),out);
+                }
                 Map<String,Object> context=result(client.exchange(client.navigationContextRequest()));
                 var params=context(context); String method;
                 switch(command) {

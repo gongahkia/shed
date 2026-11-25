@@ -299,11 +299,25 @@ public class Texteditor extends JFrame implements KeyListener {
         if (!agentNavigationInteraction.watch(getActivePane())) throw EditorMetadata.failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
         return new EditorNavigation.State(metadata, agentNavigationInteraction.revision());
     }
+    EditorNavigation.State captureEditorOpening(){
+        if(closingDown||!isDisplayable())throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
+        if(agentNavigationInteraction==null)throw EditorMetadata.failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+        if(editorPanes.size()>EditorMetadata.MAX_PANES||buffers.size()>EditorMetadata.MAX_OPEN_DOCUMENTS)throw EditorMetadata.failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        var pane=getActivePane();
+        if(pane!=null&&pane.getBuffer()!=null&&!buffers.contains(pane.getBuffer()))throw EditorMetadata.failure(WorkspaceApiException.Code.CONTEXT_CHANGED);
+        var metadata=EditorMetadata.captureForOpen(pane,workspaceDocumentSource,workspaceRoots.active(),workspaceRoots.all(),workspaceRoots.generation());
+        if(!agentNavigationInteraction.watch(pane))throw EditorMetadata.failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        return new EditorNavigation.State(metadata,agentNavigationInteraction.revision());
+    }
 
     private boolean allowsMachineNavigation() {
+        return allowsMachineNavigation(false);
+    }
+    private boolean allowsMachineNavigation(boolean opening) {
         var focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        boolean explorer=opening&&focused!=null&&treePane!=null&&treePane.getAlternateComponent()!=null&&SwingUtilities.isDescendingFrom(focused,treePane.getAlternateComponent());
         return editorState.mode == EditorMode.INSERT && extraSelections.isEmpty() && recordingRegister == null
-            && inputController.allowsMachineNavigation() && (!isFocused() || focused == writingArea);
+            && inputController.allowsMachineNavigation() && (!isFocused() || focused == writingArea || explorer);
     }
 
     EditorNavigation.Prepared prepareEditorNavigation(EditorNavigation.Command command) {
@@ -319,7 +333,7 @@ public class Texteditor extends JFrame implements KeyListener {
             EditorNavigation.State expected, java.util.function.BooleanSupplier current,
             java.util.function.Consumer<ProjectDocumentInstall.Result> completed) {
         return paneBufferController.openProjectFileAsync(root, path, getActivePane(), expected,
-            () -> current.getAsBoolean() && allowsMachineNavigation(), completed);
+            () -> current.getAsBoolean() && allowsMachineNavigation(true), completed);
     }
 
     void clearAgentActivity() { for (var pane : editorPanes) pane.clearAgentPresentation(); }

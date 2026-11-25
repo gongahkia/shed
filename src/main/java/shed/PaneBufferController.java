@@ -506,7 +506,7 @@ final class PaneBufferController {
             EditorPane target, EditorNavigation.State expected, java.util.function.BooleanSupplier authorized) {
         return authorized != null && !editor.closingDown && target != null && !target.isDisposed()
             && editor.editorPanes.contains(target) && target == editor.getActivePane()
-            && ProjectDocumentInstall.matches(prepared, target, expected, editor.captureEditorNavigation())
+            && ProjectDocumentInstall.matches(prepared, target, expected, editor.captureEditorOpening())
             && authorized.getAsBoolean();
     }
 

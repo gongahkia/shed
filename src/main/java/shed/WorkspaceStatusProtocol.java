@@ -143,7 +143,7 @@ final class WorkspaceStatusProtocol {
                         || start<0 || end!=start+content.length() || length<end || length>EditorControl.MAX_DOCUMENT
                         || !Boolean.valueOf(end<length).equals(file.get("truncated")) || !Set.of("EDITOR","DISK").contains(file.get("source")))return false;
                 }
-                case "editor/source/read" -> {
+                case "editor/source/read", "editor/source/read-visible" -> {
                     if (!"read".equals(outcome) || !(base.remove("content") instanceof String content) || content.length() > EditorControl.MAX_READ
                             || !(base.remove("offset") instanceof Long offset) || !(base.remove("nextOffset") instanceof Long end)
                             || offset < 0 || end != offset + content.length() || !(base.remove("truncated") instanceof Boolean)) return false;

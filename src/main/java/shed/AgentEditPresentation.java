@@ -21,7 +21,7 @@ final class AgentEditPresentation implements AutoCloseable {
     private List<Range> ranges = List.of();
     private Document document;
     private Highlighter highlighter;
-    private boolean closed, pending, touring;
+    private boolean closed, pending, touring, reading;
     private int ticks, maximumTicks = TICKS, activeRange, markerOffset;
     private long version;
     private String agentName = "Agent";
@@ -43,6 +43,11 @@ final class AgentEditPresentation implements AutoCloseable {
         area.addPropertyChangeListener(properties); area.addHierarchyListener(hierarchy); observe();
     }
     void showProgress(int start, int end, String name) { showPending(start,end); maximumTicks=600; setAgentName(name); }
+    void showReading(int start,int end,String name) {
+        show(List.of(new Range(start,end)),true);if(ranges.isEmpty())return;
+        reading=true;markerOffset=start;maximumTicks=120;setAgentName(name+" reading");
+        if(!ranges.isEmpty())area.putClientProperty("shed.agentActivity","Agent reading");
+    }
     void showPending(int start, int end) { show(List.of(new Range(start, end)), true); }
     void showPending(List<Range> changes) { show(changes, true); }
     void showApplied(int start, int end) { showApplied(List.of(new Range(start, end))); }
@@ -87,8 +92,8 @@ final class AgentEditPresentation implements AutoCloseable {
         document = area.getDocument(); document.addDocumentListener(edits);
     }
     Color agentColor() {
-        Color base = UIManager.getColor("shed.success");
-        if (base == null) base = new Color(0x27815C);
+        Color base = UIManager.getColor(reading?"shed.warning":"shed.success");
+        if (base == null) base = new Color(reading?0xA87808:0x27815C);
         Color human = area.getCaretColor();
         if (human != null && distance(base, human) < 100) base = new Color(0x8B52C7);
         return AccessibilitySupport.readableText(base, area.getBackground());
@@ -115,7 +120,7 @@ final class AgentEditPresentation implements AutoCloseable {
     void clear() {
         checkEdt(); version++;timer.stop(); repaintRanges();
         if (highlighter != null) for (Object tag : tags) highlighter.removeHighlight(tag);
-        tags.clear();touring=false; ranges = List.of(); highlighter = null; ticks = 0; agentName = "Agent";
+        tags.clear();touring=false;reading=false; ranges = List.of(); highlighter = null; ticks = 0; agentName = "Agent";
         area.putClientProperty("shed.agentActivity", null);
     }
     @Override public void close() {
@@ -137,13 +142,15 @@ final class AgentEditPresentation implements AutoCloseable {
                 Graphics2D copy = (Graphics2D) graphics.create();
                 try {
                     Color color = agentColor();
-                    int alpha = !animated() ? 48 : (pending||touring&&range.equals(ranges.get(activeRange))) ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
+                    int alpha = !animated() ? 48 : reading ? 30+(int)(12*Math.sin(ticks*.18)) : (pending||touring&&range.equals(ranges.get(activeRange))) ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
                     copy.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
                     copy.fill(line);
                     if (range.equals(ranges.get(activeRange))&&start<=markerOffset&&markerOffset<=end) {
                         Rectangle2D caret = area.modelToView2D(markerOffset);
                         if (caret != null) {
-                            copy.setColor(color); copy.fillRect((int)caret.getX(), (int)caret.getY(), 3, (int)caret.getHeight());
+                            copy.setColor(color);
+                            if(reading)copy.fillRect((int)caret.getX(),(int)caret.getMaxY()-2,7,2);
+                            else copy.fillRect((int)caret.getX(), (int)caret.getY(), 3, (int)caret.getHeight());
                             int sourceLine=area.getLineOfOffset(markerOffset),lineEnd=Math.min(document.getLength(),area.getLineEndOffset(sourceLine));
                             if(lineEnd-area.getLineStartOffset(sourceLine)<=256){
                                 if(lineEnd>0&&"\n".equals(document.getText(lineEnd-1,1)))lineEnd--;

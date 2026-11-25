@@ -173,6 +173,14 @@ final class AgentWorkspaceController implements AutoCloseable {
             }
             public EditorMetadata.Context capture() { return owner().captureEditorMetadata(); }
             public EditorNavigation.State state() { return owner().captureEditorNavigation(); }
+            public EditorNavigation.State openingState(){return owner().captureEditorOpening();}
+            public EditorNavigation.State prepareOpening(){
+                var app=owner();
+                if(app.isTreePaneActive()){
+                    var source=app.resolveTreeContentPaneForOpen();app.activateEditorPane(source);
+                }
+                return openingState();
+            }
             public EditorNavigation.Prepared prepare(EditorNavigation.Command command) { return owner().prepareEditorNavigation(command); }
             public EditorNavigation.Applied apply(EditorNavigation.Prepared prepared, java.util.function.BooleanSupplier authorized) {
                 var result = owner().applyEditorNavigation(prepared, authorized);
@@ -188,12 +196,26 @@ final class AgentWorkspaceController implements AutoCloseable {
                 if (!presentation.available()) throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
                 presentation.showPending(start, end);
             }
+            public void reading(int start,int end,String agent) {
+                var pane=owner().getActivePane();var presentation=pane.agentPresentation();
+                if(!presentation.available())throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                try{
+                    var bounds=pane.getTextArea().modelToView2D(start);
+                    if(bounds==null)throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                    presentation.showReading(start,end,agent);
+                    var reveal=bounds.getBounds();var viewport=pane.getScrollPane().getViewport();
+                    reveal.y=Math.max(0,reveal.y-viewport.getExtentSize().height/3);reveal.height=viewport.getExtentSize().height;
+                    pane.getTextArea().scrollRectToVisible(reveal);
+                    owner().showMessage(agent+" · reading "+pane.getBuffer().getDisplayName());
+                }catch(javax.swing.text.BadLocationException unavailable){throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);}
+            }
             public void progress(AgentActivityState.State state, int start, int end) {
                 if (state.terminal()) owner().clearAgentActivity();
                 else {
                     var presentation=owner().getActivePane().agentPresentation();
                     if (!presentation.available()) throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
-                    presentation.showProgress(start,end,state.agent());
+                    if(state.phase().equals("reading"))reading(start,end,state.agent());
+                    else presentation.showProgress(start,end,state.agent());
                 }
                 owner().showMessage(state.label());
             }

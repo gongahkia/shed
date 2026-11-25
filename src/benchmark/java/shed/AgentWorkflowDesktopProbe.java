@@ -128,6 +128,13 @@ public final class AgentWorkflowDesktopProbe {
             editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("watch");check(!editor.toolWindowHost.isVisible(),"Watch opened management tools");return null;
         });
         await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Agent").get("ready")),20);
+        edt(()->{
+            check(editor.getCurrentBuffer().getFile()==null,"Fresh-project probe already has an open file");
+            var area=editor.writingArea;
+            area.dispatchEvent(new java.awt.event.MouseEvent(area,java.awt.event.MouseEvent.MOUSE_PRESSED,System.currentTimeMillis(),0,12,12,1,false,java.awt.event.MouseEvent.BUTTON1));
+            check(Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Agent").get("following")),"Idle blank-editor click disabled Follow before any agent event");
+            return null;
+        });
         String source="class EditorFirst {\n"+"// agent-created source block\n".repeat(240)+"}\n";Files.writeString(project.resolve("EditorFirst.java"),source);
         await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("EditorFirst.java")&&editor.writingArea.getClientProperty("shed.agentTour")!=null,15);
         edt(()->{check(!editor.toolWindowHost.isVisible(),"Observed edit opened management tools");return null;});capture("00-editor-first-agent-change");
@@ -404,7 +411,7 @@ public final class AgentWorkflowDesktopProbe {
         Thread watchdog=new Thread(()->{try{Thread.sleep("1".equals(System.getenv("SHED_WATCH_QUALIFICATION"))?300000:150000);Runtime.getRuntime().halt(124);}catch(InterruptedException done){}} ,"shed-live-test-deadline");
         watchdog.setDaemon(true);watchdog.start();
         try {
-            editor=edt(()->new Texteditor(new String[]{project.resolve("Welcome.txt").toString()}));
+            editor=edt(()->new Texteditor(new String[]{project.toString()}));
             await(()->!editor.stagedStartupPending&&editor.getCurrentBuffer()!=null&&editor.isShowing(),30);
             qualifyEditorFirst(project);
             edt(()->{

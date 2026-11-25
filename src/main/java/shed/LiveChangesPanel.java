@@ -121,7 +121,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
     private void prepareFollow(){
         if(editor.isTreePaneActive()){var content=editor.resolveTreeContentPaneForOpen();if(content!=null){editor.activateEditorPane(content);content.getTextArea().requestFocusInWindow();}}
     }
-    void pauseForHuman(){if(root!=null)follow.setSelected(false);}
+    void pauseForHuman(){if(root!=null&&(tour!=null||pendingTour!=null))follow.setSelected(false);}
     private void publishRows(Set<String> recent){
         var changes=java.util.Collections.list(rows.elements());String summary=ExternalChangeSnapshot.moveSummary(changes);moves.setText(summary);moves.setToolTipText(summary);moves.setVisible(!summary.isEmpty());
         explorerMarks=FileChangeMarks.from(root,changes);editor.toolWindowHost.observeAgentFiles(root,changes,recent);
@@ -167,6 +167,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
     }
     private void openSelection(boolean automatic){
         var selected=files.getSelectedValue();if(selected==null||!current())return;
+        if(automatic&&editor.isTreePaneActive())prepareFollow();
         if(automatic&&(editor.getActivePane().getAlternateComponent()!=null||editor.getActivePane().isMarkdownPreview())){follow.setSelected(false);state.setText("Follow paused while another editor surface is active");return;}
         if(!automatic)prepareFollow();
         var change=automatic?activity.get(selected.path()):selected;if(change==null||change.kind().equals("D"))return;

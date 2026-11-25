@@ -1,0 +1,11 @@
+{
+  "evidence": "Authenticated read-only watch-state query of the attachment supplied in the user screenshot; credentials and instance IDs omitted",
+  "observation": {
+    "watching": true,
+    "following": false,
+    "ready": true,
+    "error": "",
+    "files": 1,
+    "agent": "Agent"
+  }
+}

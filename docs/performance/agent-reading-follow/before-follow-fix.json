@@ -1,0 +1,33 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "b7b9f640bbf84f80a9fea597b5e6182cf94d81f377934d4c2652a3969165ffab",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-jz33vrdw",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "d71853be0a24b166d6939a238c4168d516bbcdbab15bbfa922de449ee29a522a",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-jz33vrdw/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-jz33vrdw/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-jz33vrdw/run/config",
+    "-cp",
+    "/private/tmp/shed-native-jz33vrdw/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-jz33vrdw/run/live",
+    "/private/tmp/shed-native-jz33vrdw/run/project"
+  ],
+  "pid": 21800,
+  "exit": 1,
+  "log": "java.util.concurrent.ExecutionException: java.lang.AssertionError: Idle blank-editor click disabled Follow before any agent event\n\tat java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)\n\tat java.base/java.util.concurrent.FutureTask.get(FutureTask.java:205)\n\tat shed.AgentWorkflowDesktopProbe.edt(AgentWorkflowDesktopProbe.java:20)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEditorFirst(AgentWorkflowDesktopProbe.java:131)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:416)\nCaused by: java.lang.AssertionError: Idle blank-editor click disabled Follow before any agent event\n\tat shed.AgentWorkflowDesktopProbe.check(AgentWorkflowDesktopProbe.java:28)\n\tat shed.AgentWorkflowDesktopProbe.lambda$qualifyEditorFirst$20(AgentWorkflowDesktopProbe.java:135)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:308)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)\n\tat java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)\n",
+  "result": {
+    "events": [],
+    "error": "java.util.concurrent.ExecutionException: java.lang.AssertionError: Idle blank-editor click disabled Follow before any agent event",
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 5.006466874998296
+}

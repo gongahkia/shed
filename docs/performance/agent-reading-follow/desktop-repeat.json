@@ -1,0 +1,147 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "e89a0a27aebcc54a1e2a9ac4d62ac74dd671d7be008ef33c77b13979ccb198b6",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-f3wylpdh",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "43811e57c3977f1dddfb125d795cfb764bbdf8338b17015e7fab70f6706b5c86",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-f3wylpdh/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-f3wylpdh/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-f3wylpdh/run/config",
+    "-cp",
+    "/private/tmp/shed-native-f3wylpdh/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-f3wylpdh/run/live",
+    "/private/tmp/shed-native-f3wylpdh/run/project"
+  ],
+  "pid": 56155,
+  "exit": 0,
+  "log": "LIVE_READY\nLIVE_PASS\n",
+  "result": {
+    "state": "PASS",
+    "capture": "owned Swing root pane",
+    "live_window": true,
+    "events": [
+      {
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls",
+        "exact": true,
+        "standard_scrollpanes": 65
+      },
+      {
+        "source_and_caret_preserved": true,
+        "exact": true,
+        "second_client_ms": 137.679,
+        "first_client_ms": 170.939209,
+        "phase": "external_cli_visible_read_two_files",
+        "expired": true
+      },
+      {
+        "converge_ms": 2569.154125,
+        "phase": "5000_file_atomic_burst",
+        "baseline_ms": 174.947584,
+        "exact": true,
+        "changes": 142
+      },
+      {
+        "samples_ms": [
+          2.922833,
+          3.633,
+          0.857833,
+          1.36275,
+          0.79375,
+          0.899208,
+          0.859167,
+          0.791458,
+          0.802459,
+          0.954667,
+          0.725875,
+          0.999042,
+          0.891375,
+          0.702708,
+          0.78675,
+          0.639041,
+          0.848625,
+          0.804583,
+          0.686792,
+          0.735584,
+          0.860167
+        ],
+        "first_ms": 2.922833,
+        "warm_p95_ms": 1.36275,
+        "phase": "5000_file_watch_typing"
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      },
+      {
+        "exact": true,
+        "phase": "light_dark_narrow_density_focus_three_splits"
+      },
+      {
+        "phase": "animation_cycles_and_real_expiration",
+        "exact": true,
+        "cycles": 24
+      },
+      {
+        "exact": true,
+        "phase": "custom_ui_editor_fonts_hit_testing"
+      },
+      {
+        "heap_before": 118554552,
+        "exact": true,
+        "cycles": 12,
+        "heap_after_diagnostic_gc": 18847160,
+        "phase": "watch_start_stop_cycles",
+        "retained_watchers": 0
+      },
+      {
+        "phase": "safe_configs_moves_tree_badges",
+        "exact": true,
+        "changes": 6
+      },
+      {
+        "exact": true,
+        "phase": "git_same_status_patch_refresh"
+      },
+      {
+        "exact": true,
+        "phase": "observation_before_authoritative_reload"
+      },
+      {
+        "selection_before_reload": [
+          2,
+          6
+        ],
+        "scroll_y": 4871,
+        "phase": "append_five_functions_reveals_eof",
+        "caret_preserved": true,
+        "exact": true,
+        "selection_after_reload": [
+          6,
+          6
+        ],
+        "source_units": 5559
+      },
+      {
+        "phase": "save_and_attachment_cleanup",
+        "descendants": 0,
+        "exact": true
+      }
+    ]
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 34.510242333999486
+}

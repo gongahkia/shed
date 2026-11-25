@@ -1,0 +1,39 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "c5089257b1e189923e9554e0e84ead9a120b70a1aa1372cdf2c1f7887d233ac4",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-jvi7al12",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "f124cbec3c75e0de665adfa15565ef4aae49b4623c2da7fa259124bdc1222e32",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-jvi7al12/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-jvi7al12/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-jvi7al12/run/config",
+    "-cp",
+    "/private/tmp/shed-native-jvi7al12/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-jvi7al12/run/live",
+    "/private/tmp/shed-native-jvi7al12/run/project"
+  ],
+  "pid": 47389,
+  "exit": 1,
+  "log": "READ_OPEN_DIAGNOSTIC mode=INSERT allowed=true focused=false focus=none sourceFocused=false state=State[metadata=Context[activeRoot=/private/tmp/shed-native-jvi7al12/run/project, roots=[/private/tmp/shed-native-jvi7al12/run/project], generation=1, paneId=pane-a788231f-a237-4dfe-a085-b22fb25c7dc6, documentId=buffer-ea9ad6d1-09d6-4cd2-9574-6be2a7ac3ee8, path=/private/tmp/shed-native-jvi7al12/run/project/ReadFirst.java, length=6650, revision=1, dirty=false, caret=0, start=0, end=0], interaction=28]\njava.lang.AssertionError: External reading failed: {\"jsonrpc\":\"2.0\",\"id\":\"ctl\",\"error\":{\"code\":-32000,\"message\":\"Editor control request failed\",\"data\":{\"outcome\":\"rejected\",\"code\":\"CONTEXT_CHANGED\"}}}\n\n\tat shed.AgentWorkflowDesktopProbe.check(AgentWorkflowDesktopProbe.java:28)\n\tat shed.AgentWorkflowDesktopProbe.externalRead(AgentWorkflowDesktopProbe.java:198)\n\tat shed.AgentWorkflowDesktopProbe.qualifyVisibleReading(AgentWorkflowDesktopProbe.java:214)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:476)\n",
+  "result": {
+    "events": [
+      {
+        "standard_scrollpanes": 65,
+        "exact": true,
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls"
+      }
+    ],
+    "state": "FAIL",
+    "error": "java.lang.AssertionError: External reading failed: {\"jsonrpc\":\"2.0\",\"id\":\"ctl\",\"error\":{\"code\":-32000,\"message\":\"Editor control request failed\",\"data\":{\"outcome\":\"rejected\",\"code\":\"CONTEXT_CHANGED\"}}}\n"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 6.693584040993301
+}

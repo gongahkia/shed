@@ -13,6 +13,18 @@ shed ctl read --offset 0 --limit 2048
 
 `--connect <descriptor>` is the equivalent explicit option. The matching `.key` filename is derived from the authenticated descriptor; `--credential <file>` remains available. There is no automatic choice among running windows or projects. The installed launcher may be replaced with `java -jar /path/to/shed.jar` in these examples. All replies are JSON-RPC JSON; `--json` is optional. Existing `--workspace-api` commands remain available.
 
+To show what an external agent is reading, use the path form:
+
+```sh
+shed ctl read src/App.java --offset 0 --limit 2048 --agent "My agent"
+```
+
+This opens the actual file in the source pane, reveals the requested chunk, returns its exact text and displays a slower amber reading pulse with an underline marker and reading label. It can start with the tree active and an untitled source pane; an existing unsaved draft stays in its buffer. The animated pulse expires after approximately six seconds and clears on source changes, document replacement or hiding. Reduced motion retains a static indicator until replacement/cleanup without a running animation timer. No human caret/selection is moved by the reading decoration itself. Opening a different file uses the existing navigation behavior.
+
+Continue from `nextOffset` to reveal successive chunks. `shed ctl read` without a path remains an observation of the already-active file without visual side effects; `read-file` remains the existing project read. Ordinary `cat`, editor tool and filesystem reads do not send reading signals. Ask the external agent to use the path form when visualizing reads. The label is agent-reported, not proof of who accessed a file. Use matching client/application builds and relaunch older windows after upgrading.
+
+Opening and reading are checked requests, not a single atomic RPC. Human context changes can reject the read after the file has opened; do not retry an uncertain navigation blindly. The API retains path policy, root pinning, project authorization, source revision and pane/context checks.
+
 Read replies include `documentId`, `documentRevision`, exact UTF-16 `offset`/`nextOffset`, and `truncated`. Reads are bounded to 2,048 UTF-16 units and respect grapheme boundaries. Continue from `nextOffset`; never interpret it as a byte or code-point index. Use the document ID and revision from the observation that motivated your edit:
 
 ```sh

@@ -1,0 +1,39 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "9e4da68cdab57bf6f950143135e093598e7c0f3a45120669b4a46b61b007c961",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-9sfmx2mj",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "3420e84286bfe2ab910639fdc333144046c3cc54db1c25f8057f996a8f028298",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-9sfmx2mj/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-9sfmx2mj/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-9sfmx2mj/run/config",
+    "-cp",
+    "/private/tmp/shed-native-9sfmx2mj/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-9sfmx2mj/run/live",
+    "/private/tmp/shed-native-9sfmx2mj/run/project"
+  ],
+  "pid": 27278,
+  "exit": 1,
+  "log": "java.lang.AssertionError: External reading failed: {\"jsonrpc\":\"2.0\",\"id\":\"ctl\",\"error\":{\"message\":\"Control request failed\",\"data\":{\"code\":\"NO_ACTIVE_EDITOR\",\"outcome\":\"rejected\"},\"code\":-32000}}\n\n\tat shed.AgentWorkflowDesktopProbe.check(AgentWorkflowDesktopProbe.java:28)\n\tat shed.AgentWorkflowDesktopProbe.externalRead(AgentWorkflowDesktopProbe.java:192)\n\tat shed.AgentWorkflowDesktopProbe.qualifyVisibleReading(AgentWorkflowDesktopProbe.java:203)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:465)\n",
+  "result": {
+    "error": "java.lang.AssertionError: External reading failed: {\"jsonrpc\":\"2.0\",\"id\":\"ctl\",\"error\":{\"message\":\"Control request failed\",\"data\":{\"code\":\"NO_ACTIVE_EDITOR\",\"outcome\":\"rejected\"},\"code\":-32000}}\n",
+    "state": "FAIL",
+    "events": [
+      {
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls",
+        "exact": true,
+        "standard_scrollpanes": 65
+      }
+    ]
+  },
+  "fixture_removed": true,
+  "elapsed_s": 6.576751666994824
+}

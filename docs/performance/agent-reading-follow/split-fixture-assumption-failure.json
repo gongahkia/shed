@@ -1,0 +1,90 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "89b6006897c513f9d15858f101b42facd3f487774d0eb9796a99f32743453c3d",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-yk68q9wb",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "f124cbec3c75e0de665adfa15565ef4aae49b4623c2da7fa259124bdc1222e32",
+  "compile_exit": 0,
+  "compile_output": "Note: /Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/AgentWorkflowDesktopProbe.java uses unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-yk68q9wb/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-yk68q9wb/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-yk68q9wb/run/config",
+    "-cp",
+    "/private/tmp/shed-native-yk68q9wb/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentWorkflowDesktopProbe",
+    "/private/tmp/shed-native-yk68q9wb/run/live",
+    "/private/tmp/shed-native-yk68q9wb/run/project"
+  ],
+  "pid": 52054,
+  "exit": 1,
+  "log": "LIVE_READY\njava.util.concurrent.ExecutionException: java.lang.AssertionError: Split lost document owner\n\tat java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)\n\tat java.base/java.util.concurrent.FutureTask.get(FutureTask.java:205)\n\tat shed.AgentWorkflowDesktopProbe.edt(AgentWorkflowDesktopProbe.java:20)\n\tat shed.AgentWorkflowDesktopProbe.qualifyEdges(AgentWorkflowDesktopProbe.java:330)\n\tat shed.AgentWorkflowDesktopProbe.main(AgentWorkflowDesktopProbe.java:484)\nCaused by: java.lang.AssertionError: Split lost document owner\n\tat shed.AgentWorkflowDesktopProbe.check(AgentWorkflowDesktopProbe.java:28)\n\tat shed.AgentWorkflowDesktopProbe.lambda$qualifyEdges$91(AgentWorkflowDesktopProbe.java:330)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:308)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)\n\tat java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)\n",
+  "result": {
+    "state": "FAIL",
+    "error": "java.util.concurrent.ExecutionException: java.lang.AssertionError: Split lost document owner",
+    "events": [
+      {
+        "exact": true,
+        "phase": "editor_first_quiet_watch_smooth_scroll_and_opt_in_controls",
+        "standard_scrollpanes": 65
+      },
+      {
+        "exact": true,
+        "source_and_caret_preserved": true,
+        "expired": true,
+        "phase": "external_cli_visible_read_two_files",
+        "first_client_ms": 160.4965,
+        "second_client_ms": 131.989
+      },
+      {
+        "phase": "5000_file_atomic_burst",
+        "converge_ms": 2573.855291,
+        "changes": 142,
+        "exact": true,
+        "baseline_ms": 175.754667
+      },
+      {
+        "phase": "5000_file_watch_typing",
+        "warm_p95_ms": 1.197541,
+        "first_ms": 3.130167,
+        "samples_ms": [
+          3.130167,
+          1.849583,
+          0.90825,
+          0.777125,
+          0.912125,
+          0.746625,
+          0.928458,
+          0.856125,
+          1.197541,
+          0.930875,
+          0.625375,
+          0.854625,
+          0.953375,
+          0.851875,
+          0.9265,
+          0.883625,
+          0.954667,
+          0.774333,
+          0.95825,
+          0.983834,
+          0.798459
+        ]
+      },
+      {
+        "exact": true,
+        "phase": "same_file_conflict_view_both_save_undo_redo"
+      },
+      {
+        "exact": true,
+        "phase": "human_edit_during_delayed_follow"
+      }
+    ]
+  },
+  "fixture_removed": true,
+  "elapsed_s": 20.858068708002975
+}

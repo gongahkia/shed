@@ -1,0 +1,29 @@
+{
+  "starting_head": "968b099add5909b0d9e542b6dfb4f866f98dbcb6",
+  "sha256": {
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "target/shed-2.0.0.jar": "e89a0a27aebcc54a1e2a9ac4d62ac74dd671d7be008ef33c77b13979ccb198b6",
+    "src/benchmark/java/shed/AgentWorkflowDesktopProbe.java": "43811e57c3977f1dddfb125d795cfb764bbdf8338b17015e7fab70f6706b5c86",
+    "src/benchmark/java/shed/ShedVisualizeLaunchProbe.java": "3166eb15ae02dd2f5c11ccdb0e77c49df35cb95f06e56fa0fd0553bcd115b8a5",
+    "src/test/resources/shed/portable-fixture-tests.properties": "df53df77d3dca18e76e754648821202063a610a8f20615eb6215d8fe7a6d6855",
+    "src/main/java/shed/WorkspaceStatusProtocol.java": "0c5c32d4e0496efb40fee1b92dd531793a357517ebca9e5210afc5bca1777c58",
+    "src/main/java/shed/PaneBufferController.java": "e71ed78c40205615158b8a7607661603e658e5c1c6bc03a1653480939ce4bdee",
+    "src/main/java/shed/EditorControl.java": "c875aa9200fca621ca9fd20e83d03e3d7dba0a579a14086daf49174c300cf656",
+    "src/main/java/shed/LiveChangesPanel.java": "58e59c6aaea0f1c907beff01febb85065a1c837d0cea7c5499b3b3f030404523",
+    "src/main/java/shed/Texteditor.java": "2cd22e169770ad798340647d15525f1af1ab3c0de9fbccc5c75a1370db13898f",
+    "src/main/java/shed/EditorMetadata.java": "5300e6694ba094c96e0b8a910bf98bca1f98f3291dfe5e21b15f22921a9983b7",
+    "src/main/java/shed/ShedControlCli.java": "f1214a85f62b7dbcca538b336daab75f6daf44f2bb845e13f0ab92252d8d022c",
+    "src/main/java/shed/AgentWorkspaceController.java": "51ce8ccfb52f686b2764d5cf6021880bf511b47c8a4a24da91c1767c1e165861",
+    "src/main/java/shed/AgentEditPresentation.java": "2f8e820f1c6e4fe6b70b52ef14854956c27574a2abfadc8f347065214e95fa6b"
+  },
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "captured_after_tests_load": [
+    13.09326171875,
+    6.4892578125,
+    4.91943359375
+  ],
+  "implementation_commits": [
+    "9d7171cc9",
+    "00b8cab4f"
+  ]
+}

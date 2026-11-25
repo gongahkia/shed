@@ -210,6 +210,12 @@ final class AgentWorkspaceController implements AutoCloseable {
                     owner().showMessage(agent+" · reading "+pane.getBuffer().getDisplayName());
                 }catch(javax.swing.text.BadLocationException unavailable){throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);}
             }
+            public void intent(AgentBufferIntent intent){
+                var app=owner();var presentation=app.getActivePane().agentPresentation();
+                if(!presentation.available())throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                app.toolWindowHost.retireAgentPresentation();presentation.showIntent(intent);
+                app.showMessage(intent.label(intent.focus()));
+            }
             public void progress(AgentActivityState.State state, int start, int end) {
                 if (state.terminal()) owner().clearAgentActivity();
                 else {

@@ -127,6 +127,10 @@ final class WorkspaceStatusProtocol {
                 }
                 case "editor/file/open" -> { if (!"applied".equals(outcome)) return false; }
                 case "editor/agent/activity" -> { if (!"shown".equals(outcome)) return false; }
+                case "editor/agent/intent" -> {
+                    if(!"shown".equals(outcome))return false;
+                    try{AgentBufferIntent.parse(base.remove("intent"));}catch(RuntimeException invalid){return false;}
+                }
                 case "editor/agent/progress", "editor/agent/state", "editor/agent/cancel" -> {
                     if (!"activity".equals(outcome) || !validActivity(base.remove("activity"))) return false;
                 }

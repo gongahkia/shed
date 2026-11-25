@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--output").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--output","--kind","--status","--ranges","--focus").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -40,6 +40,24 @@ final class ShedControlCli {
                     String action=switch(command){case "watch"->"start";case "watch-state"->"state";case "watch-stop"->"stop";default->command;};
                     mutationSent=!command.equals("watch-state");
                     return emit(client.exchange(request("editor/watch",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"action",action,"agent",name==null?"Agent":name))),out);
+                }
+                if(command.equals("intent")){
+                    var intent=intent(options);
+                    String document=options.remove("--document"),revision=options.remove("--revision");
+                    if((document==null)!=(revision==null)||!options.isEmpty())throw new IllegalArgumentException();
+                    Long expectedRevision=revision==null?null:Long.parseLong(revision);
+                    if(expectedRevision!=null&&expectedRevision<0)throw new IllegalArgumentException();
+                    Map<String,Object> opened=null;
+                    if(path!=null){
+                        mutationSent=true;
+                        opened=result(client.exchange(request("editor/file/open",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"path",path))));
+                    }
+                    var settled=result(client.exchange(client.navigationContextRequest()));
+                    if(opened!=null)for(String field:List.of("paneId","documentId","documentRevision","caretOffset","selectionStart","selectionEnd","dirty"))
+                        if(!Objects.equals(opened.get(field),settled.get(field)))throw new WorkspaceApiException(WorkspaceApiException.Code.CONTEXT_CHANGED,"Opened source changed before intent");
+                    if(document!=null&&(!document.equals(settled.get("documentId"))||!expectedRevision.equals(settled.get("documentRevision"))))throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_REVISION,"Intent requires the observed source revision");
+                    var params=context(settled);params.put("intent",intent.json());mutationSent=true;
+                    return emit(client.exchange(request("editor/agent/intent",params)),out);
                 }
                 if(command.equals("open")||command.equals("read")&&path!=null){
                     if(path==null)throw new IllegalArgumentException();
@@ -128,13 +146,25 @@ final class ShedControlCli {
             boolean unknown=mutationSent && Set.of(WorkspaceApiException.Code.TIMEOUT,WorkspaceApiException.Code.SESSION_INVALID,WorkspaceApiException.Code.SESSION_EXPIRED,WorkspaceApiException.Code.OUTCOME_UNKNOWN).contains(failure.code());
             out.println(WorkspaceRpc.error("ctl",-32000,"Control request failed",Map.of("code",unknown?"OUTCOME_UNKNOWN":failure.code().name(),"outcome",unknown?"unknown":"rejected")));return unknown?79:65;
         } catch(IllegalArgumentException invalid) {
-            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|activity|propose|replace [options]",Map.of("code","INVALID_REQUEST")));return 64;
+            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|intent|activity|propose|replace [options]",Map.of("code","INVALID_REQUEST")));return 64;
         } catch(IOException failure) {
             out.println(WorkspaceRpc.error("ctl",-32000,"Control connection or input unavailable",Map.of("code",mutationSent?"OUTCOME_UNKNOWN":"TRANSPORT_ERROR","outcome",mutationSent?"unknown":"rejected")));return mutationSent?79:74;
         }
     }
     static byte[] boundedFile(Path path,int maximum) throws IOException {
         try(var stream=Files.newInputStream(path)){byte[] bytes=stream.readNBytes(maximum+1);if(bytes.length>maximum)throw new IllegalArgumentException();return bytes;}
+    }
+    private static AgentBufferIntent intent(Map<String,String> options){
+        String kind=required(options,"--kind"),status=options.remove("--status"),agent=options.remove("--agent"),raw=options.remove("--ranges");
+        var ranges=new ArrayList<AgentEditPresentation.Range>();
+        if(raw==null){long start=number(options,"--start",-1),end=number(options,"--end",-1);if(start>Integer.MAX_VALUE||end>Integer.MAX_VALUE)throw new IllegalArgumentException();ranges.add(new AgentEditPresentation.Range((int)start,(int)end));}
+        else{
+            if(raw.length()>1024||options.containsKey("--start")||options.containsKey("--end"))throw new IllegalArgumentException();
+            var pairs=raw.split(",",-1);if(pairs.length>32)throw new IllegalArgumentException();
+            for(String pair:pairs){var ends=pair.split(":",-1);if(ends.length!=2)throw new IllegalArgumentException();ranges.add(new AgentEditPresentation.Range(Integer.parseInt(ends[0]),Integer.parseInt(ends[1])));}
+        }
+        long focus=number(options,"--focus",0);if(focus>Integer.MAX_VALUE)throw new IllegalArgumentException();
+        return new AgentBufferIntent(kind,status==null?(kind.equals("verify")?"checking":"active"):status,agent==null?"Agent":agent,ranges,(int)focus);
     }
     static String request(String method,Map<String,Object> params){return MiniJson.stringify(Map.of("jsonrpc","2.0","id","ctl","method",method,"params",params));}
     static Map<String,Object> context(Map<String,Object> value){

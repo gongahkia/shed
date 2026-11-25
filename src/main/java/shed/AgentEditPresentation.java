@@ -2,6 +2,7 @@ package shed;
 
 import java.awt.*;
 import java.awt.event.HierarchyListener;
+import java.awt.event.*;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
@@ -25,6 +26,13 @@ final class AgentEditPresentation implements AutoCloseable {
     private int ticks, maximumTicks = TICKS, activeRange, markerOffset;
     private long version;
     private String agentName = "Agent";
+    private AgentBufferIntent intent;
+    private JViewport intentViewport;
+    private JScrollPane intentScroll;
+    private int intentFromY,intentTargetY;
+    private final KeyAdapter intentKeys=new KeyAdapter(){@Override public void keyPressed(KeyEvent e){clear();}};
+    private final MouseAdapter intentMouse=new MouseAdapter(){@Override public void mousePressed(MouseEvent e){clear();}@Override public void mouseWheelMoved(MouseWheelEvent e){clear();}};
+    private final FocusAdapter intentFocus=new FocusAdapter(){@Override public void focusLost(FocusEvent e){if(e.getOppositeComponent()!=null)clear();}};
     void setAgentName(String name) { checkEdt(); agentName = name; repaintRanges(); }
     private final DocumentListener edits = new DocumentListener() {
         public void insertUpdate(DocumentEvent event) { clear(); }
@@ -43,6 +51,23 @@ final class AgentEditPresentation implements AutoCloseable {
         area.addPropertyChangeListener(properties); area.addHierarchyListener(hierarchy); observe();
     }
     void showProgress(int start, int end, String name) { showPending(start,end); maximumTicks=600; setAgentName(name); }
+    void showIntent(AgentBufferIntent event){
+        show(event.ranges(),true);if(ranges.isEmpty())return;
+        intent=event;activeRange=event.focus();markerOffset=ranges.get(activeRange).start();maximumTicks=120;
+        setAgentName(event.label(activeRange));
+        area.putClientProperty("shed.agentIntent",event.kind());area.putClientProperty("shed.agentIntentStatus",event.status());
+        area.putClientProperty("shed.agentActivity",agentName);area.putClientProperty("shed.agentDirection",event.kind().equals("undo")?"right-to-left":"left-to-right");
+        area.addKeyListener(intentKeys);area.addMouseListener(intentMouse);area.addFocusListener(intentFocus);
+        intentScroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,area);
+        if(intentScroll!=null){intentScroll.addMouseWheelListener(intentMouse);intentScroll.getVerticalScrollBar().addMouseListener(intentMouse);intentScroll.getHorizontalScrollBar().addMouseListener(intentMouse);}
+        if(area.isShowing())try{
+            var bounds=area.modelToView2D(markerOffset);
+            intentViewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);
+            if(bounds!=null&&intentViewport!=null){intentFromY=intentViewport.getViewPosition().y;intentTargetY=Math.max(0,Math.min(Math.max(0,area.getHeight()-intentViewport.getExtentSize().height),(int)bounds.getY()-intentViewport.getExtentSize().height/3));if(!animated())scrollIntent(1);}
+        }catch(BadLocationException unavailable){clear();}
+        repaintRanges();
+    }
+    private void scrollIntent(double progress){if(intentViewport!=null)intentViewport.setViewPosition(new Point(intentViewport.getViewPosition().x,intentFromY+(int)((intentTargetY-intentFromY)*(1-Math.pow(1-progress,3)))));}
     void showReading(int start,int end,String name) {
         show(List.of(new Range(start,end)),true);if(ranges.isEmpty())return;
         reading=true;markerOffset=start;maximumTicks=120;setAgentName(name+" reading");
@@ -85,7 +110,7 @@ final class AgentEditPresentation implements AutoCloseable {
             || !area.getLineWrap() && !Boolean.TRUE.equals(document.getProperty("i18n"));
     }
     private void advance() {
-        if (!area.isShowing() || !animated() || ++ticks >= maximumTicks) clear(); else repaintRanges();
+        if (!area.isShowing() || !animated() || ++ticks >= maximumTicks) clear(); else {if(intent!=null&&ticks<=6)scrollIntent(ticks/6.0);repaintRanges();}
     }
     private void visibilityChanged() { if (!area.isShowing()) clear(); }
     private void observe() {
@@ -93,9 +118,13 @@ final class AgentEditPresentation implements AutoCloseable {
         document = area.getDocument(); document.addDocumentListener(edits);
     }
     Color agentColor() {
+        return rangeColor(activeRange);
+    }
+    private Color rangeColor(int index) {
         boolean deleting="deleting".equals(area.getClientProperty("shed.agentAnimation"));
-        Color base = UIManager.getColor(reading?"shed.warning":deleting?"shed.error":"shed.success");
-        if (base == null) base = new Color(reading?0xA87808:deleting?0xCC4855:0x27815C);
+        String role=intent!=null?intent.role(index):reading?"warning":deleting?"error":"success";
+        Color base = UIManager.getColor("shed."+role);
+        if (base == null) base = new Color(role.equals("warning")?0xA87808:role.equals("error")?0xCC4855:0x27815C);
         Color human = area.getCaretColor();
         if (human != null && distance(base, human) < 100) base = new Color(0x8B52C7);
         return AccessibilitySupport.readableText(base, area.getBackground());
@@ -121,6 +150,9 @@ final class AgentEditPresentation implements AutoCloseable {
     }
     void clear() {
         checkEdt(); version++;timer.stop(); repaintRanges();
+        if(intent!=null){area.removeKeyListener(intentKeys);area.removeMouseListener(intentMouse);area.removeFocusListener(intentFocus);
+            if(intentScroll!=null){intentScroll.removeMouseWheelListener(intentMouse);intentScroll.getVerticalScrollBar().removeMouseListener(intentMouse);intentScroll.getHorizontalScrollBar().removeMouseListener(intentMouse);}}
+        intent=null;intentViewport=null;intentScroll=null;area.putClientProperty("shed.agentIntent",null);area.putClientProperty("shed.agentIntentStatus",null);
         if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)playback.close();
         area.putClientProperty("shed.agentDirection",null);
         if (highlighter != null) for (Object tag : tags) highlighter.removeHighlight(tag);
@@ -145,10 +177,11 @@ final class AgentEditPresentation implements AutoCloseable {
                 Rectangle line = shape.getBounds().intersection(area.getVisibleRect());
                 Graphics2D copy = (Graphics2D) graphics.create();
                 try {
-                    Color color = agentColor();
+                    Color color = rangeColor(ranges.indexOf(range));
                     int alpha = !animated() ? 48 : reading ? 30+(int)(12*Math.sin(ticks*.18)) : (pending||touring&&range.equals(ranges.get(activeRange))) ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
                     copy.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
                     copy.fill(line);
+                    if(intent!=null){copy.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),150));copy.drawRect(line.x,line.y,Math.max(1,line.width-1),Math.max(1,line.height-1));}
                     if(animated()){
                         var sweep=(Graphics2D)copy.create();
                         try{

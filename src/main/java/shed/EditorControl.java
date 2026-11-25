@@ -14,7 +14,7 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/edits/propose", "editor/agent/activity", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch");
     static boolean mutation(String method) {
         return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
@@ -28,6 +28,7 @@ final class EditorControl implements AutoCloseable {
                                      BooleanSupplier current, Consumer<ProjectDocumentInstall.Result> completed);
         void activity(int start, int end);
         default void reading(int start, int end, String agent) { activity(start,end); }
+        default void intent(AgentBufferIntent intent) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
         default void progress(AgentActivityState.State state, int start, int end) { if (state.terminal()) clearActivity(); else activity(start,end); }
         default WatchRoot watchRoot(){var s=state().metadata();return new WatchRoot(s.activeRoot(),s.generation());}
         default Map<String,Object> watch(String action,String agent){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
@@ -80,6 +81,7 @@ final class EditorControl implements AutoCloseable {
             case "editor/project/read" -> Set.of("path", "offset", "limit");
             case "editor/project/propose" -> Set.of("changes", "requestId");
             case "editor/agent/progress" -> Set.of("start", "end", "sessionId", "agent", "phase", "completed", "total");
+            case "editor/agent/intent" -> Set.of("intent");
             case "editor/agent/state" -> Set.of();
             case "editor/agent/cancel" -> Set.of("sessionId");
             default -> Set.of("start", "end");
@@ -148,6 +150,11 @@ final class EditorControl implements AutoCloseable {
                 var result = result(method, before, "read"); result.put("offset", offset); result.put("nextOffset", end);
                 result.put("content", source.content().substring(offset, end)); result.put("truncated", end < source.content().length());
                 return result;
+            }
+            if(method.equals("editor/agent/intent")){
+                var intent=AgentBufferIntent.parse(params.get("intent"));intent.validateSource(source.content());
+                ui(lease,()->{requireState(lease,before);owner().intent(intent);return null;});
+                var reply=result(method,before,"shown");reply.put("intent",intent.json());return reply;
             }
             int start = offset(params, "start"), end = offset(params, "end");
             if (start > end || end > source.content().length() || !GraphemeBoundary.isBoundary(source.content(), start)

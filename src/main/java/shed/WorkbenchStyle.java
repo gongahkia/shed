@@ -31,6 +31,7 @@ public final class WorkbenchStyle {
         UIManager.put("RadioButtonUI", RadioUI.class.getName());
         UIManager.put("ComboBoxUI", ComboUI.class.getName());
         UIManager.put("ScrollBarUI", ScrollUI.class.getName());
+        UIManager.put("ScrollPaneUI", SmoothScrollPaneUI.class.getName());
         UIManager.put("TabbedPaneUI", TabsUI.class.getName());
         UIManager.put("SplitPaneUI", SplitUI.class.getName());
         UIManager.put("ListUI", ListUI.class.getName());

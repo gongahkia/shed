@@ -301,7 +301,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'ProviderIconsTest',
             'VisualWatchControlTest',
             'AgentEditPresentationTest',
-            'AgentChangeTourTest',
+            'AgentChangeTourTest', 'SmoothScrollPaneUITest',
             'AgentReviewPanelTest',
             'WorkspaceProposalServiceTest',
         }

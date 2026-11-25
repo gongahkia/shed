@@ -7,6 +7,20 @@ import javax.swing.undo.UndoManager;
 import org.junit.jupiter.api.Test;
 
 class AgentEditPresentationTest {
+    @Test void firstLineLabelUsesFreeSpaceInsteadOfCoveringSource()throws Exception {
+        SwingUtilities.invokeAndWait(()->{
+            var area=new JTextArea("class Example {}\n");area.setFont(new java.awt.Font(java.awt.Font.MONOSPACED,0,16));area.setSize(600,100);
+            try(var presentation=new AgentEditPresentation(area)){
+                presentation.showApplied(0,1);presentation.setAgentName("Agent");
+                var image=new java.awt.image.BufferedImage(600,100,java.awt.image.BufferedImage.TYPE_INT_RGB);var graphics=image.createGraphics();area.paint(graphics);graphics.dispose();
+                try{
+                    int end=(int)area.modelToView2D(area.getLineEndOffset(0)-1).getX();int color=presentation.agentColor().getRGB(),overlap=0,label=0;
+                    for(int y=0;y<area.getFontMetrics(area.getFont()).getHeight();y++)for(int x=20;x<600;x++)if(image.getRGB(x,y)==color){if(x<end)overlap++;else label++;}
+                    assertEquals(0,overlap);assertTrue(label>0,"Agent label missing from the free line margin");
+                }catch(javax.swing.text.BadLocationException failure){throw new AssertionError(failure);}
+            }
+        });
+    }
     @Test void largeWrappedAndComplexDocumentsDoNotEnterPresentationLayout() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var area=new JTextArea("x".repeat(EditorNavigation.MAX_BOUNDARY_UNITS+1));area.setLineWrap(true);

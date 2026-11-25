@@ -104,7 +104,7 @@ final class AgentEditPresentation implements AutoCloseable {
                 Rectangle2D first = area.modelToView2D(range.start()), last = area.modelToView2D(range.end());
                 if (first == null || last == null) continue;
                 Rectangle part = first.getBounds().union(last.getBounds());
-                if (first.getY() != last.getY()) { part.x = visible.x; part.width = visible.width; }
+                if (first.getY() != last.getY() || range.equals(ranges.get(activeRange))) { part.x = visible.x; part.width = visible.width; }
                 part.grow(area.getFontMetrics(area.getFont()).stringWidth(agentName) + 8, 3);
                 part = part.intersection(visible);
                 if (!part.isEmpty()) dirty = dirty == null ? part : dirty.union(part);
@@ -144,7 +144,15 @@ final class AgentEditPresentation implements AutoCloseable {
                         Rectangle2D caret = area.modelToView2D(markerOffset);
                         if (caret != null) {
                             copy.setColor(color); copy.fillRect((int)caret.getX(), (int)caret.getY(), 3, (int)caret.getHeight());
-                            copy.drawString(agentName, (int)caret.getX() + 5, Math.max(area.getFontMetrics(area.getFont()).getAscent(), (int)caret.getY() - 2));
+                            int sourceLine=area.getLineOfOffset(markerOffset),lineEnd=Math.min(document.getLength(),area.getLineEndOffset(sourceLine));
+                            if(lineEnd-area.getLineStartOffset(sourceLine)<=256){
+                                if(lineEnd>0&&"\n".equals(document.getText(lineEnd-1,1)))lineEnd--;
+                                var ending=area.modelToView2D(lineEnd);var visible=area.getVisibleRect();var metrics=area.getFontMetrics(area.getFont());
+                                if(ending!=null&&Math.abs(ending.getY()-caret.getY())<1){
+                                    int labelX=(int)Math.max(caret.getX()+8,ending.getX()+12);
+                                    if(labelX+metrics.stringWidth(agentName)<visible.x+visible.width-4){copy.setFont(area.getFont());copy.drawString(agentName,labelX,(int)caret.getY()+metrics.getAscent());}
+                                }
+                            }
                         }
                     }
                 } finally { copy.dispose(); }

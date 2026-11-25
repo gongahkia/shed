@@ -37,4 +37,18 @@ class ShedControlCliTest {
             assertNull(f.reviewed);
         }
     }
+    @Test void watchingIsVendorNeutralAndAgentNamesAreOnlyLabels() throws Exception {
+        try(var f=new EditorControlTest.Fixture(temporary){
+            public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(roots.active(),roots.generation());}
+            public Map<String,Object> watch(String action,String label){return Map.of("kind","watch","agent",label);}
+        }){
+            var unnamed=call(f,"watch");assertEquals(0,unnamed.code(),unnamed.body()::toString);
+            var observation=MiniJson.asObject(MiniJson.asObject(unnamed.body().get("result")).get("observation"));assertEquals("Agent",observation.get("agent"));
+            for(String label:List.of("Codex","Claude Code","OpenCode","Local agent","Custom writer")){
+                var reply=call(f,"watch","--agent",label);assertEquals(0,reply.code(),reply.body()::toString);
+                observation=MiniJson.asObject(MiniJson.asObject(reply.body().get("result")).get("observation"));assertEquals(label,observation.get("agent"));
+            }
+        }
+    }
+
 }

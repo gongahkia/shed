@@ -2,13 +2,17 @@
 
 Tell your CLI agent:
 
-> Use Shed to visualize this project's changes. Run `shed visualize . --agent Codex` once, then continue editing files normally. Leave Shed open for me. Do not turn the filesystem edits into review proposals just to visualize them.
+> Use Shed to visualize this project's changes. Run `shed visualize .` once, then continue editing files normally. Leave Shed open for me. Do not turn the filesystem edits into review proposals just to visualize them.
 
-The launcher opens a new Shed window, captures a watch baseline, starts its explicitly authorized local attachment, prints JSON with `ready`, `descriptor`, `credential`, `pid`, `project` and `agent`, and returns. It does not run Codex or any model. The human can keep using the CLI, and Shed watches ordinary filesystem writes.
+The launcher opens a new Shed window, captures a watch baseline, starts its explicitly authorized local attachment, prints JSON with `ready`, `descriptor`, `credential`, `pid`, `project` and `agent`, and returns. It does not run or connect to any particular agent or model. The human can keep using the CLI, and Shed watches ordinary filesystem writes.
 
 ```sh
-shed visualize . --agent Codex
+shed visualize .
 ```
+
+The watcher is agent-neutral: it watches files in the selected project, not a Codex process. It works with Codex CLI, Claude Code, OpenCode, local agents, scripts or any other tool that writes supported files there. No agent-specific integration is required. Human saves and other tools also appear; the watcher cannot identify the author.
+
+`--agent` is an optional display label, defaulting to `Agent`. For example, `shed visualize . --agent "Claude Code"` changes the name beside the animated change cursor; it does not change what is watched or restrict other writers.
 
 Use the returned descriptor if you want to control the view:
 
@@ -18,7 +22,7 @@ shed ctl watch-state
 shed ctl pause
 shed ctl follow
 shed ctl watch-stop
-shed ctl watch --agent Codex
+shed ctl watch
 ```
 
 For a window already using an explicitly enabled control attachment, `shed ctl watch` starts watching that window's active project. Inside Shed, `:agent watch` or the play icon in Agents → Live changes starts a watch without launching any coding agent; the square icon stops it. `:agent watch stop` also stops it. Launching again creates another window; there is no implicit choice among existing instances.

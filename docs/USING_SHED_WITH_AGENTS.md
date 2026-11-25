@@ -92,4 +92,4 @@ Capture reads only the current source's existing, showing, revision-current prev
 
 ## Visualize ordinary CLI edits
 
-For a CLI agent that already edits files directly, use `shed visualize . --agent Codex`. It opens a watching Shed window and returns; ordinary filesystem changes appear in Agents → Live changes without being converted to proposals. See [the live visualization guide](LIVE_AGENT_VISUALIZATION.md) for baselines, follow/pause, controls and limits.
+For a CLI agent that already edits files directly, use `shed visualize .`. The watcher works with any agent or tool writing project files; an optional `--agent "Display name"` only labels the presentation. It opens a watching Shed window and returns; ordinary filesystem changes appear in Agents → Live changes without being converted to proposals. See [the live visualization guide](LIVE_AGENT_VISUALIZATION.md) for baselines, follow/pause, controls and limits.

@@ -14,7 +14,7 @@ final class ShedVisualize {
         String project=".",agent="Agent";boolean path=false;
         for(int i=1;i<args.length;i++){
             if(args[i].equals("--agent")&&i+1<args.length)agent=args[++i];
-            else if(!path&&!args[i].startsWith("--")){project=args[i];path=true;}else throw new IllegalArgumentException("Usage: shed visualize [project] [--agent Codex]");
+            else if(!path&&!args[i].startsWith("--")){project=args[i];path=true;}else throw new IllegalArgumentException("Usage: shed visualize [project] [--agent <display-name>]");
         }
         if(agent.isBlank()||agent.length()>40||agent.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException("Invalid agent label");
         Path root=Path.of(project).toRealPath();if(!Files.isDirectory(root))throw new IllegalArgumentException("Expected a project directory");

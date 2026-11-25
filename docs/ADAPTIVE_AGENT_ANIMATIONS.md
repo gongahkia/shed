@@ -30,7 +30,15 @@ Glyph masking is deliberately limited to unwrapped, non-complex layout and range
 
 ## Live demonstration
 
-Use the existing JDK and rebuilt JAR, with a new output directory:
+From the repository root, run:
+
+```sh
+make demo
+```
+
+This rebuilds the JAR if needed, resolves the existing JDK 21 through `scripts/resolve-toolchain.sh`, and runs the paced demo below. Watch the Shed window for roughly 100 seconds; it closes when the demo finishes. Each run saves its report and captures to a fresh `target/agent-demo-*` directory printed in the terminal. Python 3, a working desktop session and the existing fixed `/usr/bin/git` fixture are required. It does not start a real coding model. If Java is not installed in a discoverable location, set `JAVA=/absolute/path/to/jdk-21/bin/java` before `make demo`; a rebuild also needs Maven (`MVN` may select its executable).
+
+To select an output location directly, use the existing JDK and rebuilt JAR with a new output directory:
 
 ```sh
 python3 scripts/test-agent-desktop.py \

@@ -9,7 +9,7 @@ SOURCES := $(shell find src/main assets -type f 2>/dev/null)
 RUN_GOALS := $(filter-out run,$(MAKECMDGOALS))
 RUN_ARGS := $(strip $(ARGS) $(RUN_GOALS))
 
-.PHONY: all build run profile-startup test check clean install uninstall help $(RUN_GOALS)
+.PHONY: all build run demo profile-startup test check clean install uninstall help $(RUN_GOALS)
 
 all: build
 
@@ -22,6 +22,13 @@ $(JAR): pom.xml $(SOURCES)
 
 run: $(JAR)
 	@$(LAUNCHER) $(RUN_ARGS)
+
+demo: $(JAR)
+	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
+	 output="$$(pwd -P)/target/agent-demo-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
+	 printf 'Starting the disposable live animation demo. Watch the Shed window.\nResults: %s\n' "$$output"; \
+	 python3 scripts/test-agent-desktop.py --jdk "$$java_home" --jar "$(abspath $(JAR))" \
+	   --output "$$output" --git-fixture --visual-only --animation-demo
 
 profile-startup: $(JAR)
 	@SHED_STARTUP_PROFILE=1 $(LAUNCHER) $(ARGS)
@@ -51,6 +58,7 @@ clean:
 help:
 	@printf '%s\n' 'make build              package Shed without tests'
 	@printf '%s\n' 'make run [path ...]     rebuild if needed, then launch files or folders (make run . opens this folder)'
+	@printf '%s\n' 'make demo               run the disposable live agent animation demo; reports in target/agent-demo-*'
 	@printf '%s\n' 'make profile-startup    print local startup phase timings, then keep Shed open'
 	@printf '%s\n' 'make install            install the shed launcher and JAR under ~/.local'
 	@printf '%s\n' 'make uninstall          remove the locally installed shed launcher and JAR'

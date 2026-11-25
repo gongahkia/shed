@@ -29,15 +29,36 @@ final class ShedVisualize {
             long until=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(45);
             while(child.isAlive()&&System.nanoTime()<until){
                 if(Files.exists(ready,LinkOption.NOFOLLOW_LINKS)){
-                    byte[] bytes=PrivateWorkspaceFiles.read(ready,8192);var response=MiniJson.asObject(MiniJson.parseStrict(new String(bytes,StandardCharsets.UTF_8)));
-                    if(response==null||!Boolean.TRUE.equals(response.get("ready"))||!(response.get("pid") instanceof Number pid)||pid.longValue()!=child.pid()||!root.toString().equals(response.get("project")))throw new IllegalStateException("Invalid visualization readiness");
-                    System.out.println(MiniJson.stringify(response));success=true;PrivateWorkspaceFiles.deleteIfMatching(ready,bytes);return;
+                    byte[] bytes=PrivateWorkspaceFiles.read(ready,8192);
+                    try{var response=validateResponse(bytes,child.pid(),root);System.out.println(MiniJson.stringify(response));success=true;return;}
+                    finally{PrivateWorkspaceFiles.deleteIfMatching(ready,bytes);}
                 }Thread.sleep(50);
-            }throw new IllegalStateException("Visualization did not become ready; check project size and desktop availability");
+            }throw new IllegalStateException(child.isAlive()?"Visualization startup timed out; open Shed normally to inspect local diagnostics":"Visualization exited before readiness (exit "+child.exitValue()+")");
         }finally{
-            if(!success){child.destroy();if(!child.waitFor(2,java.util.concurrent.TimeUnit.SECONDS))child.destroyForcibly();}
+            if(!success){child.destroy();if(!child.waitFor(2,java.util.concurrent.TimeUnit.SECONDS)){child.destroyForcibly();child.waitFor(2,java.util.concurrent.TimeUnit.SECONDS);}}
             try{Files.deleteIfExists(directory);}catch(java.io.IOException busy){/* child may still be retiring its owned readiness record */}
         }
+    }
+    static Map<String,Object> validateResponse(byte[] bytes,long expectedPid,Path root){
+        var response=MiniJson.asObject(MiniJson.parseStrict(new String(bytes,StandardCharsets.UTF_8)));
+        if(response==null||!(response.get("schemaVersion") instanceof Number version)||version.longValue()!=1||!(response.get("pid") instanceof Number pid)||pid.longValue()!=expectedPid||!root.toString().equals(response.get("project")))throw new IllegalStateException("Invalid visualization readiness");
+        if(Boolean.FALSE.equals(response.get("ready"))){
+            var error=MiniJson.asObject(response.get("error"));
+            if(error==null||!(error.get("code") instanceof String code)||!Set.of("WATCH_START_FAILED","ATTACHMENT_FAILED","WINDOW_CLOSED","STARTUP_TIMEOUT").contains(code)||!(error.get("message") instanceof String message)||message.isBlank()||message.length()>256)throw new IllegalStateException("Invalid visualization failure");
+            throw new IllegalStateException(code+": "+message);
+        }
+        if(!Boolean.TRUE.equals(response.get("ready")))throw new IllegalStateException("Invalid visualization readiness");
+        return response;
+    }
+    private static Map<String,Object> failure(Path project,String code,String message){
+        return Map.of("schemaVersion",1,"ready",false,"project",project.toString(),"pid",ProcessHandle.current().pid(),"error",Map.of("code",code,"message",message));
+    }
+    private static void publish(Path directory,Map<String,Object> result){
+        Thread.ofVirtual().name("shed-visualize-ready").start(()->{
+            byte[] bytes=MiniJson.stringify(result).getBytes(StandardCharsets.UTF_8);Path pending=null;
+            try{pending=PrivateWorkspaceFiles.create(directory,"ready-pending.json",bytes);Files.move(pending,directory.resolve("ready.json"),StandardCopyOption.ATOMIC_MOVE);}
+            catch(java.io.IOException failed){if(pending!=null)try{PrivateWorkspaceFiles.deleteIfMatching(pending,bytes);}catch(java.io.IOException cleanup){failed.addSuppressed(cleanup);}System.getLogger("shed.visualize").log(System.Logger.Level.WARNING,"Visualization readiness could not be published");}
+        });
     }
     static String absoluteClassPath(String classPath,Path directory){
         var entries=java.util.Arrays.stream(classPath.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator),-1))
@@ -53,20 +74,18 @@ final class ShedVisualize {
             var editor=new Texteditor(new String[]{project.toString()});long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(40);
             var ready=new java.util.concurrent.atomic.AtomicBoolean();
             javax.swing.Timer timer=new javax.swing.Timer(100,null);timer.addActionListener(e->{
-                if(!editor.isDisplayable()||System.nanoTime()>deadline){timer.stop();return;}
+                if(!editor.isDisplayable()||System.nanoTime()>deadline){timer.stop();publish(directory,failure(project,editor.isDisplayable()?"STARTUP_TIMEOUT":"WINDOW_CLOSED",editor.isDisplayable()?"Window initialization timed out":"Visualization window closed before readiness"));return;}
                 if(editor.stagedStartupPending)return;
                 if(!ready.getAndSet(true)){
                     editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("api start control");editor.toolWindowHost.watchAgentChanges("start",args[2]);
                 }
                 var attachment=editor.visualAttachment();
                 var watch=editor.toolWindowHost.watchAgentChanges("state",args[2]);
+                if(watch.get("error") instanceof String message&&!message.isEmpty()){timer.stop();publish(directory,failure(project,"WATCH_START_FAILED",message));return;}
+                if(attachment==null&&editor.visualAttachmentFailed()){timer.stop();publish(directory,failure(project,"ATTACHMENT_FAILED","Local control attachment could not start; check local diagnostics and session directory permissions"));return;}
                 if(attachment==null||!Boolean.TRUE.equals(watch.get("ready")))return;
-                var result=Map.of("schemaVersion",1,"ready",true,"project",project.toString(),"descriptor",attachment.descriptor().toString(),"credential",attachment.credential().toString(),"pid",ProcessHandle.current().pid(),"agent",args[2]);
-                timer.stop();Thread.ofVirtual().name("shed-visualize-ready").start(()->{
-                    byte[] bytes=MiniJson.stringify(result).getBytes(StandardCharsets.UTF_8);Path pending=null;
-                    try{pending=PrivateWorkspaceFiles.create(directory,"ready-pending.json",bytes);Files.move(pending,directory.resolve("ready.json"),StandardCopyOption.ATOMIC_MOVE);}
-                    catch(java.io.IOException failure){if(pending!=null)try{PrivateWorkspaceFiles.deleteIfMatching(pending,bytes);}catch(java.io.IOException cleanup){failure.addSuppressed(cleanup);}System.getLogger("shed.visualize").log(System.Logger.Level.WARNING,"Visualization readiness could not be published");}
-                });
+                Map<String,Object> result=Map.of("schemaVersion",1,"ready",true,"project",project.toString(),"descriptor",attachment.descriptor().toString(),"credential",attachment.credential().toString(),"pid",ProcessHandle.current().pid(),"agent",args[2]);
+                timer.stop();publish(directory,result);
             });timer.start();editor.addWindowListener(new java.awt.event.WindowAdapter(){public void windowClosed(java.awt.event.WindowEvent e){timer.stop();}});
         });
     }

@@ -29,6 +29,21 @@ class ExternalChangeSnapshotTest {
             Files.writeString(root.resolve("external.txt"),"external");assertNotNull(changed.get(5,TimeUnit.SECONDS));assertTrue(watch.watching());watch.close();assertFalse(watch.watching());
         }
     }
+    @Test void opaqueAssetsDoNotConsumeTheTextBudgetAndMetadataIsNotAContentHash() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("asset-project"));byte[] asset=new byte[ExternalChangeSnapshot.MAX_FILE];
+        for(int i=0;i<40;i++)Files.write(root.resolve("asset-"+i+(i%2==0?".png":".gz")),asset);
+        Files.writeString(root.resolve("Source.java"),"class Source {}\n");var before=ExternalChangeSnapshot.capture(root);
+        assertEquals(41,before.size());assertEquals("class Source {}\n",before.get("Source.java").text());assertFalse(before.get("asset-0.png").textual());
+        Path changed=root.resolve("asset-0.png");Files.setLastModifiedTime(changed,java.nio.file.attribute.FileTime.fromMillis(Files.getLastModifiedTime(changed).toMillis()+2000));
+        var rows=ExternalChangeSnapshot.compare(before,ExternalChangeSnapshot.capture(root));assertEquals(1,rows.size());assertEquals("M",rows.getFirst().kind());assertTrue(ChangeDiffView.format(rows.getFirst()).contains("textual comparison unavailable"));
+        var opaque=new ExternalChangeSnapshot.File("[Binary or unsupported encoding]","opaque:matching-metadata",false);
+        var unrelated=ExternalChangeSnapshot.compare(Map.of("old.png",opaque),Map.of("new.png",opaque));assertEquals(Set.of("A","D"),unrelated.stream().map(ExternalChangeSnapshot.Change::kind).collect(java.util.stream.Collectors.toSet()));
+    }
+    @Test void theTextBudgetStillRejectsOversizedBaselines() throws Exception {
+        Path root=Files.createDirectory(temporary.resolve("text-project"));byte[] text="x".repeat(ExternalChangeSnapshot.MAX_FILE).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        for(int i=0;i<=ExternalChangeSnapshot.MAX_TOTAL/ExternalChangeSnapshot.MAX_FILE;i++)Files.write(root.resolve("source-"+i+".txt"),text);
+        assertTrue(assertThrows(java.io.IOException.class,()->ExternalChangeSnapshot.capture(root)).getMessage().contains("byte limit"));
+    }
     @Test void hiddenTemporaryTailDoesNotMaskTheSourceWrite() throws Exception {
         Path root=Files.createDirectory(temporary.resolve("atomic"));var changed=new CompletableFuture<Path>();
         try(var watch=TestWatchService.start(root,path->ExternalChangeSnapshot.allowed(root,path),changed::complete)){

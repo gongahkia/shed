@@ -9,11 +9,12 @@ import java.util.*;
 /** Disposable observation snapshots; never installed as editable documents or written to disk. */
 final class ExternalChangeSnapshot {
     static final int MAX_FILES=16384, MAX_FILE=1024*1024, MAX_TOTAL=32*1024*1024;
+    private static final Set<String> OPAQUE_EXTENSIONS=Set.of(".png",".jpg",".jpeg",".gif",".webp",".bmp",".tif",".tiff",".ico",".icns",".pdf",".zip",".gz",".tgz",".bz2",".xz",".7z",".jar",".class",".ttf",".otf",".woff",".woff2",".mp3",".mp4",".mov",".wav");
     record Identity(Object key,java.nio.file.attribute.FileTime created){}
     record File(String text,String digest,boolean textual,Identity identity) {
         File(String text,String digest,boolean textual){this(text,digest,textual,null);}
     }
-    static final String COVERAGE="Source and safe config files; private files, generated paths, symlinks and other dotfiles excluded";
+    static final String COVERAGE="Source and safe config files; binary assets tracked by metadata; private/generated paths excluded";
     private static final Set<String> CONFIG_FILES=Set.of(".gitignore",".gitattributes",".gitmodules",".editorconfig",".dockerignore",".gitlab-ci.yml",".prettierrc",".prettierrc.json",".prettierrc.yaml",".eslintrc",".eslintrc.json",".eslintrc.yml",".stylelintrc",".clang-format",".clang-tidy",".nvmrc",".python-version",".tool-versions");
     private static final Set<String> CONFIG_DIRECTORIES=Set.of(".github",".changeset");
     record Change(String kind,String path,String previous,String before,String after,List<WorkspaceTextEdits.Hunk> hunks) {
@@ -40,6 +41,11 @@ final class ExternalChangeSnapshot {
                 if(result.size()>=MAX_FILES)throw new IOException("Watch snapshot limit reached; choose a smaller project");
                 String key=root.relativize(file).toString();
                 if(a.size()>MAX_FILE){result.put(key,new File("[File exceeds the 1 MiB visual diff limit]","large:"+a.size()+":"+a.lastModifiedTime(),false));return FileVisitResult.CONTINUE;}
+                if(OPAQUE_EXTENSIONS.contains(extension(key).toLowerCase(Locale.ROOT))){
+                    // binary comparisons are deferred; do not spend the bounded source budget reading assets
+                    result.put(key,new File("[Binary or unsupported encoding; metadata-only observation]","opaque:"+a.fileKey()+":"+a.creationTime()+":"+a.lastModifiedTime()+":"+a.size(),false,a.fileKey()==null?null:new Identity(a.fileKey(),a.creationTime())));
+                    return FileVisitResult.CONTINUE;
+                }
                 byte[] data;try(var input=Files.newInputStream(file,LinkOption.NOFOLLOW_LINKS)){data=input.readNBytes(MAX_FILE+1);}
                 bytes[0]+=data.length;if(data.length>MAX_FILE||bytes[0]>MAX_TOTAL)throw new IOException("Watch snapshot byte limit reached");
                 boolean text=true;String content;
@@ -89,8 +95,8 @@ final class ExternalChangeSnapshot {
         for(String path:added){var id=now.get(path).identity();var sources=id==null?List.<String>of():identities.getOrDefault(id,List.of());if(sources.size()==1&&targets.get(id)==1)moves.put(path,new Move(sources.getFirst(),"R"));}
         var exactSources=new HashMap<String,List<String>>();var exactTargets=new HashMap<String,List<String>>();
         var used=new HashSet<String>();moves.values().forEach(move->used.add(move.previous()));
-        for(String path:removed)if(!used.contains(path)&&!base.get(path).digest().startsWith("large:"))exactSources.computeIfAbsent(base.get(path).digest(),key->new ArrayList<>()).add(path);
-        for(String path:added)if(!moves.containsKey(path))exactTargets.computeIfAbsent(now.get(path).digest(),key->new ArrayList<>()).add(path);
+        for(String path:removed)if(!used.contains(path)&&contentDigest(base.get(path)))exactSources.computeIfAbsent(base.get(path).digest(),key->new ArrayList<>()).add(path);
+        for(String path:added)if(!moves.containsKey(path)&&contentDigest(now.get(path)))exactTargets.computeIfAbsent(now.get(path).digest(),key->new ArrayList<>()).add(path);
         exactTargets.forEach((digest,paths)->{var sources=exactSources.getOrDefault(digest,List.of());if(paths.size()==1&&sources.size()==1)moves.put(paths.getFirst(),new Move(sources.getFirst(),"R"));});
         // similarity is advisory, bounded and reciprocal; ambiguous pairs remain add/delete
         if((long)removed.size()*added.size()>4096)return moves;
@@ -109,6 +115,7 @@ final class ExternalChangeSnapshot {
             if(winner.getValue()-alternate>=10)moves.put(target.getKey(),new Move(winner.getKey(),"R?"));
         }return moves;
     }
+    private static boolean contentDigest(File file){return !file.digest().startsWith("large:")&&!file.digest().startsWith("opaque:");}
     private static String extension(String path){String name=Path.of(path).getFileName().toString();int dot=name.lastIndexOf('.');return dot<0?"":name.substring(dot);}
     private static int similarity(String a,String b){
         var left=a.lines().toList();var right=b.lines().toList();if(left.size()<4||right.size()<4)return 0;

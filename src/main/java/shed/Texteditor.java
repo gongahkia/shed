@@ -3696,6 +3696,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     WorkspaceBridgeServer visualAttachment(){return agentWorkspaceController.visualAttachment();}
+    boolean visualAttachmentFailed(){return agentWorkspaceController.visualAttachmentFailed();}
 
     // Main method
     public static void main(String[] args) {

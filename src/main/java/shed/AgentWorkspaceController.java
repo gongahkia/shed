@@ -28,6 +28,7 @@ final class AgentWorkspaceController implements AutoCloseable {
 
     void ownSession(AgentSessionService session) { sessions.own(session); }
     WorkspaceBridgeServer visualAttachment(){return active!=null&&active.controlEnabled()&&active.running()?active:null;}
+    boolean visualAttachmentFailed(){return startingJob<0&&visualAttachment()==null;}
     void applicationReady() { applicationReady = true; if (applicationStatus != null) applicationStatus.ready(); }
 
     String handle(String argument) {

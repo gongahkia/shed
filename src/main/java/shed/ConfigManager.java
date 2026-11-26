@@ -367,7 +367,7 @@ public class ConfigManager {
         defineDefault("agent.opencode.model", "");
         defineDefault("agent.context.instructions", "AGENTS.md,AGENT.md");
         defineDefault("agent.context.rules", ".agents/skills,.shed/rules");
-        defineDefault("ai.completion.delay.ms", 500);
+        defineDefault("ai.completion.delay.ms", 250);
         defineDefault("ai.completion.timeout.ms", 10000);
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
         defineDefault("lsp.completion.enabled", lspFeatures.completion());

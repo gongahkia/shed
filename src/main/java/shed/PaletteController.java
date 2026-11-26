@@ -114,7 +114,9 @@ final class PaletteController {
 
         action("Language Services", "lsp manage", "Open the local Language Services panel."),
         action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
-        action("AI: Complete", "agent complete", "Request an inline suggestion from the configured local model. Tab accepts; Escape dismisses."),
+        action("AI: Complete", "agent complete", "Request an inline suggestion through the configured OpenCode model. Tab accepts; Escape dismisses."),
+        action("Inline Suggestions: Enable", "agent complete on", "Opt in to sending bounded source context to your configured OpenCode model."),
+        action("Inline Suggestions: Disable", "agent complete off", "Stop inline suggestions and cancel pending requests."),
         action("AI: Edit Selection", "agent edit", "Describe a change to selected code, then review the proposal before applying."),
         action("AI: Ask/Search", "agent ask", "Ask about the project and navigate to referenced code."),
         action("AI: Run Task", "agent run", "Request changes across files and review the proposed changes."),

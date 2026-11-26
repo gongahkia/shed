@@ -35,6 +35,20 @@ class InlineCompletionSessionTest {
     }
     @AfterEach void close() throws Exception { if (session != null) edt(session::close); }
 
+    @Test void wordAcceptanceRetainsRemainingGhostWithoutAnotherProviderRequestAndUndoesExactly()throws Exception{
+        open("return ;",7);var undo=new UndoManager();edt(()->{area.getDocument().addUndoableEditListener(undo);session.request();});requests.getFirst().complete("value + other");flush();
+        edt(()->{var word=key(java.awt.event.KeyEvent.VK_RIGHT,java.awt.event.InputEvent.CTRL_DOWN_MASK);assertTrue(session.keyPressed(word,false));assertEquals("return value;",area.getText());assertEquals(" + other",session.preview());assertEquals(1,requests.size());assertTrue(session.keyPressed(key(java.awt.event.KeyEvent.VK_TAB,0),false));assertEquals("return value + other;",area.getText());undo.undo();assertEquals("return value;",area.getText());undo.undo();assertEquals("return ;",area.getText());undo.redo();undo.redo();assertEquals("return value + other;",area.getText());});
+    }
+    @Test void partialAcceptanceKeepsUnicodeClustersAndYieldsWhenAnotherFeatureOwnsKeys()throws Exception{
+        open("",0);edt(session::request);requests.getFirst().complete("👩‍💻 next");flush();
+        edt(()->{assertTrue(session.keyPressed(key(java.awt.event.KeyEvent.VK_RIGHT,java.awt.event.InputEvent.META_DOWN_MASK),false));assertEquals("👩‍💻",area.getText());assertEquals(" next",session.preview());assertFalse(session.keyPressed(key(java.awt.event.KeyEvent.VK_RIGHT,java.awt.event.InputEvent.CTRL_DOWN_MASK),true));assertEquals("👩‍💻",area.getText());});
+        for(String text:List.of("e\u0301clair rest","\u0915\u094d\u0937 value"," 👩‍💻 done"))assertTrue(GraphemeBoundary.isBoundary(text,InlineCompletionSession.wordEnd(text)));
+    }
+    @Test void disabledSuggestionsNeverCallProviderAndClosingRetiresListeners()throws Exception{
+        open("code",4);eligible.set(false);int listeners=area.getCaretListeners().length;
+        edt(()->{for(int i=0;i<100;i++)area.append("x");area.setCaretPosition(area.getDocument().getLength());session.request();assertTrue(requests.isEmpty());session.close();assertEquals(listeners-1,area.getCaretListeners().length);});
+    }
+
     @Test void previewDoesNotEditTheDocumentAndAcceptanceIsOneUndoableInsertion() throws Exception {
         open("return ;", 7); UndoManager undo = new UndoManager();
         edt(() -> { area.getDocument().addUndoableEditListener(undo); session.request(); });

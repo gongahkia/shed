@@ -72,6 +72,9 @@ final class ShedMenuBar {
         item(view, "Tasks", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TASKS));
         item(view, "Tests", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TESTS));
         item(view, "Agent Chat…", -1, 0, () -> command("agent delegate"));
+        var inline=new javax.swing.JCheckBoxMenuItem("Inline Code Suggestions");inline.setName("editor.inlineSuggestions");inline.setSelected(Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled","false")));inline.setToolTipText("Opt in to bounded source context through OpenCode. Tab accepts; Ctrl/Command+Right accepts a word; Escape dismisses.");
+        inline.addActionListener(e->{if(!editor.agentOwnsEditor())show(editor.setAiCompletionEnabled(inline.isSelected()));inline.setSelected(Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled","false")));});view.add(inline);
+        view.addMenuListener(new javax.swing.event.MenuListener(){public void menuSelected(javax.swing.event.MenuEvent e){inline.setSelected(Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled","false")));}public void menuDeselected(javax.swing.event.MenuEvent e){}public void menuCanceled(javax.swing.event.MenuEvent e){}});
 
         JMenu navigate = menu("Navigate");
         item(navigate, "Go Back", nativeMac ? KeyEvent.VK_MINUS : KeyEvent.VK_LEFT,

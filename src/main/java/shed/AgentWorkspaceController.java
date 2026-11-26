@@ -40,6 +40,8 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "task" -> {AgentTaskLauncher.show(editor);yield "Advanced one-shot task setup.";}
             case "takeback" -> {editor.takeBackAgentControl();yield "Control returned to you.";}
             case "complete" -> editor.requestAiCompletion();
+            case "complete on" -> editor.setAiCompletionEnabled(true);
+            case "complete off" -> editor.setAiCompletionEnabled(false);
             case "edit", "ask", "run" -> {
                 if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentAction(
                     value.equals("edit") ? AgentAction.EDIT : value.equals("ask") ? AgentAction.ASK : AgentAction.RUN);

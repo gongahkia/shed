@@ -40,8 +40,8 @@ final class InlineCompletionController implements AutoCloseable {
     }
 
     private int delay() {
-        try { return Integer.parseInt(editor.configManager.get("ai.completion.delay.ms", "500")); }
-        catch (NumberFormatException invalid) { return 500; }
+        try { return Integer.parseInt(editor.configManager.get("ai.completion.delay.ms", "250")); }
+        catch (NumberFormatException invalid) { return 250; }
     }
 
     private CompletableFuture<String> complete(String prefix, String suffix) {
@@ -69,7 +69,7 @@ final class InlineCompletionController implements AutoCloseable {
 
     static boolean hasLegacyMapping(ConfigManager config, EditorMode mode, KeyEvent event) {
         if (!config.getKeymapProfile().usesVimModeHandling() || mode == null) return false;
-        String key = switch (event.getKeyCode()) { case KeyEvent.VK_TAB -> "<tab>"; case KeyEvent.VK_ESCAPE -> "<esc>"; default -> null; };
+        String key = switch (event.getKeyCode()) { case KeyEvent.VK_TAB -> "<tab>"; case KeyEvent.VK_ESCAPE -> "<esc>"; case KeyEvent.VK_RIGHT -> "<right>"; default -> null; };
         return key != null && config.getKeybinding(mode.name().toLowerCase(java.util.Locale.ROOT), key) != null;
     }
 

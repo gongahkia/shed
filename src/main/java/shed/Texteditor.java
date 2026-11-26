@@ -258,6 +258,11 @@ public class Texteditor extends JFrame implements KeyListener {
     void stopAiCompletionRequests() { if (inlineCompletionController != null) inlineCompletionController.stopRequests(); }
     void dismissAiCompletion() { if (inlineCompletionController != null) inlineCompletionController.dismiss(); }
     String requestAiCompletion() { return inlineCompletionController == null ? "Inline completion is unavailable." : inlineCompletionController.request(); }
+    String setAiCompletionEnabled(boolean enabled){
+        String result=settingsApplication.update("ai.completion.enabled",Boolean.toString(enabled));
+        if(!Boolean.parseBoolean(configManager.get("ai.completion.enabled","false")))stopAiCompletionRequests();
+        return result.startsWith("Error")?result:enabled?"Inline suggestions on · OpenCode supplies suggestions. Tab accepts; Escape dismisses.":"Inline suggestions off.";
+    }
 
     /** Composition seam for explicitly enabled machine/agent adapters; constructing it opens no surface. */
     WorkspaceQueryService workspaceQueries(Path root, AgentPolicy policy) {

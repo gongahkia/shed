@@ -14,6 +14,7 @@ final class InlineCompletionDisplay extends BasicTextAreaUI {
     private final JTextArea source;
     private JTextArea display;
     private int anchor, length;
+    private boolean hint;
 
     InlineCompletionDisplay(JTextArea source) {
         this.source = source;
@@ -45,6 +46,17 @@ final class InlineCompletionDisplay extends BasicTextAreaUI {
     }
 
     boolean showing() { return display != null; }
+    void hint(boolean enabled){hint=enabled;}
+
+    @Override protected void paintSafely(Graphics graphics){
+        super.paintSafely(graphics);if(display==null||!hint)return;
+        var g=(Graphics2D)graphics.create();try{
+            var visible=source.getVisibleRect();g.setFont(source.getFont().deriveFont(Math.max(10f,source.getFont().getSize2D()-2)));var metrics=g.getFontMetrics();String text="Tab accept · Ctrl/Meta+Right word · Esc dismiss";
+            if(metrics.stringWidth(text)+16>visible.width)text="Tab accept · Esc dismiss";
+            int width=metrics.stringWidth(text)+12,height=metrics.getHeight()+6;if(width>visible.width||height>visible.height)return;
+            int x=visible.x+visible.width-width-4,y=visible.y+visible.height-height-4;g.setColor(source.getBackground());g.fillRoundRect(x,y,width,height,6,6);g.setColor(source.getForeground());g.drawString(text,x+6,y+3+metrics.getAscent());
+        }finally{g.dispose();}
+    }
 
     private void configure() {
         if (display == null) return;

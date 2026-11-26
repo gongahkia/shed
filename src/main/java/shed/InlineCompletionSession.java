@@ -55,6 +55,7 @@ final class InlineCompletionSession implements AutoCloseable {
         this.area = area; this.eligible = eligible; this.delay = delay; this.provider = provider;
         this.insertion = insertion; this.errors = errors;
         display = new InlineCompletionDisplay(area);
+        display.hint(true);
         timer = new Timer(500, event -> { if (System.nanoTime() >= retryAfter) request(); }); timer.setRepeats(false);
         bind(); area.addCaretListener(caret); area.addFocusListener(focus); area.addPropertyChangeListener(binding);
     }
@@ -66,7 +67,7 @@ final class InlineCompletionSession implements AutoCloseable {
 
     private void changed(DocumentEvent event, boolean inserted) {
         revision++; invalidate();
-        if (!inserted || accepting || closed) return;
+        if (!inserted || accepting || closed || !eligible.getAsBoolean()) return;
         long changedRevision = revision, epoch = automaticEpoch; Document changedDocument = document;
         int expectedCaret = event.getOffset() + event.getLength();
         // Caret movement from this insertion settles before the idle timer starts.
@@ -135,9 +136,23 @@ final class InlineCompletionSession implements AutoCloseable {
 
     boolean accept() {
         if (!visible()) { invalidate(); return false; }
-        String text = suggestion.text(); invalidate(); accepting = true;
-        try { insertion.accept(text); } finally { accepting = false; }
+        return accept(suggestion.text().length());
+    }
+
+    boolean acceptWord(){if(!visible())return false;return accept(wordEnd(suggestion.text()));}
+    private boolean accept(int count){
+        String text=suggestion.text();Document original=document;long before=revision;int anchor=suggestion.caret();invalidate();accepting=true;
+        try{insertion.accept(text.substring(0,count));}finally{accepting=false;}
+        if(count<text.length()&&document==original&&revision==before+1&&area.getCaretPosition()==anchor+count&&canRequest()){
+            String remainder=text.substring(count);try{display.show(anchor+count,remainder);suggestion=new Suggestion(document,revision,anchor+count,remainder);}catch(BadLocationException unavailable){display.clear();}
+        }
         return true;
+    }
+    static int wordEnd(String text){
+        int end=0;while(end<text.length()&&Character.isWhitespace(text.codePointAt(end)))end+=Character.charCount(text.codePointAt(end));
+        if(end==text.length())return end;
+        if(Character.isJavaIdentifierPart(text.codePointAt(end))){while(end<text.length()&&Character.isJavaIdentifierPart(text.codePointAt(end)))end+=Character.charCount(text.codePointAt(end));return GraphemeBoundary.ceiling(text,end);}
+        return GraphemeBoundary.next(text,end);
     }
 
     boolean dismiss() { boolean hadRequest = suggestion != null || pending != null || timer.isRunning(); automaticEpoch++; invalidate(); return hadRequest; }
@@ -147,6 +162,7 @@ final class InlineCompletionSession implements AutoCloseable {
         if (otherCompletionOwnsKeys) { dismiss(); return false; }
         boolean plain = !event.isAltDown() && !event.isControlDown() && !event.isMetaDown() && !event.isShiftDown();
         if ((plain && event.getKeyCode() == java.awt.event.KeyEvent.VK_TAB && accept())
+            || (event.getKeyCode()==java.awt.event.KeyEvent.VK_RIGHT&&!event.isAltDown()&&!event.isShiftDown()&&(event.isControlDown()^event.isMetaDown())&&acceptWord())
             || (plain && event.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE && dismiss())) {
             event.consume(); return true;
         }
@@ -157,7 +173,6 @@ final class InlineCompletionSession implements AutoCloseable {
         generation++; timer.stop(); suggestion = null;
         display.clear();
         var previous = pending; pending = null; if (previous != null) previous.cancel(true);
-        area.repaint();
     }
 
     @Override public void close() {

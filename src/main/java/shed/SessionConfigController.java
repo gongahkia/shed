@@ -417,6 +417,11 @@ final class SessionConfigController {
 
 
     void applySetting(String key) {
+        if(key!=null&&key.startsWith("ai.completion.")){
+            editor.stopAiCompletionRequests();
+            if(!editor.stagedStartupPending)editor.setJMenuBar(ShedMenuBar.create(editor));
+            editor.requestStatusBarRefresh();return;
+        }
         if (!"ui.density".equals(key)) {
             applyRuntimeConfigFromSettings();
             return;

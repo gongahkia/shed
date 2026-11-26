@@ -17,6 +17,6 @@ record InlineCompletionSettings(boolean enabled, AgentProvider provider, int del
         var provider = new AgentProvider("opencode-completion", configured.command(),
             OpenCodePreset.completionEnvironment(configured.environment()), configured.startupTimeout(), timeout);
         return new InlineCompletionSettings(Boolean.parseBoolean(config.get("ai.completion.enabled", "false")), provider,
-            Integer.parseInt(config.get("ai.completion.delay.ms", "500")), timeout);
+            Integer.parseInt(config.get("ai.completion.delay.ms", "250")), timeout);
     }
 }

@@ -9,6 +9,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 class InlineCompletionKeymapTest {
     @TempDir Path temporary;
+    @Test void inlineCompletionRemainsOptInAndAnExistingSavedDelaySurvivesReload()throws Exception{
+        String home=System.getProperty("user.home");System.setProperty("user.home",temporary.toString());try{
+            var config=new ConfigManager();assertEquals("false",config.get("ai.completion.enabled",""));assertEquals("250",config.get("ai.completion.delay.ms",""));config.setAndPersist("ai.completion.delay.ms","500");var reloaded=new ConfigManager();assertEquals("500",reloaded.get("ai.completion.delay.ms",""));assertEquals("false",reloaded.get("ai.completion.enabled",""));
+        }finally{System.setProperty("user.home",home);}
+    }
     @Test void legacyVimTabAndEscapeMappingsKeepPriorityWithoutAffectingPlainEditing() {
         String home = System.getProperty("user.home"); System.setProperty("user.home", temporary.toString());
         try {
@@ -20,6 +25,7 @@ class InlineCompletionKeymapTest {
             assertTrue(InlineCompletionController.hasLegacyMapping(config, EditorMode.INSERT, tab));
             assertFalse(InlineCompletionController.hasLegacyMapping(config, EditorMode.NORMAL, tab));
             assertTrue(InlineCompletionController.hasLegacyMapping(config, EditorMode.INSERT, escape));
+            config.set("keybind.insert.<right>","nop");assertTrue(InlineCompletionController.hasLegacyMapping(config,EditorMode.INSERT,new KeyEvent(new JTextArea(),KeyEvent.KEY_PRESSED,0,java.awt.event.InputEvent.CTRL_DOWN_MASK,KeyEvent.VK_RIGHT,KeyEvent.CHAR_UNDEFINED)));
             config.set("keymap.profile", "plain"); assertFalse(InlineCompletionController.hasLegacyMapping(config, EditorMode.INSERT, tab));
         } finally { System.setProperty("user.home", home); }
     }

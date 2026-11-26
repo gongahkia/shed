@@ -308,6 +308,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'AgentViewportHandoffTest',
             'AgentAnimationEdgeTest',
             'OpenVsxThemeTest',
+            'TerminalColorTest',
             'EditorWorkspaceDocumentsTest',
             'AgentChangeTourTest', 'SmoothScrollPaneUITest',
             'AgentReviewPanelTest',

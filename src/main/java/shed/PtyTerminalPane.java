@@ -343,25 +343,26 @@ final class PtyTerminalPane implements AutoCloseable {
             Color fg = readableColor(configManager == null ? Color.WHITE : configManager.getEditorForeground(), bg);
             Color accent = configManager == null ? new Color(97, 175, 239) : configManager.getCaretColor();
             Color string = configManager == null ? new Color(152, 195, 121) : configManager.getSyntaxStringColor();
-            Color command = configManager == null ? new Color(229, 192, 123) : configManager.getCommandColor();
-            Color replace = configManager == null ? new Color(224, 108, 117) : configManager.getReplaceColor();
-            Color visual = configManager == null ? new Color(198, 120, 221) : configManager.getVisualColor();
+            // Mode backgrounds may all be identical; use Shed's semantic hues for ANSI text.
+            Color yellow = configManager == null ? new Color(229, 192, 123) : new Color(0xA87808);
+            Color red = configManager == null ? new Color(224, 108, 117) : new Color(0xCC4855);
+            Color magenta = configManager == null ? new Color(198, 120, 221) : new Color(0x8B52C7);
             Color function = configManager == null ? new Color(86, 182, 194) : configManager.getSyntaxFunctionColor();
             this.colors = new com.jediterm.core.Color[] {
                 toCoreColor(readableColor(blend(bg, fg, 0.55), bg)),
-                toCoreColor(readableColor(replace, bg)),
+                toCoreColor(readableColor(red, bg)),
                 toCoreColor(readableColor(string, bg)),
-                toCoreColor(readableColor(command, bg)),
+                toCoreColor(readableColor(yellow, bg)),
                 toCoreColor(readableColor(accent, bg)),
-                toCoreColor(readableColor(visual, bg)),
+                toCoreColor(readableColor(magenta, bg)),
                 toCoreColor(readableColor(function, bg)),
                 toCoreColor(readableColor(fg, bg)),
                 toCoreColor(readableColor(blend(bg, fg, 0.80), bg)),
-                toCoreColor(readableColor(brighten(replace), bg)),
+                toCoreColor(readableColor(brighten(red), bg)),
                 toCoreColor(readableColor(brighten(string), bg)),
-                toCoreColor(readableColor(brighten(command), bg)),
+                toCoreColor(readableColor(brighten(yellow), bg)),
                 toCoreColor(readableColor(brighten(accent), bg)),
-                toCoreColor(readableColor(brighten(visual), bg)),
+                toCoreColor(readableColor(brighten(magenta), bg)),
                 toCoreColor(readableColor(brighten(function), bg)),
                 toCoreColor(readableColor(Color.WHITE, bg))
             };

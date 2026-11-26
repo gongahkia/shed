@@ -163,9 +163,9 @@ final class VsCodeThemeImporter {
         if (scope.contains(" ") || scope.contains("-") || scope.contains(":")) return null;
         if (scope.equals("comment") || scope.startsWith("comment.")) return "ui.syntax.comment";
         if (scope.equals("string") || scope.startsWith("string.")) return "ui.syntax.string";
-        if (scope.equals("keyword") || scope.startsWith("keyword.") || scope.startsWith("storage.")) return "ui.syntax.keyword";
+        if (scope.equals("keyword") || scope.startsWith("keyword.") || scope.equals("storage") || scope.startsWith("storage.")) return "ui.syntax.keyword";
         if (scope.startsWith("constant.numeric")) return "ui.syntax.number";
-        if (scope.startsWith("constant.")) return "ui.syntax.constant";
+        if (scope.equals("constant") || scope.startsWith("constant.")) return "ui.syntax.constant";
         if (scope.startsWith("entity.name.function") || scope.startsWith("support.function")) return "ui.syntax.function";
         if (scope.startsWith("entity.name.type") || scope.startsWith("support.type") || scope.startsWith("support.class")) return "ui.syntax.type";
         if (scope.startsWith("entity.name.tag") || scope.startsWith("meta.annotation")) return "ui.syntax.annotation";

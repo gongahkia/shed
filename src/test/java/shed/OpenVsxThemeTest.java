@@ -67,6 +67,23 @@ class OpenVsxThemeTest {
         return home;
     }
 
+    @Test void mapsBareConstantAndStorageAndPreservesNumericScope() throws Exception {
+        String palette = """
+            {"tokenColors":[
+              {"scope":"constant","settings":{"foreground":"#123456"}},
+              {"scope":"storage","settings":{"foreground":"#ABCDEF"}},
+              {"scope":"constant.numeric","settings":{"foreground":"#654321"}}
+            ]}
+            """;
+        ImportedTheme theme = VsCodeThemeImporter.translate(zip(Map.of(
+            "extension/package.json", MANIFEST, "extension/themes/dark.json", palette)),
+            EXTENSION, "MIT", "").getFirst();
+        assertAll(
+            () -> assertEquals("#123456", theme.colors().get("ui.syntax.constant")),
+            () -> assertEquals("#ABCDEF", theme.colors().get("ui.syntax.keyword")),
+            () -> assertEquals("#654321", theme.colors().get("ui.syntax.number")));
+    }
+
     @Test void mapsJsoncPaletteSyntaxAndAlphaWithoutExecutingExtension() throws Exception {
         ImportedTheme theme = theme();
         assertEquals("#112233", theme.colors().get("normal"));

@@ -1,0 +1,62 @@
+{
+  "boundary": "source-reviewed non-native tests, not general process confinement",
+  "tests": [
+    "OpenVsxThemeTest"
+  ],
+  "fixture": "/private/tmp/shed-native-q41dm9fl",
+  "native_benchmarks": "BLOCKED",
+  "phase": "test",
+  "dependency_copy": {
+    "entries": 1821,
+    "bytes": 98186046
+  },
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-q41dm9fl/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-q41dm9fl/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-q41dm9fl/run/config",
+    "-Djava.awt.headless=true",
+    "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd",
+    "-cp",
+    "/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/boot/plexus-classworlds-2.9.0.jar",
+    "org.codehaus.plexus.classworlds.launcher.Launcher",
+    "-B",
+    "-o",
+    "-s",
+    "/private/tmp/shed-native-q41dm9fl/run/config/settings.xml",
+    "-gs",
+    "/private/tmp/shed-native-q41dm9fl/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-q41dm9fl/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-q41dm9fl/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-q41dm9fl/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-q41dm9fl/run/config",
+    "-Djava.awt.headless=true",
+    "-DforkCount=0",
+    "-Dtest=OpenVsxThemeTest",
+    "test"
+  ],
+  "exit": 1,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 27 resources from assets to target/classes/assets\n[INFO] Copying 3 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 442 source files with javac [debug release 21] to target/classes\n[WARNING] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/main/java/shed/ApplicationErrorReporter.java:[120,77] java.lang.ThreadDeath in java.lang has been deprecated and marked for removal\n[INFO] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/main/java/shed/EditorUiController.java: Some input files use or override a deprecated API.\n[INFO] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/main/java/shed/EditorUiController.java: Recompile with -Xlint:deprecation for details.\n[INFO] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/main/java/shed/BracketColorService.java: /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/main/java/shed/BracketColorService.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/main/java/shed/BracketColorService.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed dependency.\n[INFO] Compiling 326 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.OpenVsxThemeTest\n[ERROR] Tests run: 16, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.157 s <<< FAILURE! -- in shed.OpenVsxThemeTest\n[ERROR] shed.OpenVsxThemeTest.mapsBareConstantAndStorageAndPreservesNumericScope -- Time elapsed: 0.004 s <<< FAILURE!\norg.opentest4j.MultipleFailuresError: \nMultiple Failures (2 failures)\n\torg.opentest4j.AssertionFailedError: expected: <#123456> but was: <null>\n\torg.opentest4j.AssertionFailedError: expected: <#ABCDEF> but was: <null>\n\tat org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:80)\n\tat org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:44)\n\tat org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:38)\n\tat org.junit.jupiter.api.Assertions.assertAll(Assertions.java:2944)\n\tat shed.OpenVsxThemeTest.mapsBareConstantAndStorageAndPreservesNumericScope(OpenVsxThemeTest.java:81)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tSuppressed: org.opentest4j.AssertionFailedError: expected: <#123456> but was: <null>\n\t\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\t\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\t\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\t\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)\n\t\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)\n\t\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)\n\t\tat shed.OpenVsxThemeTest.lambda$mapsBareConstantAndStorageAndPreservesNumericScope$0(OpenVsxThemeTest.java:82)\n\t\tat org.junit.jupiter.api.AssertAll.lambda$assertAll$0(AssertAll.java:68)\n\t\tat java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)\n\t\tat java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)\n\t\tat java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)\n\t\tat java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)\n\t\tat java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)\n\t\tat java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)\n\t\tat java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)\n\t\tat org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:77)\n\t\t... 7 more\n\tSuppressed: org.opentest4j.AssertionFailedError: expected: <#ABCDEF> but was: <null>\n\t\tat org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)\n\t\tat org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)\n\t\tat org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)\n\t\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)\n\t\tat org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)\n\t\tat org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)\n\t\tat shed.OpenVsxThemeTest.lambda$mapsBareConstantAndStorageAndPreservesNumericScope$1(OpenVsxThemeTest.java:83)\n\t\tat org.junit.jupiter.api.AssertAll.lambda$assertAll$0(AssertAll.java:68)\n\t\tat java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)\n\t\tat java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:1024)\n\t\tat java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)\n\t\tat java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)\n\t\tat java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)\n\t\tat java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)\n\t\tat java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)\n\t\tat org.junit.jupiter.api.AssertAll.assertAll(AssertAll.java:77)\n\t\t... 7 more\n\n[INFO] \n[INFO] Results:\n[INFO] \n[ERROR] Failures: \n[ERROR]   OpenVsxThemeTest.mapsBareConstantAndStorageAndPreservesNumericScope:81 Multiple Failures (2 failures)\n\torg.opentest4j.AssertionFailedError: expected: <#123456> but was: <null>\n\torg.opentest4j.AssertionFailedError: expected: <#ABCDEF> but was: <null>\n[INFO] \n[ERROR] Tests run: 16, Failures: 1, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  7.762 s\n[INFO] Finished at: 2026-11-26T01:55:28Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project shed: There are test failures.\n[ERROR] \n[ERROR] Please refer to /Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/target/surefire-reports for the individual test results.\n[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.\n[ERROR] -> [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n",
+  "elapsed_s": 9.451840875000926,
+  "fixture_removed": true,
+  "metrics": [
+    {
+      "operation": "creation",
+      "ns": 759541
+    },
+    {
+      "operation": "guard",
+      "ns": 371125
+    },
+    {
+      "operation": "guard",
+      "ns": 757208
+    },
+    {
+      "operation": "cleanup",
+      "ns": 86730625
+    }
+  ]
+}

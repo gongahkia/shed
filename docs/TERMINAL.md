@@ -32,6 +32,21 @@ The integration is unavailable for noninteractive commands and unsupported shell
 
 Shed retains Jediterm/PTy4J behavior for terminal emulation. The fixture is a regression boundary, not a claim of complete xterm-sequence support.
 
+## Colors and syntax highlighting
+
+The built-in terminal already interprets ANSI colors, extended 256-color SGR and RGB true-color output. New terminal processes advertise `TERM=xterm-256color` and `COLORTERM=truecolor`. Programs decide which color sequences to emit; plain program output is not parsed as source code by Shed. Shell command-line syntax highlighting comes from the selected shell and its existing configuration, loaded through the shell integration above. Shed does not install a Zsh highlighting plugin, edit user dotfiles or replace the shell's line editor.
+
+The default terminal palette uses readable theme-derived colors. Its red, yellow and magenta fallback roles now use Shed's existing semantic hues rather than editor-mode backgrounds: those backgrounds are identical in Shed Light/Dark and had collapsed all three ANSI hues into one gray. Bright variants retain the existing contrast adjustment. Nib's dedicated ANSI palette, explicit 256/RGB colors, terminal fonts, input and shell behavior are unchanged.
+
+To inspect colors in your own ordinary terminal session, run:
+
+```sh
+printf '\033[31mred\033[0m  \033[33myellow\033[0m  \033[35mmagenta\033[0m\n'
+printf '\033[38;5;196m256-color red\033[0m  \033[38;2;18;164;239mRGB blue\033[0m\n'
+```
+
+`TerminalColorTest` verifies real emulator styles and palette values without starting a shell: basic ANSI, independent foreground/background, 256-color/RGB handling, reset/defaults, light/dark contrast, Nib preservation and font/theme refresh. See [live task and terminal-color evidence](performance/live-codex-task/INDEX.md). Native-shell process confinement remains unqualified; these component checks do not qualify shell startup, user plugins or every application's color configuration.
+
 ## Output links
 
 Shed makes an existing local source location such as `src/Main.java:12:4` clickable, resolving a relative path against the terminal's latest shell-reported directory when available, otherwise its startup directory. Clicking opens that regular local file at the reported one-based line and column. An explicitly connected Dev Container maps only absolute paths beneath its verified mounted workspace to existing files beneath the matching host workspace. For a connected SSH/container/WSL workspace that declares a remote language-server root, an absolute terminal path under that remote root is also clickable only when the corresponding local-mirror file exists. An ordinary terminal opened through `:remote use` also resolves relative paths from its requested local-mirror subdirectory, and only accepts results that remain inside that mirror. It also makes `http://` and `https://` output clickable for an explicit system-browser handoff.

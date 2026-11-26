@@ -1,0 +1,101 @@
+{
+  "boundary": "real T3-prepared checkout src subtree authorized by user; disposable app home/preferences; fixed direct Java, no shell/model process launched by this harness; not an OS sandbox",
+  "checkout": "/Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd",
+  "project": "/Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src",
+  "jar_sha256": "4502ab68b7b12410720890eaf5acaf3cc9e0f2b096de6291559a9d3ab418a412",
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-5e0oilae/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-5e0oilae/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-5e0oilae/run/config",
+    "-Djava.awt.headless=false",
+    "-cp",
+    "/private/tmp/shed-native-5e0oilae/run/work/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.LiveCodeTaskProbe",
+    "/Users/gongahkia/.t3/worktrees/shed/t3-4c208758-8e993b78e9a9ecbd/src",
+    "/private/tmp/shed-native-5e0oilae/run/work"
+  ],
+  "exit": 0,
+  "log": "OBSERVED main/java/shed/VsCodeThemeImporter.java Agent reading \nOBSERVED test/java/shed/OpenVsxThemeTest.java Agent reading \nOBSERVED test/resources/shed/portable-fixture-tests.properties Agent reading \nOBSERVED test/java/shed/OpenVsxThemeTest.java Agent change applied chunks\nOBSERVED test/java/shed/OpenVsxThemeTest.java Agent change applied \nOBSERVED test/resources/shed/portable-fixture-tests.properties Agent change applied deleting\nOBSERVED test/resources/shed/portable-fixture-tests.properties Agent change applied typing\nOBSERVED test/resources/shed/portable-fixture-tests.properties Agent change applied \nOBSERVED main/java/shed/VsCodeThemeImporter.java Agent change applied typing\nOBSERVED main/java/shed/VsCodeThemeImporter.java Agent change applied \n",
+  "events": [
+    {
+      "animation": "",
+      "epoch_ms": 1795658102262,
+      "direction": "top-to-bottom",
+      "activity": "Agent reading",
+      "path": "main/java/shed/VsCodeThemeImporter.java"
+    },
+    {
+      "animation": "",
+      "epoch_ms": 1795658102444,
+      "direction": "top-to-bottom",
+      "activity": "Agent reading",
+      "path": "test/java/shed/OpenVsxThemeTest.java"
+    },
+    {
+      "animation": "",
+      "epoch_ms": 1795658102728,
+      "direction": "top-to-bottom",
+      "activity": "Agent reading",
+      "path": "test/resources/shed/portable-fixture-tests.properties"
+    },
+    {
+      "animation": "chunks",
+      "epoch_ms": 1795658111247,
+      "direction": "left-to-right",
+      "activity": "Agent change applied",
+      "path": "test/java/shed/OpenVsxThemeTest.java"
+    },
+    {
+      "animation": "",
+      "epoch_ms": 1795658113166,
+      "direction": "",
+      "activity": "Agent change applied",
+      "path": "test/java/shed/OpenVsxThemeTest.java"
+    },
+    {
+      "animation": "deleting",
+      "epoch_ms": 1795658121280,
+      "direction": "right-to-left",
+      "activity": "Agent change applied",
+      "path": "test/resources/shed/portable-fixture-tests.properties"
+    },
+    {
+      "animation": "typing",
+      "epoch_ms": 1795658122302,
+      "direction": "left-to-right",
+      "activity": "Agent change applied",
+      "path": "test/resources/shed/portable-fixture-tests.properties"
+    },
+    {
+      "animation": "",
+      "epoch_ms": 1795658123589,
+      "direction": "",
+      "activity": "Agent change applied",
+      "path": "test/resources/shed/portable-fixture-tests.properties"
+    },
+    {
+      "animation": "typing",
+      "epoch_ms": 1795658141247,
+      "direction": "left-to-right",
+      "activity": "Agent change applied",
+      "path": "main/java/shed/VsCodeThemeImporter.java"
+    },
+    {
+      "animation": "",
+      "epoch_ms": 1795658142759,
+      "direction": "",
+      "activity": "Agent change applied",
+      "path": "main/java/shed/VsCodeThemeImporter.java"
+    }
+  ],
+  "result": {
+    "reading": true,
+    "events": 10,
+    "state": "PASS",
+    "editing": true
+  },
+  "fixture_removed": true
+}

@@ -1,0 +1,95 @@
+{
+  "jar_sha256": "4e0b0c2ea2d265dece7ea0d654a2a72e549174eed549874e1bf1a4e009377607",
+  "jar_bytes": 50996492,
+  "probe_sha256": "7aff36cad7d2112bd6cb0d7d3153063e58c7f5f32bde905560f2036f8cf0152c",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Xms64m",
+    "-Xmx512m",
+    "-Djava.awt.headless=true",
+    "-Duser.home=/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg/home/java-preferences",
+    "-cp",
+    "/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.PackagedMarkdownSmoke",
+    "/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg"
+  ],
+  "state": "PASS",
+  "exit": 0,
+  "stdout": "SMOKE {\"classpath\":\"/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar\",\"provider_descriptors\":1,\"providers\":[\"com.oracle.truffle.js.lang.JavaScriptLanguageProvider\",\"com.oracle.truffle.regex.RegexLanguageProvider\"],\"application_origin\":\"/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar\",\"operation\":\"runtime\"}\nSMOKE {\"threads\":7,\"heap_used_bytes\":6325000,\"heap_committed_bytes\":69206016,\"operation\":\"before_assets\"}\nSMOKE {\"threads\":9,\"heap_used_bytes\":24150792,\"heap_committed_bytes\":69206016,\"operation\":\"plain_before_first_mermaid\"}\nSMOKE {\"render_ms\":100.647166,\"operation\":\"math_first\"}\nSMOKE {\"render_ms\":1689.334834,\"operation\":\"mermaid_first_after_plain_and_math\"}\nSMOKE {\"render_ms\":0.001584,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":8.33E-4,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":5.84E-4,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":665.721,\"operation\":\"mermaid_multiple_nodes\"}\nSMOKE {\"render_ms\":395.950083,\"operation\":\"mermaid_changed\"}\nSMOKE {\"render_ms\":0.001708,\"operation\":\"mermaid_valid_after_invalid\"}\nSMOKE {\"render_ms\":321.960667,\"operation\":\"mermaid_changed_after_invalid\"}\nSMOKE {\"threads\":16,\"heap_used_bytes\":260571136,\"heap_committed_bytes\":441450496,\"operation\":\"after_renders_no_forced_gc\"}\nSMOKE {\"threads\":13,\"heap_used_bytes\":247463936,\"heap_committed_bytes\":441450496,\"operation\":\"after_assets_close_no_forced_gc\"}\nSMOKE_PASS\n",
+  "stderr": "[GraalJS] Creating context...\n[GraalJS] Context created in 57 ms\n[GraalJS] Bindings set in 135 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1251 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 541 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 361 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 310 ms\n[GraalJS] Result read in 0 ms\n[MermaidRenderer] Render failed: ERROR:UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\nSTACK: UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\n    at detectType (Unnamed:3301:74)\n    at Function.fromText (Unnamed:6014:6680)\n    at Object.render (Unnamed:6022:1191)\n    at Unnamed:6022:5541\n    at new Promise (native)\n    at performCall (Unnamed:6022:5518)\n    at executeQueue (Unnamed:6022:5178)\n    at Unnamed:6022:5665\n    at new Promise (native)\n    at Object.render (Unnamed:6022:5486)\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 256 ms\n[GraalJS] Result read in 0 ms\n[MermaidRenderer] Render failed: ERROR:UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\nSTACK: UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\n    at detectType (Unnamed:3301:74)\n    at Function.fromText (Unnamed:6014:6680)\n    at Object.render (Unnamed:6022:1191)\n    at Unnamed:6022:5541\n    at new Promise (native)\n    at performCall (Unnamed:6022:5518)\n    at executeQueue (Unnamed:6022:5178)\n    at Unnamed:6022:5665\n    at new Promise (native)\n    at Object.render (Unnamed:6022:5486)\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 1 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 287 ms\n[GraalJS] Result read in 1 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 1 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 266 ms\n[GraalJS] Result read in 0 ms\n",
+  "events": [
+    {
+      "classpath": "/private/tmp/shed-native-ooq6rm9y/run/tmp/shed-packaged-markdown-e18aqqsg/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+      "provider_descriptors": 1,
+      "providers": [
+        "com.oracle.truffle.js.lang.JavaScriptLanguageProvider",
+        "com.oracle.truffle.regex.RegexLanguageProvider"
+      ],
+      "application_origin": "/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+      "operation": "runtime"
+    },
+    {
+      "threads": 7,
+      "heap_used_bytes": 6325000,
+      "heap_committed_bytes": 69206016,
+      "operation": "before_assets"
+    },
+    {
+      "threads": 9,
+      "heap_used_bytes": 24150792,
+      "heap_committed_bytes": 69206016,
+      "operation": "plain_before_first_mermaid"
+    },
+    {
+      "render_ms": 100.647166,
+      "operation": "math_first"
+    },
+    {
+      "render_ms": 1689.334834,
+      "operation": "mermaid_first_after_plain_and_math"
+    },
+    {
+      "render_ms": 0.001584,
+      "operation": "mermaid_identical_cached"
+    },
+    {
+      "render_ms": 0.000833,
+      "operation": "mermaid_identical_cached"
+    },
+    {
+      "render_ms": 0.000584,
+      "operation": "mermaid_identical_cached"
+    },
+    {
+      "render_ms": 665.721,
+      "operation": "mermaid_multiple_nodes"
+    },
+    {
+      "render_ms": 395.950083,
+      "operation": "mermaid_changed"
+    },
+    {
+      "render_ms": 0.001708,
+      "operation": "mermaid_valid_after_invalid"
+    },
+    {
+      "render_ms": 321.960667,
+      "operation": "mermaid_changed_after_invalid"
+    },
+    {
+      "threads": 16,
+      "heap_used_bytes": 260571136,
+      "heap_committed_bytes": 441450496,
+      "operation": "after_renders_no_forced_gc"
+    },
+    {
+      "threads": 13,
+      "heap_used_bytes": 247463936,
+      "heap_committed_bytes": 441450496,
+      "operation": "after_assets_close_no_forced_gc"
+    }
+  ]
+}

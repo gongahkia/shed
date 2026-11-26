@@ -1,0 +1,91 @@
+{
+  "boundary": "production AnimatedTerminalPanel and emulator in BufferedImage; no PTY or shell; same host, font and text",
+  "cases": [
+    {
+      "label": "before",
+      "jar_sha256": "4502ab68b7b12410720890eaf5acaf3cc9e0f2b096de6291559a9d3ab418a412",
+      "command": [
+        "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+        "-Djava.awt.headless=true",
+        "-Duser.home=/private/tmp/shed-native-r1j1lfr7/run/home",
+        "-Djava.io.tmpdir=/private/tmp/shed-native-r1j1lfr7/run/tmp",
+        "-Djava.util.prefs.userRoot=/private/tmp/shed-native-r1j1lfr7/run/config",
+        "-cp",
+        "/private/tmp/shed-native-r1j1lfr7/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/live-codex-task-1795658026/terminal-before.jar",
+        "shed.TerminalColorPaintProbe",
+        "/private/tmp/shed-native-r1j1lfr7/run/before"
+      ],
+      "exit": 0,
+      "result": {
+        "rows": [
+          {
+            "theme": "shed-light",
+            "screen": "Shed terminal: shed-light (in-memory emulator, no shell)        \n                                                                \nRED error output                                                \nYELLOW warning output                                           \nMAGENTA output                                                  \nGREEN success output                                            \nBLUE output                                                     \n                                                                \n256-color red  RGB #12A4EF                                      \nPlain output remains unchanged.                                 \n                                                                \n                                                                \n",
+            "colors": {
+              "1": "#737374",
+              "3": "#737374",
+              "5": "#737374"
+            }
+          },
+          {
+            "theme": "shed-dark",
+            "screen": "Shed terminal: shed-dark (in-memory emulator, no shell)         \n                                                                \nRED error output                                                \nYELLOW warning output                                           \nMAGENTA output                                                  \nGREEN success output                                            \nBLUE output                                                     \n                                                                \n256-color red  RGB #12A4EF                                      \nPlain output remains unchanged.                                 \n                                                                \n                                                                \n",
+            "colors": {
+              "1": "#8D8F92",
+              "3": "#8D8F92",
+              "5": "#8D8F92"
+            }
+          }
+        ],
+        "state": "PASS",
+        "native_shell": "NOT_USED",
+        "font": "Monospaced 18"
+      }
+    },
+    {
+      "label": "after",
+      "jar_sha256": "4e0b0c2ea2d265dece7ea0d654a2a72e549174eed549874e1bf1a4e009377607",
+      "command": [
+        "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+        "-Djava.awt.headless=true",
+        "-Duser.home=/private/tmp/shed-native-r1j1lfr7/run/home",
+        "-Djava.io.tmpdir=/private/tmp/shed-native-r1j1lfr7/run/tmp",
+        "-Djava.util.prefs.userRoot=/private/tmp/shed-native-r1j1lfr7/run/config",
+        "-cp",
+        "/private/tmp/shed-native-r1j1lfr7/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+        "shed.TerminalColorPaintProbe",
+        "/private/tmp/shed-native-r1j1lfr7/run/after"
+      ],
+      "exit": 0,
+      "result": {
+        "rows": [
+          {
+            "theme": "shed-light",
+            "screen": "Shed terminal: shed-light (in-memory emulator, no shell)        \n                                                                \nRED error output                                                \nYELLOW warning output                                           \nMAGENTA output                                                  \nGREEN success output                                            \nBLUE output                                                     \n                                                                \n256-color red  RGB #12A4EF                                      \nPlain output remains unchanged.                                 \n                                                                \n                                                                \n",
+            "colors": {
+              "1": "#C64652",
+              "3": "#976C07",
+              "5": "#8B52C7"
+            }
+          },
+          {
+            "theme": "shed-dark",
+            "screen": "Shed terminal: shed-dark (in-memory emulator, no shell)         \n                                                                \nRED error output                                                \nYELLOW warning output                                           \nMAGENTA output                                                  \nGREEN success output                                            \nBLUE output                                                     \n                                                                \n256-color red  RGB #12A4EF                                      \nPlain output remains unchanged.                                 \n                                                                \n                                                                \n",
+            "colors": {
+              "1": "#D76E79",
+              "3": "#B28723",
+              "5": "#A67AD4"
+            }
+          }
+        ],
+        "state": "PASS",
+        "native_shell": "NOT_USED",
+        "font": "Monospaced 18"
+      }
+    }
+  ],
+  "compile_exit": 0,
+  "compile_output": "",
+  "state": "PASS",
+  "fixture_removed": true
+}

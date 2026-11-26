@@ -1,0 +1,38 @@
+{
+  "recorded_utc": "2026-11-26T02:10:07.464518+00:00",
+  "starting_head": "7e4b959d30446617be3785afa2b8be79fc7461b6",
+  "model_task_commit": "2d174116e82bbbada724900e636f7dbb3d26df06",
+  "terminal_commit": "ad108e83d94ca6d295e3d54a95337847daa064ea",
+  "model_provider": "codex",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "low",
+  "cloud_model_local_cli": true,
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "jdk": "21.0.13.1+2",
+  "maven": "3.9.11",
+  "source_sha256": {
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "scripts/test_native_fixture.py": "4d1e9654e825ac6b752bfa4e6ab7793a2fa5bcfa3f1390e6033b5c0d2e7fbe43",
+    "src/main/java/shed/PtyTerminalPane.java": "52022a25cb1cd999c9effb73d07c0aa0f849346992175e63df6e2a33fa0e0c81",
+    "src/main/java/shed/VsCodeThemeImporter.java": "827502bb159adc29ab5c7b28f64b2c4d43d18ed4eb5e4335afd71026dd531222",
+    "src/test/java/shed/OpenVsxThemeTest.java": "cf413946fbc583367055574a3b7fac6f059aa78c06f1cf23afb63a10e0b200dd",
+    "src/test/java/shed/TerminalColorTest.java": "6608231564d4ed3a155586252b47cc717b5ee7e86f93647378a17610855cfcbc",
+    "src/test/resources/shed/portable-fixture-tests.properties": "320739c08ab4a82815fe25b5d8319fd0ebd604a9bbf83a470b6608a9f4bf34f6",
+    "target/shed-2.0.0.jar": "4e0b0c2ea2d265dece7ea0d654a2a72e549174eed549874e1bf1a4e009377607"
+  },
+  "capture_sha256": {
+    "terminal-after-dark.png": "7fbe65bf740d6e46605900d3e2ff49d9b5e53668bc2a2205c026effbf9898e98",
+    "terminal-after-light.png": "91adb422c23cbd4510ae131bd21703899e447de997a9906b889f91d5584900e0",
+    "codex-test-insertion.png": "057bac4f37d555a59dc77e81b0f336b56d9167ee31d2f5d0d5b5251c18f0cd69",
+    "terminal-before-dark.png": "fb2ee3cd079e79468623cdb4aeb57e17c0d55265b314ddcb7dc0661921f443b6",
+    "terminal-before-light.png": "516cdd338cae70f09a6d777718c463db00fc1fcc929b772f82963f16199a111f",
+    "codex-reading-source.png": "7133be6681f3be9862f2d916bf721b687418693de34d06a88a2cf45d903204fa",
+    "codex-source-typing.png": "c4010730b068de236e12078512ddc1f2c6a8200703469d8a1be67288517016c2"
+  },
+  "probe_sha256": {
+    "run.py": "ffd7161aca83591ef79e1648a8554d309b4f1a37e40db128d3d10e2084ceacbe",
+    "TerminalColorPaintProbe.java": "5182e12398804bd6695df54e5e6e90d96119284ae13ae265a9cddf55068d8ba8",
+    "shed_ctl.py": "710aefd3dd63c72419bf79bb2af3779a8e02454052b056d54094dab518dabd64",
+    "LiveCodeTaskProbe.java": "2eca6aa52d88c916a9c3b62d916baa2513bbae86acf59c216adfe647dd90ec7f"
+  }
+}

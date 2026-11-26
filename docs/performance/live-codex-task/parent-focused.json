@@ -1,0 +1,65 @@
+{
+  "boundary": "source-reviewed non-native tests, not general process confinement",
+  "tests": [
+    "OpenVsxThemeTest",
+    "ThemePreviewTest",
+    "UiDensityTest",
+    "AgentAnimationEdgeTest"
+  ],
+  "fixture": "/private/tmp/shed-native-4qlkyc9u",
+  "native_benchmarks": "BLOCKED",
+  "phase": "test",
+  "dependency_copy": {
+    "entries": 1821,
+    "bytes": 98186046
+  },
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-4qlkyc9u/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-4qlkyc9u/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-4qlkyc9u/run/config",
+    "-Djava.awt.headless=true",
+    "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed",
+    "-cp",
+    "/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/boot/plexus-classworlds-2.9.0.jar",
+    "org.codehaus.plexus.classworlds.launcher.Launcher",
+    "-B",
+    "-o",
+    "-s",
+    "/private/tmp/shed-native-4qlkyc9u/run/config/settings.xml",
+    "-gs",
+    "/private/tmp/shed-native-4qlkyc9u/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-4qlkyc9u/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-4qlkyc9u/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-4qlkyc9u/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-4qlkyc9u/run/config",
+    "-Djava.awt.headless=true",
+    "-DforkCount=0",
+    "-Dtest=OpenVsxThemeTest,ThemePreviewTest,UiDensityTest,AgentAnimationEdgeTest",
+    "test"
+  ],
+  "exit": 0,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- enforcer:3.6.3:enforce (enforce-java-21) @ shed ---\n[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed\n[INFO] \n[INFO] --- resources:3.3.1:resources (default-resources) @ shed ---\n[INFO] Copying 27 resources from assets to target/classes/assets\n[INFO] Copying 3 resources from docs to target/classes/META-INF/licenses\n[INFO] \n[INFO] --- compiler:3.15.0:compile (default-compile) @ shed ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 442 source files with javac [debug release 21] to target/classes\n[WARNING] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/ApplicationErrorReporter.java:[120,77] java.lang.ThreadDeath in java.lang has been deprecated and marked for removal\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/EditorUiController.java: Some input files use or override a deprecated API.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/EditorUiController.java: Recompile with -Xlint:deprecation for details.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java: /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/main/java/shed/BracketColorService.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- resources:3.3.1:testResources (default-testResources) @ shed ---\n[INFO] Copying 6 resources from src/test/resources to target/test-classes\n[INFO] \n[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shed ---\n[INFO] Recompiling the module because of changed dependency.\n[INFO] Compiling 326 source files with javac [debug release 21] to target/test-classes\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java uses unchecked or unsafe operations.\n[INFO] /Users/gongahkia/Desktop/coding/projects/shed/src/test/java/shed/TexteditorSwingIntegrationTest.java: Recompile with -Xlint:unchecked for details.\n[INFO] \n[INFO] --- surefire:3.2.5:test (default-test) @ shed ---\n[WARNING] useSystemClassLoader setting has no effect when not forking\n[WARNING] The parameter forkCount should likely not be 0. Forking a JVM for tests improves test accuracy. Ensure to have a <forkCount> >= 1.\n[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider\n[INFO] Running shed.UiDensityTest\n[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.259 s -- in shed.UiDensityTest\n[INFO] Running shed.AgentAnimationEdgeTest\n[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.240 s -- in shed.AgentAnimationEdgeTest\n[INFO] Running shed.ThemePreviewTest\n[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in shed.ThemePreviewTest\n[INFO] Running shed.OpenVsxThemeTest\n[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.152 s -- in shed.OpenVsxThemeTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 35, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  8.631 s\n[INFO] Finished at: 2026-11-26T01:57:21Z\n[INFO] ------------------------------------------------------------------------\n",
+  "elapsed_s": 10.263618625001982,
+  "fixture_removed": true,
+  "metrics": [
+    {
+      "operation": "creation",
+      "ns": 723750
+    },
+    {
+      "operation": "guard",
+      "ns": 425333
+    },
+    {
+      "operation": "guard",
+      "ns": 793459
+    },
+    {
+      "operation": "cleanup",
+      "ns": 86598292
+    }
+  ]
+}

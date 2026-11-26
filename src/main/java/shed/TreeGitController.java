@@ -821,6 +821,7 @@ final class TreeGitController {
     }
 
     String loadGitCommitComparison(File root,String hash,AsyncJobService.JobToken token){
+        if(!editor.configManager.getGitDiffsEnabled())throw new IllegalStateException("Git diffs disabled by git.diffs.enabled=false");
         if(root==null||hash==null||!hash.matches("[0-9a-fA-F]{7,64}"))throw new IllegalArgumentException("Commit unavailable");
         var result=runCommand(root,List.of("git","show","--no-ext-diff","--no-textconv","--format=fuller","--stat","--patch",hash),token);
         if(result.exitCode!=0)throw new IllegalStateException(gitError(result));return result.stdout;
@@ -828,6 +829,7 @@ final class TreeGitController {
 
     GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token) {return loadGitHistory(token,100);}
     GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token,int count) {
+        if(!editor.configManager.getGitHistoryEnabled()||!editor.configManager.getGitPanelPresentationEnabled())return GitHistoryModel.unavailable("Git history disabled by current settings.");
         File root = resolveGitRoot();
         if (root == null) return GitHistoryModel.unavailable("Not inside a Git repository.");
         CommandResult history = runCommand(root,

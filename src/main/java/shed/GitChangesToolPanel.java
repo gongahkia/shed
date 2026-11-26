@@ -230,7 +230,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         });
     }
     static boolean usableHistory(GitHistoryModel.Snapshot snapshot,long expectedWorkspace,long currentWorkspace){return snapshot!=null&&snapshot.available()&&!snapshot.root().isBlank()&&expectedWorkspace==currentWorkspace;}
-    private void openGraph(){if(usableHistory(historySnapshot,historyWorkspace,editor.workspaceRoots.generation()))editor.treeGitController.showGitGraph(new File(historySnapshot.root()),Integer.toString(historyLimit));else state.setText("Refresh available history for this project before opening its graph.");}
+    private void openGraph(){if(editor.configManager.getGitHistoryEnabled()&&editor.configManager.getGitPanelPresentationEnabled()&&usableHistory(historySnapshot,historyWorkspace,editor.workspaceRoots.generation()))editor.treeGitController.showGitGraph(new File(historySnapshot.root()),Integer.toString(historyLimit));else state.setText("Refresh available history for this project before opening its graph.");}
     private void openCommit(){
         int row=historyTable.getSelectedRow();if(row<0||row>=history.size()||!usableHistory(historySnapshot,historyWorkspace,editor.workspaceRoots.generation()))return;var entry=history.get(row);var root=historySnapshot.root();var project=editor.treeRoot;var pane=editor.getActivePane();var source=editor.getCurrentBuffer();long revision=source==null?-1:source.documentRevision(),input=editor.inputController.lastKeyPressNanos();long request=++historyGeneration,workspace=editor.workspaceRoots.generation();
         if(historyJob>=0)editor.asyncJobService.cancel(historyJob);

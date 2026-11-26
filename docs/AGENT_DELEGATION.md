@@ -30,6 +30,14 @@ make demo-delegation
 
 It uses a clearly labeled fixed Java client, not a cloud model. The existing `make demo` animation tour is unchanged.
 
+## Java setup
+
+Shed requires Java 21. The launcher first honors an explicit `JAVA`, then a valid `JAVA_HOME` (including a Homebrew prefix or macOS JDK bundle). An existing but incompatible home remains an error. A missing `JAVA_HOME` now produces a warning and continues discovery instead of blocking every command.
+
+Automatic discovery prefers the app-owned `~/.local/share/shed-tools/jdk-21` before PATH and macOS/Homebrew discovery, avoiding the macOS Java-install stub when a working Shed runtime is already available. No JDK is downloaded automatically and shell startup files are not changed.
+
+On this development Mac, the already available JDK 21 was copied into that stable app-owned directory, so ordinary `make demo-delegation` works despite the stale `/opt/homebrew/opt/openjdk@21` export. The old temporary JDK was preserved. You can explicitly choose a different valid runtime with `JAVA` or `JAVA_HOME`.
+
 ## Freshness acknowledgement
 
 ```sh

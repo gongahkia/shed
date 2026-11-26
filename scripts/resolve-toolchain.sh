@@ -36,9 +36,16 @@ resolve_java() {
     fi
     if [ -n "${JAVA_HOME:-}" ]; then
         java_candidate "$JAVA_HOME/bin/java" && return 0
-        echo "shed: JAVA_HOME must point to a working JDK 21: $JAVA_HOME" >&2
-        return 1
+        for jdk_candidate_home in "$JAVA_HOME/libexec/openjdk.jdk/Contents/Home" "$JAVA_HOME/Contents/Home"; do
+            java_candidate "$jdk_candidate_home/bin/java" && return 0
+        done
+        if [ -e "$JAVA_HOME" ] || [ -L "$JAVA_HOME" ]; then
+            echo "shed: JAVA_HOME must point to a working JDK 21: $JAVA_HOME" >&2
+            return 1
+        fi
+        echo "shed: ignoring missing JAVA_HOME: $JAVA_HOME; looking for JDK 21." >&2
     fi
+    java_candidate "$HOME/.local/share/shed-tools/jdk-21/bin/java" && return 0
     java_candidate java && return 0
     if [ -x /usr/libexec/java_home ]; then
         mac_home=$(/usr/libexec/java_home -v 21 2>/dev/null || true)
@@ -47,7 +54,6 @@ resolve_java() {
         fi
     fi
     for home in \
-        "$HOME/.local/share/shed-tools/jdk-21" \
         /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
         /usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home; do
         java_candidate "$home/bin/java" && return 0

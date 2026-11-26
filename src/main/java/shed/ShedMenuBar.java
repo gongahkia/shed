@@ -109,7 +109,7 @@ final class ShedMenuBar {
             if (custom == null) item.setAccelerator(KeyStroke.getKeyStroke(key, modifiers));
             else item.setToolTipText("Editor shortcut customized: " + custom + " — see Keyboard Shortcuts");
         }
-        item.addActionListener(event -> run.run());
+        item.addActionListener(event -> {if(!editor.agentOwnsEditor())run.run();});
         menu.add(item);
     }
 

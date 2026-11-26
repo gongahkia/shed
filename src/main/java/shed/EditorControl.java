@@ -14,7 +14,7 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal");
+    static final Set<String> OPERATIONS = Set.of("editor/delegation", "editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal");
     static boolean mutation(String method) {
         return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/source/sync","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
@@ -36,6 +36,8 @@ final class EditorControl implements AutoCloseable {
         default java.awt.image.BufferedImage capturePreview(){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default Map<String,Object> terminal(String action,String id,String agent,String body,BooleanSupplier authorized){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default void revokeTerminals(){}
+        default Map<String,Object> delegation(String action,String id,String agent,String task) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
+        default boolean delegationAllowed(String id) { return true; }
         void review(String proposal);
         void clearActivity();
     }
@@ -67,9 +69,32 @@ final class EditorControl implements AutoCloseable {
         }
     }
 
+    BooleanSupplier authorizeDelegation(Map<String,Object> params, BooleanSupplier connection) {
+        Object supplied=params.remove("delegationId");
+        if(supplied!=null && (!(supplied instanceof String id)||!id.matches("[A-Za-z0-9_-]{1,64}")))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        String id=(String)supplied;
+        BooleanSupplier authorized=()->connection.getAsBoolean() && host.get()!=null && host.get().delegationAllowed(id);
+        if(!authorized.getAsBoolean())throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+        return authorized;
+    }
+    private Map<String,Object> delegation(Map<String,Object> params, BooleanSupplier connection) {
+        if(!params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","action","requestId","agent","task")))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        if(!Long.valueOf(1).equals(params.get("schemaVersion")))throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
+        grant.requireIdentity(text(params,"instanceId",64),text(params,"windowId",64));
+        if(!grant.projectId.equals(text(params,"projectId",64)))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
+        try(var lease=new Lease(connection)) {
+            var observation=ui(lease,()->{
+                var project=owner().watchRoot();grant.authorizeProject(project.root(),project.generation());
+                return owner().delegation(text(params,"action",16),text(params,"requestId",64),text(params,"agent",40),text(params,"task",4096));
+            });
+            return Map.of("schemaVersion",1,"instanceId",params.get("instanceId"),"windowId",params.get("windowId"),"projectId",grant.projectId,"operation","editor/delegation","observation",observation);
+        }
+    }
+
     Map<String, Object> dispatch(String method, Map<String, Object> params, BooleanSupplier connection) {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Control dispatch belongs off the EDT");
         if (!OPERATIONS.contains(method)) throw fail(WorkspaceApiException.Code.UNSUPPORTED);
+        if (method.equals("editor/delegation")) return delegation(params, connection);
         if (method.equals("editor/source/sync")) return sync(params, connection);
         if(method.equals("editor/watch"))return watch(params,connection);
         if(method.equals("editor/terminal"))return terminal(params,connection);

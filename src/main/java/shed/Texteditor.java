@@ -277,6 +277,9 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void ownAgentSession(AgentSessionService session) { agentWorkspaceController.ownSession(session); }
 
+    AgentDelegationController agentDelegation(){return agentWorkspaceController.delegation;}
+    boolean agentOwnsEditor(){return agentWorkspaceController!=null&&agentWorkspaceController.delegation.ownsEditor();}
+
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
     EditorInteraction agentNavigationInteraction;

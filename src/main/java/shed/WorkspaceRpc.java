@@ -66,7 +66,9 @@ public final class WorkspaceRpc {
             try {
                 var params = MiniJson.asObject(request.get("params"));
                 if (params == null) throw WorkspaceApiException.invalidRequest("Control parameters must be an object");
-                return result(id, metadata.control.dispatch(method, params, connection));
+                params = new java.util.LinkedHashMap<>(params);
+                var authorized = method.equals("editor/delegation") ? connection : metadata.control.authorizeDelegation(params,connection);
+                return result(id, metadata.control.dispatch(method, params, authorized));
             } catch (WorkspaceApiException unavailable) {
                 return error(id, -32000, "Editor control request failed", Map.of("code", unavailable.code().name(),
                     "outcome", unavailable.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN ? "unknown" : "rejected"));
@@ -78,7 +80,9 @@ public final class WorkspaceRpc {
             try {
                 var params = MiniJson.asObject(request.get("params"));
                 if (params == null) throw WorkspaceApiException.invalidRequest("Navigation parameters must be an object");
-                return result(id, metadata.navigation.dispatch(method, params, id, connection));
+                params = new java.util.LinkedHashMap<>(params);
+                var authorized = metadata.control == null ? connection : metadata.control.authorizeDelegation(params,connection);
+                return result(id, metadata.navigation.dispatch(method, params, id, authorized));
             } catch (WorkspaceApiException unavailable) {
                 return error(id, -32000, unavailable.getMessage(), Map.of("code", unavailable.code().name(),
                     "outcome", unavailable.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN ? "unknown" : "rejected"));
@@ -90,6 +94,8 @@ public final class WorkspaceRpc {
             try {
                 var params = MiniJson.asObject(request.get("params"));
                 if (params == null) throw EditorMetadata.failure(WorkspaceApiException.Code.INVALID_REQUEST);
+                params = new java.util.LinkedHashMap<>(params);
+                if(metadata.control != null) metadata.control.authorizeDelegation(params,connection);
                 return MiniJson.stringify(response(id, "result", metadata.observe(params)));
             } catch (WorkspaceApiException unavailable) { return error(id, -32000, unavailable.getMessage(), Map.of("code", unavailable.code().name())); }
             catch (RuntimeException invalid) { return error(id, -32603, "Editor context is unavailable", Map.of("code", "INVALID_CONTEXT")); }

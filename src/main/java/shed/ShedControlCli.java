@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms","--delegation","--task-file").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -31,6 +31,14 @@ final class ShedControlCli {
             String key=options.remove("--credential");
             Path credential=key==null?descriptor.resolveSibling("status-"+identity.attachmentId()+".key"):Path.of(key);
             try(var client=WorkspaceBridgeClient.control(descriptor,credential)) {
+                String delegation=options.remove("--delegation");if(delegation==null)delegation=System.getenv("SHED_DELEGATION");client.delegation(delegation);
+                if(Set.of("session-request","session-status","session-finish").contains(command)) {
+                    if(path!=null)throw new IllegalArgumentException();String id=required(options,"--request-id"),agent="",task="";
+                    if(command.equals("session-request")) { agent=required(options,"--agent");String file=required(options,"--task-file");task=WorkspaceFrames.decode(file.equals("-")?input.readNBytes(4097):boundedFile(Path.of(file),4096)); }
+                    if(command.equals("session-finish") && options.containsKey("--task-file")){String file=required(options,"--task-file");task=WorkspaceFrames.decode(file.equals("-")?input.readNBytes(4097):boundedFile(Path.of(file),4096));}
+                    if(!id.matches("[A-Za-z0-9_-]{1,64}")||!options.isEmpty())throw new IllegalArgumentException();
+                    return emit(client.exchange(request("editor/delegation",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"action",command.substring(8),"requestId",id,"agent",agent,"task",task))),out);
+                }
                 if (command.equals("sync")) {
                     if (path == null) throw new IllegalArgumentException();
                     String hash = required(options,"--sha256"); long timeout = number(options,"--timeout-ms",2500);

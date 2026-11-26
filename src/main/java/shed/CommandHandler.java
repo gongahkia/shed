@@ -36,6 +36,7 @@ public class CommandHandler {
         if (command.startsWith(":")) {
             command = command.substring(1);
         }
+        if(editor.agentOwnsEditor()&&!command.equals("agent takeback"))return "Take back agent control before using editor commands.";
         editor.rememberExCommand(":" + command);
 
         if (command.startsWith("/")) {

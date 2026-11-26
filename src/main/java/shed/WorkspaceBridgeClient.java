@@ -21,6 +21,8 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     private final ScheduledThreadPoolExecutor deadlines;
     private final AtomicBoolean timedOut = new AtomicBoolean();
     private long sequence;
+    private String delegationId;
+    void delegation(String id) { if(id!=null&&!id.matches("[A-Za-z0-9_-]{1,64}"))throw WorkspaceApiException.invalidRequest("Invalid delegation ID");delegationId=id; }
 
     WorkspaceBridgeClient(Path descriptor, Path requestedRoot) throws IOException {
         this.statusSession = null; this.deadlines = null;
@@ -95,7 +97,15 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     }
 
     synchronized String exchange(String request) throws IOException {
-        if (statusSession != null) return statusExchange(request);
+        if (statusSession != null) {
+            if(delegationId!=null) {
+                var envelope=new java.util.LinkedHashMap<>(MiniJson.asObject(MiniJson.parseStrict(request)));
+                if(envelope.get("method") instanceof String method && method.startsWith("editor/") && !method.equals("editor/delegation") && !method.equals("editor/status")) {
+                    var params=new java.util.LinkedHashMap<>(MiniJson.asObject(envelope.get("params")));params.put("delegationId",delegationId);envelope.put("params",params);request=MiniJson.stringify(envelope);
+                }
+            }
+            return statusExchange(request);
+        }
         WorkspaceFrames.write(socket.getOutputStream(), request, WorkspaceFrames.MAX_REQUEST_BYTES);
         if (!WorkspaceRpc.expectsResponse(request)) return null;
         byte[] response = WorkspaceFrames.read(input, WorkspaceFrames.MAX_RESPONSE_BYTES);

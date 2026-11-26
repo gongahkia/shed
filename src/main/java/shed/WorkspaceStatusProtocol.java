@@ -106,7 +106,16 @@ final class WorkspaceStatusProtocol {
             return acceptsMetadata(base);
         }
 
+        private static boolean bounded(Object value,int max) { return value instanceof String text && text.length()<=max; }
         boolean acceptsControl(String method, Map<String, Object> value) {
+            if(method.equals("editor/delegation")) {
+                var o=value==null?null:MiniJson.asObject(value.get("observation"));
+                return EditorControl.SCOPE.equals(scope())&&value!=null&&value.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","operation","observation"))
+                    &&Long.valueOf(1).equals(value.get("schemaVersion"))&&target.instanceId().equals(value.get("instanceId"))&&target.windowId().equals(value.get("windowId"))&&target.projectId().equals(value.get("projectId"))&&method.equals(value.get("operation"))
+                    &&o!=null&&o.keySet().equals(Set.of("kind","requestId","agent","task","state","summary"))&&"delegation".equals(o.get("kind"))
+                    &&bounded(o.get("requestId"),64)&&bounded(o.get("agent"),40)&&bounded(o.get("task"),4096)&&bounded(o.get("summary"),4096)
+                    &&Set.of("awaiting-approval","preparing","active","completed","cancelled","rejected","failed","expired").contains(o.get("state"));
+            }
             if (method.equals("editor/source/sync")) {
                 var observation = value == null ? null : MiniJson.asObject(value.get("observation"));
                 return EditorControl.SCOPE.equals(scope()) && value != null

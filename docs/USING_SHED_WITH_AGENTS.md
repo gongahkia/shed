@@ -1,5 +1,22 @@
 # Use Shed with an external coding agent
 
+## Delegate an ordinary CLI task
+
+Open a project and use **View → Delegate Task…** (or `:agent delegate`). Choose a local coding CLI, describe the task, then approve the control dialog. Shed supplies the authenticated attachment, bounded permission lease and vendor-neutral instructions. It starts the CLI only after approval and a fresh change baseline. Reads using `ctl read <path>` open and highlight the actual file; ordinary writes use the existing watcher and animations. **Take Back Control** (also Ctrl+Shift+Escape) returns human input. Normal completion opens the session's existing change summary.
+
+For an already-running external agent, one command launches a normal Shed window and waits for your approval:
+
+```sh
+printf '%s\n' 'Describe the project task here.' | ./scripts/shed delegate . --agent Codex --task-file -
+```
+
+The JSON result contains `SHED_CONTROL`, `SHED_DELEGATION` and ready-to-use agent instructions. Have the agent use that environment for its Shed commands. `--connect <descriptor>` explicitly targets an existing control-enabled window instead of opening another. No window is chosen implicitly. An agent that ignores the instructions can still write files, but ordinary filesystem reads cannot produce reading animations.
+
+After a disk write to an open file, `shed ctl sync <path> --sha256 <raw-file-SHA-256> --timeout-ms 2500` acknowledges that Shed's editor snapshot matches the expected bytes. It waits off the EDT and rejects dirty buffers, changed bytes and deadlines. It never forces a reload or overwrites a draft.
+
+See [delegation, lifecycle, tests and limitations](AGENT_DELEGATION.md). The sections below document the existing explicitly enabled, human-reviewed proposal workflow; that workflow remains available separately.
+
+
 Shed uses the same source buffers and Undo history for human and reviewed agent edits. Start Shed normally, open the intended project, and explicitly run `:agent api start control`. The status line shows a private connection descriptor. Stop access with `:agent api stop`. Credentials remain in the owner-only session directory; do not paste key contents into a prompt.
 
 Select that attachment once in your shell:

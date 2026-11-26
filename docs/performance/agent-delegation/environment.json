@@ -1,0 +1,11 @@
+{
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "starting_head": "6b472202e79b99e4f690a51b7c2ed3ce4187a197",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "jar_sha256": "db0b9a3e2ef2520bf357db61a13f8e6f2964544d1ddf52545eed4d2b61ce29c2",
+  "java_home": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "native_shell": "NOT_USED",
+  "real_model": "NOT_RUN",
+  "qualified_code_head": "1395c06b1758b7a856cf1fd16c8f7507125df82d"
+}

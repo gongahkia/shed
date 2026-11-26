@@ -57,6 +57,19 @@ class AgentDelegationTest {
             });
         }
     }
+    @Test void chatFocusAllowsApprovedNavigationOnlyWhileSourceOwnershipIsHeld() throws Exception {
+        try(var f=new EditorControlTest.Fixture(temporary)) {
+            EditorControlTest.edt(()->{
+                var root=new JRootPane();var chat=new JPanel();var composer=new JTextArea();chat.add(composer);root.getContentPane().add(chat);var unrelated=new JButton("Other tool");
+                var owner=new AgentEditorOwnership(root,()->List.of(f.pane),"Agent",()->{},chat);
+                assertTrue(owner.allowsChatNavigationFrom(composer));assertTrue(owner.allowsChatNavigationFrom(root.getGlassPane()));
+                assertFalse(owner.allowsChatNavigationFrom(unrelated));assertFalse(owner.allowsChatNavigationFrom(null));assertFalse(f.pane.getTextArea().isEditable());
+                owner.close();assertFalse(owner.allowsChatNavigationFrom(composer));assertTrue(f.pane.getTextArea().isEditable());
+                try(var legacy=new AgentEditorOwnership(root,()->List.of(f.pane),"Agent",()->{})){assertFalse(legacy.allowsChatNavigationFrom(composer));}
+                return null;
+            });
+        }
+    }
     static final class DelegatedFixture extends EditorControlTest.Fixture {
         final AgentDelegation lease=new AgentDelegation();
         volatile boolean revokeOnCapture;

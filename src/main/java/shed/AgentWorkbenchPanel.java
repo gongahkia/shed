@@ -15,6 +15,8 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     private final List<AgentSessionPanel> sessions = new ArrayList<>();
     private final AgentReviewPanel review;
     private LiveChangesPanel liveChanges;
+    private AgentCliChatPanel chat;
+    private java.awt.Component advanced;
     private final Supplier<AgentSessionPanel> factory;
     private final Supplier<Font> uiFont;
     private final Runnable dismissCompletion;
@@ -33,6 +35,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         review.onNavigate(location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent change")));
         review.onApplied(editor::agentEditsApplied);
         liveChanges=new LiveChangesPanel(editor);tabs.addTab("Live changes",liveChanges.component());
+        advanced=tabs.getComponentAt(0);chat=new AgentCliChatPanel(editor);tabs.setComponentAt(0,chat.component());tabs.setTitleAt(0,"Chat");tabs.addTab("Advanced",advanced);tabs.setSelectedIndex(0);
     }
 
     AgentWorkbenchPanel(Supplier<AgentSessionPanel> factory, Function<AgentSessionPanel, AgentReviewPanel.Scope> reviewScope,
@@ -74,7 +77,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
             String caption = title + (working ? " · Working" : "");
             if (!caption.equals(conversations.getTitleAt(index))) conversations.setTitleAt(index, caption);
         });
-        conversations.setSelectedComponent(session.component()); tabs.setSelectedIndex(0);
+        conversations.setSelectedComponent(session.component()); if(advanced!=null)tabs.setSelectedComponent(advanced);else tabs.setSelectedIndex(0);
         add.setEnabled(sessions.size() < 8); refresh();
     }
     private void closeConversation() {
@@ -86,11 +89,12 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     }
     private void stopAll() {
         if (closed) return;
-        sessions.forEach(AgentSessionPanel::stopRequests); dismissCompletion.run();
+        if(chat!=null)chat.stopRequests();sessions.forEach(AgentSessionPanel::stopRequests); dismissCompletion.run();
     }
     @Override public JPanel component() { return panel; }
     @Override public void focus() {
-        if (tabs.getSelectedIndex() == 1) review.focus();
+        if(chat!=null&&tabs.getSelectedComponent()==chat.component())chat.focus();
+        else if (tabs.getSelectedIndex() == 1) review.focus();
         else if(tabs.getSelectedIndex()==2 && liveChanges!=null)liveChanges.focus();
         else { var session = current(); if (session != null) session.focus(); }
     }
@@ -101,10 +105,12 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     void showLiveChanges(){if(liveChanges!=null){tabs.setSelectedIndex(2);liveChanges.refresh();}}
     void showReview() { if(!workspaceReview)reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
     void showReview(String proposal) { workspaceReview = true; reviewOwner = null; tabs.setSelectedIndex(1); review.showProposal(proposal); }
-    void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); tabs.setSelectedIndex(0); }
+    void showChat(){tabs.setSelectedIndex(0);if(chat!=null)chat.focus();}
+    void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); if(advanced!=null)tabs.setSelectedComponent(advanced);else tabs.setSelectedIndex(0); }
     @Override public void refresh() {
         if (closed) return;
-        if (tabs.getSelectedIndex() == 0) { var current = current(); if (current != null) current.refresh(); }
+        if(chat!=null&&tabs.getSelectedComponent()==chat.component())chat.refresh();
+        else if (tabs.getSelectedIndex() == 0||tabs.getSelectedComponent()==advanced) { var current = current(); if (current != null) current.refresh(); }
         else if(tabs.getSelectedIndex()==2 && liveChanges!=null)liveChanges.refresh();
         else review.refresh();
     }
@@ -112,8 +118,8 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         tabs.setFont(uiFont.get()); conversations.setFont(uiFont.get());
         for (JButton button : List.of(add, remove, stopAll)) { button.setFont(uiFont.get()); WorkbenchStyle.quiet(button); button.setPreferredSize(null);
             var size = button.getPreferredSize(); button.setPreferredSize(new java.awt.Dimension(size.width, Math.max(size.height, WorkbenchStyle.px(40)))); }
-        if(liveChanges!=null)liveChanges.refreshAppearance();
+        if(liveChanges!=null)liveChanges.refreshAppearance();if(chat!=null)chat.refreshAppearance();
         sessions.forEach(AgentSessionPanel::refreshAppearance); review.refreshAppearance();
     }
-    @Override public void close() { if (closed) return; closed = true; if(liveChanges!=null)liveChanges.close();review.close(); sessions.forEach(AgentSessionPanel::close); }
+    @Override public void close() { if (closed) return; closed = true;if(chat!=null)chat.close(); if(liveChanges!=null)liveChanges.close();review.close(); sessions.forEach(AgentSessionPanel::close); }
 }

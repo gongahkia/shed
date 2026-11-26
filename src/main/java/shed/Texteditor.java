@@ -282,7 +282,7 @@ public class Texteditor extends JFrame implements KeyListener {
     boolean canDelegateWindow(){return !closingDown&&!stagedStartupPending&&!reloadPromptActive&&!formatOnSaveController.busy()&&buffers.stream().noneMatch(FileBuffer::isModified);}
     void takeBackAgentControl(){if(agentDelegationController!=null)agentDelegationController.takeBack();}
     boolean agentApprovalRequired(){return agentDelegationController!=null&&agentDelegationController.lease.approvalRequired();}
-    boolean agentDelegationAllowed(String id){return agentDelegationController!=null&&agentDelegationController.lease.allowed(id);}
+    boolean agentDelegationAllowed(String id){return agentDelegationController!=null&&agentDelegationController.allowsBridge(id);}
     java.util.Map<String,Object> agentDelegationCommand(String action,String id,String agent,String task){return agentDelegationController.command(action,id,agent,task);}
     boolean agentOwnsEditor(){return agentDelegationController!=null&&agentDelegationController.ownsEditor();}
 
@@ -325,8 +325,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private boolean allowsMachineNavigation(boolean opening) {
         var focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         boolean explorer=opening&&focused!=null&&treePane!=null&&treePane.getAlternateComponent()!=null&&SwingUtilities.isDescendingFrom(focused,treePane.getAlternateComponent());
+        boolean chat=agentDelegationController!=null&&agentDelegationController.allowsChatNavigationFrom(focused);
         return editorState.mode == EditorMode.INSERT && extraSelections.isEmpty() && recordingRegister == null
-            && inputController.allowsMachineNavigation() && (!isFocused() || focused == writingArea || explorer);
+            && inputController.allowsMachineNavigation() && (!isFocused() || focused == writingArea || explorer || chat);
     }
 
     EditorNavigation.Prepared prepareEditorNavigation(EditorNavigation.Command command) {

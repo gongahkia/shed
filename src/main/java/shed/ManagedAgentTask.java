@@ -35,6 +35,9 @@ final class ManagedAgentTask {
     }
     private static Path executable(Path p)throws IOException {Path real=p.toRealPath();if(!Files.isRegularFile(real)||!Files.isExecutable(real))throw new IOException("Expected a working CLI executable");return real;}
     static Result run(List<String> command,Path project,Path descriptor,String id,String prompt,Map<String,String> environment,java.util.function.BooleanSupplier live,long timeoutMillis)throws Exception {
+        return run(command,project,descriptor,id,prompt,environment,live,timeoutMillis,ignored->{});
+    }
+    static Result run(List<String> command,Path project,Path descriptor,String id,String prompt,Map<String,String> environment,java.util.function.BooleanSupplier live,long timeoutMillis,java.util.function.Consumer<String> outputChunk)throws Exception {
         if(javax.swing.SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Agent process work belongs off the EDT");
         if(timeoutMillis<100||timeoutMillis>8*60_000||prompt.getBytes(StandardCharsets.UTF_8).length>32768)throw new IllegalArgumentException("Bounded task required");
         if(!live.getAsBoolean())throw new CancellationException();
@@ -46,8 +49,8 @@ final class ManagedAgentTask {
         Process child=builder.start();var descendants=new LinkedHashMap<Long,Child>();var output=new StringBuilder();var ioFailed=new AtomicBoolean();
         ioWorkers.incrementAndGet();
         Thread reader=Thread.ofVirtual().name("shed-agent-task-output").start(()->{
-            try(var in=new InputStreamReader(child.getInputStream(),StandardCharsets.UTF_8)){char[] chars=new char[1024];int n;while((n=in.read(chars))!=-1)synchronized(output){output.append(chars,0,n);if(output.length()>8192)output.delete(0,output.length()-8192);}}
-            catch(IOException stopped){if(child.isAlive())ioFailed.set(true);}
+            try(var in=new InputStreamReader(child.getInputStream(),StandardCharsets.UTF_8)){char[] chars=new char[1024];int n;while((n=in.read(chars))!=-1){synchronized(output){output.append(chars,0,n);if(output.length()>8192)output.delete(0,output.length()-8192);}outputChunk.accept(new String(chars,0,n));}}
+            catch(IOException|RuntimeException stopped){if(child.isAlive())ioFailed.set(true);}
             finally{ioWorkers.decrementAndGet();}
         });
         ioWorkers.incrementAndGet();

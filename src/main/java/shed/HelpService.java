@@ -137,7 +137,10 @@ public class HelpService {
             case "agent":
                 return "Help: AI assistance\n\n"
                     + "The command palette exposes AI: Complete, Edit Selection, Ask/Search and Run Task.\n"
-                    + ":agent opens the Assistant and Review changes tabs (also View > AI Assistant).\n"
+                    + ":agent chat opens an ongoing local CLI conversation (also View > Agent Chat).\n"
+                    + "Choose Codex, Claude Code or OpenCode, send a message, then approve control. Shed supplies visualization instructions every turn.\n"
+                    + "Enter sends; Shift+Enter inserts a newline. Stop returns editor control; New chat starts a separate native conversation.\n"
+                    + "The following reviewed ACP actions remain under Advanced.\n"
                     + ":agent complete requests inline ghost text; Tab accepts and Escape dismisses.\n"
                     + "Configure agent.opencode.model (or your OpenCode default), authenticate OpenCode, and set ai.completion.enabled=true.\n"
                     + "Completion is opt-in and independent of the agent connection. Existing completion and keymap bindings take priority.\n"

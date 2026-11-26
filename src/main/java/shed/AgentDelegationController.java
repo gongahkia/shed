@@ -9,18 +9,21 @@ final class AgentDelegationController implements AutoCloseable {
     final AgentDelegation lease=new AgentDelegation();
     private final Texteditor editor;
     private final javax.swing.Timer timer;
-    private AgentEditorOwnership ownership;
+    private volatile AgentEditorOwnership ownership;
     private JDialog approval;
     private Path root;
     private long generation;
     private Runnable onActive=()->{},onEnd=()->{};
     private boolean closed,handedBack;
+    private volatile JComponent chatSurface;
     private String launchDescription="External CLI; Shed does not own its process.";
     void launchDescription(String value){launchDescription=value;}
     AgentDelegationController(Texteditor editor) {
         this.editor=editor;timer=new javax.swing.Timer(100,e->tick());
     }
     boolean ownsEditor(){return ownership!=null;}
+    boolean allowsBridge(String id){return lease.allowed(id)&&(chatSurface==null||ownership!=null);}
+    boolean allowsChatNavigationFrom(java.awt.Component focused){return chatSurface!=null&&ownership!=null&&lease.allowed(lease.id())&&ownership.allowsChatNavigationFrom(focused);}
     void requireApproval(){lease.requireApproval();}
     Map<String,Object> command(String action,String id,String agent,String task) {
         if(closed)throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
@@ -38,12 +41,30 @@ final class AgentDelegationController implements AutoCloseable {
         return lease.status(id);
     }
     void whenActive(Runnable active,Runnable ended){onActive=active;onEnd=ended;}
+    void chatTurn(String id,String agent,String task,JComponent surface,Runnable ready,Runnable ended) {
+        if(!editor.canDelegateWindow())throw WorkspaceApiException.invalidRequest("Save unsaved buffers and finish pending saves before sending.");
+        if(lease.id().equals(id)&&lease.allowed(id)&&lease.state().equals("active")) {
+            if(chatSurface!=surface||!validProject()||ownership!=null)throw EditorMetadata.failure(WorkspaceApiException.Code.BUSY);
+            onActive=ready;onEnd=ended;
+            ownership=new AgentEditorOwnership(editor.getRootPane(),()->List.copyOf(editor.editorPanes),lease.agent(),this::takeBack,chatSurface);
+            editor.toolWindowHost.watchAgentChanges("follow",agent);ready.run();return;
+        }
+        if(lease.running())throw EditorMetadata.failure(WorkspaceApiException.Code.BUSY);
+        chatSurface=surface;whenActive(ready,ended);launchDescription="Local CLI chat; the conversation remains available while the agent works.";
+        command("request",id,agent,task);
+    }
+    void chatTurnDone(String id) {
+        if(!lease.id().equals(id)||chatSurface==null)return;
+        if(ownership!=null){ownership.close();ownership=null;}
+        editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());
+        onActive=()->{};editor.showMessage(lease.agent()+" replied · ready for your next message.");
+    }
     private void ask(String id) {
         if(closed||!lease.id().equals(id)||!lease.state().equals("awaiting-approval"))return;
         if(root==null||!editor.canDelegateWindow()){lease.revoke("rejected");handBack();editor.showMessage("Finish pending saves and resolve unsaved buffers or reload prompts before delegating control.");return;}
         var body=new JPanel(new java.awt.BorderLayout(8,10));
         var task=new JTextArea(lease.task(),6,52);task.setFont(UIManager.getFont("Label.font"));task.setEditable(false);task.setLineWrap(true);task.setWrapStyleWord(true);task.setCaretPosition(0);body.add(new JScrollPane(task));
-        var notice=new JTextArea("Allow "+lease.agent()+" to control this Shed window for up to 8 minutes?\nProject: "+root+"\nCLI: "+launchDescription+"\n\nTyping and navigation pause while the agent works. Take Back Control is always available.\nA fresh change baseline starts now. An external CLI keeps its own filesystem permissions.");
+        var notice=new JTextArea("Allow "+lease.agent()+" to control this Shed window for up to 8 minutes?\nProject: "+root+"\nCLI: "+launchDescription+"\n\nEditor input pauses while the agent works. Take Back Control is always available.\nA fresh change baseline starts now. An external CLI keeps its own filesystem permissions.");
         notice.setFont(UIManager.getFont("Label.font"));notice.setEditable(false);notice.setLineWrap(true);notice.setWrapStyleWord(true);notice.setOpaque(false);body.add(notice,java.awt.BorderLayout.SOUTH);
         var pane=new JOptionPane(body,JOptionPane.QUESTION_MESSAGE,JOptionPane.YES_NO_OPTION,null,new String[]{"Allow Control","Cancel"},"Cancel");
         approval=pane.createDialog(editor,"Delegate control to "+lease.agent()+"?");approval.setName("agent.approval");
@@ -55,8 +76,8 @@ final class AgentDelegationController implements AutoCloseable {
             if(!validProject()||!editor.canDelegateWindow()){lease.revoke("rejected");handBack();return;}
             editor.stopAiCompletionRequests();
             lease.approve(id);
-            ownership=new AgentEditorOwnership(editor.getRootPane(),()->List.copyOf(editor.editorPanes),lease.agent(),this::takeBack);
-            editor.toolWindowHost.watchAgentChanges("session-start",lease.agent());editor.hideToolWindow();
+            ownership=new AgentEditorOwnership(editor.getRootPane(),()->List.copyOf(editor.editorPanes),lease.agent(),this::takeBack,chatSurface);
+            editor.toolWindowHost.watchAgentChanges("session-start",lease.agent());if(chatSurface==null)editor.hideToolWindow();
         });
         approval.addWindowListener(new java.awt.event.WindowAdapter(){public void windowClosing(java.awt.event.WindowEvent e){lease.revoke("rejected");handBack();}});
         approval.setVisible(true);
@@ -79,12 +100,14 @@ final class AgentDelegationController implements AutoCloseable {
     private void disposeApproval(){if(approval!=null){var dialog=approval;approval=null;dialog.dispose();}}
     private void handBack() {
         timer.stop();disposeApproval();
+        boolean chat=chatSurface!=null;chatSurface=null;
         boolean worked=ownership!=null;
         if(ownership!=null){ownership.close();ownership=null;}
         if(handedBack)return;handedBack=true;
         try{onEnd.run();}finally{onActive=()->{};onEnd=()->{};launchDescription="External CLI; Shed does not own its process.";}
         editor.clearAgentActivity();
-        if(worked&&!closed){editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());editor.toolWindowHost.showAgentChanges();editor.showMessage(lease.agent()+" · "+lease.state()+" · control returned to you. Changes are available for review.");
+        if(worked&&!closed){editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());}
+        if(worked&&!closed&&!chat){editor.toolWindowHost.showAgentChanges();editor.showMessage(lease.agent()+" · "+lease.state()+" · control returned to you. Changes are available for review.");
             var status=lease.status(lease.id());if(status.get("summary") instanceof String summary&&!summary.isBlank()){var text=new JTextArea(summary,8,52);text.setEditable(false);text.setLineWrap(true);text.setWrapStyleWord(true);text.setCaretPosition(0);SwingUtilities.invokeLater(()->{if(!closed)JOptionPane.showMessageDialog(editor,new JScrollPane(text),"Agent-reported session summary",JOptionPane.INFORMATION_MESSAGE);});}}
     }
     @Override public void close(){closed=true;lease.revoke("cancelled");handBack();}

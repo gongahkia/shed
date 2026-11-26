@@ -141,6 +141,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview();
         showTab(Tab.AGENT);
     }
+    void showAgentChat(){showTab(Tab.AGENT);if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.showChat();}
     void showAgentChanges(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.showLiveChanges();showTab(Tab.AGENT);}
 
     java.util.Map<String,Object> watchAgentChanges(String action,String name){

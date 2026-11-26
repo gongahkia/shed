@@ -1,6 +1,6 @@
 # Ongoing CLI chat inside Shed
 
-Shed's normal agent surface is a conversation with an already-installed local coding CLI. The CLI owns its native conversation and tools; Shed supplies the chat UI and the existing authenticated visualization attachment. There is no new model service, daemon, API key store or document model.
+Shed's normal agent surface is a single right-hand Chat panel for a conversation with an already-installed local coding CLI. The CLI owns its native conversation and tools; Shed supplies the chat UI and the existing authenticated visualization attachment. There is no new model service, daemon, API key store or document model.
 
 ## Use it
 
@@ -8,11 +8,19 @@ Shed's normal agent surface is a conversation with an already-installed local co
 2. Choose **Codex**, **Claude Code** or **OpenCode**. Shed uses the CLI's configured model, login and permissions. If needed, expand **CLI path** and select its executable (not a shell command).
 3. Type a message. **Enter** sends; **Shift+Enter** inserts a newline. Approve the existing control dialog before the first process starts. Save unsaved buffers and finish pending saves/reloads first.
 4. Read the reply and send follow-ups in the same conversation. **Stop** or **Take Back Control** interrupts a turn. Drafting the next message remains possible while the current turn runs.
-5. **Changes** opens the existing session summary and diffs after a turn. **New chat** cancels any active turn and clears the visible conversation; the CLI's own stored session history is not deleted.
+5. **Changes** opens the existing session summary and diffs after a turn; **Back to Chat** returns to the conversation. **New chat** cancels any active turn and clears the visible conversation; the CLI's own stored session history is not deleted.
 
 The editor stays visible and source input pauses only while a turn is running. It returns between replies; bridge commands are suspended during that interval. The approved lease lasts up to eight minutes. Expiration/revocation ends control, not the visible conversation: a later message needs a new approval and resumes the known native conversation ID. Changing projects requires New chat. A dirty buffer prevents the next turn until it is saved or otherwise resolved.
 
 Run the controlled demonstration with `make demo-chat` or `make demo-delegation`. Both show two conversation turns, actual source reading/editing and cancellation with a fixed Java CLI double. This is a live application test, not a real cloud-model run. The general animation tour remains `make demo`.
+
+## Add selected source to a message
+
+Select text in an editor, right-click, and choose **Add selection to chat**. Shed opens Chat and adds a removable context chip; it does not send the message or change source, caret/selection, revision, dirty state or Undo history. Type your instruction, then Send. The attachment carries the project-relative filename, observed document revision, end-exclusive UTF-16 range and exact selected text. It is a snapshot, so the agent is instructed to re-read before editing.
+
+Up to four selections totaling 8,192 UTF-16 units may be attached to one message. The existing 32 KiB UTF-8 prompt cap is checked before approval/process launch. Another project's selection is rejected. Pending approval cancellation keeps the draft and attachments; successful submission consumes only that message's context. New chat clears it. Context isn't silently included again in later follow-ups.
+
+Editor close icons now live inside each file tab. Closing an inactive tab restores the previously active document if it remains available; existing unsaved-change confirmation still applies. Claude's logo is orange in the shared provider renderer, including editor/terminal activity markers, with the bundled silhouette and transparency retained.
 
 ## Automatic visualization
 
@@ -48,10 +56,10 @@ The existing delegation controller reuses consent and one change baseline across
 
 Managed CLIs retain the user's normal environment and CLI configuration, with the selected Shed attachment and current Java runtime supplied explicitly. This is intentional user-approved agent execution, not a filesystem sandbox. The CLI's own tool policies still apply. Revocation cannot reverse completed disk writes or confine detached processes; these limits are unchanged from [delegation](AGENT_DELEGATION.md).
 
-The legacy ACP session tools remain under **Advanced**. The original one-shot launcher is explicit through `:agent task`. Existing `delegate --connect` and other external control commands retain their behavior.
+The normal surface has no Chat/Review/Live/Advanced tab strip and no duplicate AI Assistant menu entry. Legacy ACP tools open only through explicit commands such as `:agent edit`, `:agent ask` and `:agent run`, with **Back to Chat** to return. The original one-shot launcher is explicit through `:agent task`. Existing `delegate --connect` and other external control commands retain their behavior.
 
 ## Qualification
 
-See [commands, counts, failures and captures](performance/agent-cli-chat/INDEX.md). Safe component/transport tests and the controlled macOS Swing workflow cover native-ID continuation, hidden context on every turn, real file opening/highlighting, exact disk/editor source, source ownership restoration, idle bridge suspension, draft preservation, Stop and child/IO retirement.
+See [original chat commands, counts, failures and captures](performance/agent-cli-chat/INDEX.md) and [the unified Chat refinement checks](performance/agent-chat-ui/INDEX.md). Safe component/transport tests and the controlled macOS Swing workflow cover native-ID continuation, hidden context on every turn, real file opening/highlighting, exact disk/editor source, source ownership restoration, idle bridge suspension, draft preservation, Stop and child/IO retirement.
 
 Real cloud CLI compatibility, Windows/Linux desktops, OS keyboard-to-screen latency, complete native-memory attribution and detached-service confinement remain unqualified. B0.1's native-shell harness remains NO-GO and was not used. The Unicode/glyph and HTML-preview limitations remain open. No README, theme/font default, document ownership, saved preference migration or new dependency is part of this change.

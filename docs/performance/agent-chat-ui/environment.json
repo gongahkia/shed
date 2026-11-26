@@ -1,0 +1,11 @@
+{
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "starting_head": "790a784084baa483611565fc0928ea14acc8549f",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "native_shell": "NOT_USED",
+  "real_agent": "NOT_RUN",
+  "jdk": "/Users/gongahkia/.local/share/shed-tools/jdk-21",
+  "gui": "Controlled macOS Swing; in-component capture only",
+  "code_head": "11267be5ee76c530dd47d1fade233ad8758b65eb",
+  "jar_sha256": "e351ee43946225b9311874522fea879853bc180116c31c43e298ba0df94a5b7b"
+}

@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** One consented CLI process, bounded output and lifetime; no shell, service or implicit permission flags. */
 final class ManagedAgentTask {
+    private static final java.util.concurrent.atomic.AtomicInteger ioWorkers=new java.util.concurrent.atomic.AtomicInteger();
+    static int activeIoWorkers(){return ioWorkers.get();}
     record Result(int exit,String output){}
     private record Child(ProcessHandle handle,Instant started) {
         boolean owned(){return started!=null&&handle.isAlive()&&started.equals(handle.info().startInstant().orElse(null));}
@@ -42,11 +44,14 @@ final class ManagedAgentTask {
         // Reuse the current runtime even when GUI PATH/JAVA_HOME are stale.
         builder.environment().put("JAVA_HOME",System.getProperty("java.home"));builder.environment().put("JAVA",Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name","").startsWith("Windows")?"java.exe":"java").toString());
         Process child=builder.start();var descendants=new LinkedHashMap<Long,Child>();var output=new StringBuilder();var ioFailed=new AtomicBoolean();
+        ioWorkers.incrementAndGet();
         Thread reader=Thread.ofVirtual().name("shed-agent-task-output").start(()->{
             try(var in=new InputStreamReader(child.getInputStream(),StandardCharsets.UTF_8)){char[] chars=new char[1024];int n;while((n=in.read(chars))!=-1)synchronized(output){output.append(chars,0,n);if(output.length()>8192)output.delete(0,output.length()-8192);}}
             catch(IOException stopped){if(child.isAlive())ioFailed.set(true);}
+            finally{ioWorkers.decrementAndGet();}
         });
-        Thread writer=Thread.ofVirtual().name("shed-agent-task-input").start(()->{try(var out=child.getOutputStream()){out.write(prompt.getBytes(StandardCharsets.UTF_8));}catch(IOException stopped){if(child.isAlive())ioFailed.set(true);}});
+        ioWorkers.incrementAndGet();
+        Thread writer=Thread.ofVirtual().name("shed-agent-task-input").start(()->{try(var out=child.getOutputStream()){out.write(prompt.getBytes(StandardCharsets.UTF_8));}catch(IOException stopped){if(child.isAlive())ioFailed.set(true);}finally{ioWorkers.decrementAndGet();}});
         long deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(timeoutMillis);int exit;
         try {
             do {

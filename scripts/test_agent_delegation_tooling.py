@@ -1,0 +1,58 @@
+"""Synthetic CLI admission checks; no Java process or window is launched."""
+import contextlib
+import importlib.util
+import io
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location('delegation_driver', Path(__file__).with_name('test-agent-delegation.py'))
+driver = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(driver)
+
+
+class AgentDelegationAdmissionTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='shed-delegation-admission-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.jdk = self.root / 'jdk'
+        (self.jdk / 'bin').mkdir(parents=True)
+        for tool in ('java', 'javac'):
+            (self.jdk / 'bin' / tool).write_text('synthetic; never executed')
+        self.jar = self.root / 'fixture.jar'
+        self.jar.write_bytes(b'synthetic; never executed')
+
+    def reject(self, output):
+        argv = ['test-agent-delegation.py', '--jdk', str(self.jdk), '--jar', str(self.jar), '--output', str(output)]
+        with patch('sys.argv', argv), patch.object(driver.subprocess, 'run') as run, patch.object(driver.subprocess, 'Popen') as launch, contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as failure:
+                driver.main()
+            self.assertEqual(failure.exception.code, 2)
+            run.assert_not_called()
+            launch.assert_not_called()
+
+    def test_existing_output_rejected_without_touching_sentinel(self):
+        output = self.root / 'existing'
+        output.mkdir()
+        sentinel = output / 'keep'
+        sentinel.write_bytes(b'unchanged')
+        before = sentinel.stat().st_mtime_ns
+        self.reject(output)
+        self.assertEqual(sentinel.read_bytes(), b'unchanged')
+        self.assertEqual(sentinel.stat().st_mtime_ns, before)
+
+    def test_symlinked_output_parent_rejected_before_any_process(self):
+        outside = self.root / 'outside'
+        outside.mkdir()
+        link = self.root / 'link'
+        link.symlink_to(outside, target_is_directory=True)
+        self.reject(link / 'new')
+        self.assertFalse((outside / 'new').exists())
+
+    def test_missing_compiler_rejected_without_creating_output(self):
+        (self.jdk / 'bin/javac').unlink()
+        output = self.root / 'not-created'
+        self.reject(output)
+        self.assertFalse(output.exists())

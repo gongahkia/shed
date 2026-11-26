@@ -459,6 +459,7 @@ final class SessionConfigController {
             buffer.applyUndoHistoryPolicy();
         }
         editor.applyUiFont();
+        if (editor.fileExplorer != null) editor.fileExplorer.refreshAppearance();
         for (EditorPane pane : editor.editorPanes) {
             if (pane.getAlternateComponent() instanceof FileTreePanel explorer) {
                 explorer.refreshAppearance();

@@ -260,7 +260,7 @@ final class TreeGitController {
             if (editor.treeRoot == null) {
                 editor.treeRoot = editor.treeService.revealRootForPath(target);
             }
-            if (editor.treePane != null && editor.editorPanes.contains(editor.treePane) && editor.treeRoot != null) {
+            if (editor.fileExplorer != null && editor.treeRoot != null) {
                 showFileTree(editor.treeRoot.getAbsolutePath());
             }
             return existed ? "File exists: " + target.getAbsolutePath() : "Created file: " + target.getAbsolutePath();
@@ -280,7 +280,7 @@ final class TreeGitController {
             if (editor.treeRoot == null) {
                 editor.treeRoot = target;
             }
-            if (editor.treePane != null && editor.editorPanes.contains(editor.treePane) && editor.treeRoot != null) {
+            if (editor.fileExplorer != null && editor.treeRoot != null) {
                 showFileTree(editor.treeRoot.getAbsolutePath());
             }
             return "Created directory: " + target.getAbsolutePath();
@@ -308,7 +308,7 @@ final class TreeGitController {
         }
         try {
             editor.treeService.rename(from, to);
-            if (editor.treeRoot != null && editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
+            if (editor.treeRoot != null && editor.fileExplorer != null) {
                 showFileTree(editor.treeRoot.getAbsolutePath());
             }
             return "Renamed: " + from.getAbsolutePath() + " -> " + to.getAbsolutePath();
@@ -338,7 +338,7 @@ final class TreeGitController {
         }
         try {
             int removed = editor.treeService.deleteRecursively(target);
-            if (editor.treeRoot != null && editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
+            if (editor.treeRoot != null && editor.fileExplorer != null) {
                 showFileTree(editor.treeRoot.getAbsolutePath());
             }
             return "Deleted " + removed + " path(s)";
@@ -383,44 +383,29 @@ final class TreeGitController {
 
 
     public String showFileTree(String pathArgument) {
-        if (editor.goyoModeEnabled) {
-            return "Tree hidden in Goyo mode";
-        }
+        if (editor.goyoModeEnabled) return "Tree hidden in Goyo mode";
         String trimmed = pathArgument == null ? "" : pathArgument.trim();
-        if (trimmed.isEmpty() && editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
-            return closeTreePane();
-        }
-
-        File root;
-        if (trimmed.isEmpty()) {
-            root = editor.treeRoot != null ? editor.treeRoot : editor.treeService.resolveRoot("");
-        } else {
-            root = editor.treeService.resolveRoot(trimmed);
-        }
-        if (!root.exists()) {
-            return "Path not found: " + root.getPath();
-        }
+        if (trimmed.isEmpty() && editor.explorerSidebar.isOpen()) return closeTreePane();
+        File root = trimmed.isEmpty()
+            ? editor.treeRoot != null ? editor.treeRoot : editor.treeService.resolveRoot("")
+            : editor.treeService.resolveRoot(trimmed);
+        if (!root.exists()) return "Path not found: " + root.getPath();
         root = WorkspaceRootResolver.normalizedIdentity(root.toPath()).toFile();
         setWorkspaceTreeRoot(root, false);
+        mountExplorer(root);
+        editor.explorerSidebar.open(true);
+        editor.fileExplorer.refreshExternalChanges();
+        editor.fileExplorer.focusTree();
+        return "File sidebar opened";
+    }
 
-        String titleSuffix = treeTitleSuffix(root);
-        FileBuffer tree = createOrReplaceTreeBuffer(titleSuffix, "File tree: " + root.getAbsolutePath() + "\n", List.of());
-        EditorPane contentPane = resolveTreeContentPaneForTreeCommand();
-        if (contentPane == null) {
-            return "No active window";
-        }
-        EditorPane pane = ensureTreePane(contentPane);
-        if (pane == null) {
-            return "Unable to open tree pane";
-        }
-        editor.loadBufferIntoPane(pane, tree, 0);
-        FileTreePanel explorer = new FileTreePanel(editor, root, this::listTreeChildren, file -> editor.showMessage(openTreeFile(file)),
-            () -> editor.activateEditorPane(pane));
-        pane.setAlternateComponent(explorer);
-        editor.renderWindowLayout();
-        editor.activateEditorPane(pane);
-        explorer.focusTree();
-        return "Tree pane opened";
+    private File explorerRoot;
+    private void mountExplorer(File root) {
+        if (editor.fileExplorer != null && root.equals(explorerRoot)) return;
+        explorerRoot = root;
+        editor.fileExplorer = new FileTreePanel(editor, root, this::listTreeChildren,
+            file -> editor.showMessage(openTreeFile(file)), () -> { });
+        editor.explorerSidebar.explorer(editor.fileExplorer);
     }
 
     void setWorkspaceTreeRoot(File root, boolean showTree) {
@@ -433,19 +418,21 @@ final class TreeGitController {
         editor.gitBranch = treeGitRoot == null ? "" : resolveBranchName(treeGitRoot);
         editor.updateStatusBar();
         editor.refreshGitGutter();
-        if (showTree && editor.treeRoot != null && editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
-            showFileTree(editor.treeRoot.getAbsolutePath());
+        if (editor.treeRoot == null) {
+            editor.fileExplorer = null; explorerRoot = null;
+            if (editor.explorerSidebar != null) editor.explorerSidebar.explorer(null);
+        } else if (editor.fileExplorer != null || showTree) {
+            mountExplorer(editor.treeRoot);
+            if (showTree) editor.explorerSidebar.open(true);
         }
     }
 
 
     String closeTreePane() {
-        if (editor.treePane == null || !editor.editorPanes.contains(editor.treePane)) {
-            return "Tree pane already closed";
-        }
-        String result = editor.closePane(editor.treePane);
-        if ("Window closed".equals(result)) return "Tree pane closed";
-        return result;
+        if (!editor.explorerSidebar.isOpen()) return "File sidebar already hidden";
+        editor.explorerSidebar.open(false);
+        editor.requestActivePaneFocus();
+        return "File sidebar hidden";
     }
 
 
@@ -504,102 +491,18 @@ final class TreeGitController {
     }
 
 
-    FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {
-        FileBuffer replacement = FileBuffer.createScratch("[tree " + titleSuffix + "]", content);
-        if (editor.treeBuffer != null) {
-            int index = editor.buffers.indexOf(editor.treeBuffer);
-            if (index >= 0) {
-                editor.releaseClosedBufferResources(editor.buffers.set(index, replacement));
-            } else {
-                editor.buffers.add(replacement);
-            }
-            editor.treeLineTargets.remove(editor.treeBuffer);
-        } else {
-            editor.buffers.add(replacement);
-        }
-        editor.treeBuffer = replacement;
-        editor.treeLineTargets.put(replacement, lineTargets);
-        return replacement;
-    }
-
-
-    EditorPane resolveTreeContentPaneForTreeCommand() {
-        EditorPane active = editor.getActivePane();
-        if (editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
-            if (active != null && active != editor.treePane) {
-                return active;
-            }
-            for (EditorPane pane : editor.editorPanes) {
-                if (pane != editor.treePane) {
-                    return pane;
-                }
-            }
-        }
-        return active;
-    }
-
-
-    EditorPane ensureTreePane(EditorPane contentPane) {
-        if (editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
-            return editor.treePane;
-        }
-        if (contentPane == null) {
-            return null;
-        }
-
-        Dimension size = editor.getSize();
-        EditorPane newPane = editor.createEditorPane(size);
-        editor.editorPanes.add(newPane);
-        if (editor.windowLayoutRoot == null) {
-            editor.windowLayoutRoot = WindowLayoutNode.leaf(contentPane);
-        }
-        double treeTargetRatio = 0.24;
-        boolean split = editor.windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL, true, treeTargetRatio);
-        if (!split) {
-            editor.windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL);
-        }
-        editor.renderWindowLayout();
-        editor.treePane = newPane;
-        return newPane;
-    }
-
-
     boolean isTreePaneActive() {
-        EditorPane active = editor.getActivePane();
-        return active != null && active == editor.treePane && isTreeBuffer(editor.getCurrentBuffer());
+        var focus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        return focus != null && editor.fileExplorer != null
+            && javax.swing.SwingUtilities.isDescendingFrom(focus, editor.fileExplorer);
     }
-
 
     boolean isTreeBuffer(FileBuffer buffer) {
         return buffer != null && editor.treeLineTargets.containsKey(buffer);
     }
 
-
     String openTreeSelection() {
-        FileBuffer current = editor.getCurrentBuffer();
-        if (!isTreeBuffer(current)) {
-            return "Tree pane not active";
-        }
-
-        if (editor.treePane != null && editor.treePane.getAlternateComponent() instanceof FileTreePanel explorer) {
-            return openTreeFile(explorer.selectedFile());
-        }
-
-        List<String> targets = editor.treeLineTargets.get(current);
-        if (targets == null || targets.isEmpty()) {
-            return "No file on this line";
-        }
-
-        int line = editor.getCurrentCaretLine();
-        if (line < 0 || line >= targets.size()) {
-            return "No file on this line";
-        }
-        String path = targets.get(line);
-        if (path == null || path.isBlank()) {
-            return "No file on this line";
-        }
-
-        return openTreeFile(new File(path));
+        return editor.fileExplorer == null ? "File sidebar is unavailable" : openTreeFile(editor.fileExplorer.selectedFile());
     }
 
 
@@ -637,13 +540,6 @@ final class TreeGitController {
 
 
     EditorPane resolveTreeContentPaneForOpen() {
-        if (editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
-            for (EditorPane pane : editor.editorPanes) {
-                if (pane != editor.treePane) {
-                    return pane;
-                }
-            }
-        }
         return editor.getActivePane();
     }
 

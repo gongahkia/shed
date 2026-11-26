@@ -211,6 +211,8 @@ public class Texteditor extends JFrame implements KeyListener {
     List<LspClient.TextEdit> pendingLspRenameEdits;
     String pendingLspRenameTarget;
     LspClient.CodeAction pendingLspCodeAction;
+    FileExplorerSidebar explorerSidebar;
+    FileTreePanel fileExplorer;
     EditorPane treePane;
     FileBuffer treeBuffer;
     File treeRoot;
@@ -329,7 +331,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
     private boolean allowsMachineNavigation(boolean opening) {
         var focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-        boolean explorer=opening&&focused!=null&&treePane!=null&&treePane.getAlternateComponent()!=null&&SwingUtilities.isDescendingFrom(focused,treePane.getAlternateComponent());
+        boolean explorer=opening&&focused!=null&&fileExplorer!=null&&SwingUtilities.isDescendingFrom(focused,fileExplorer);
         boolean chat=agentDelegationController!=null&&agentDelegationController.allowsChatNavigationFrom(focused);
         return editorState.mode == EditorMode.INSERT && extraSelections.isEmpty() && recordingRegister == null
             && inputController.allowsMachineNavigation() && (!isFocused() || focused == writingArea || explorer || chat);
@@ -2122,18 +2124,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String treeTitleSuffix(File root) {
         return treeGitController.treeTitleSuffix(root);
-    }
-
-    FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {
-        return treeGitController.createOrReplaceTreeBuffer(titleSuffix, content, lineTargets);
-    }
-
-    EditorPane resolveTreeContentPaneForTreeCommand() {
-        return treeGitController.resolveTreeContentPaneForTreeCommand();
-    }
-
-    EditorPane ensureTreePane(EditorPane contentPane) {
-        return treeGitController.ensureTreePane(contentPane);
     }
 
     boolean isTreePaneActive() {

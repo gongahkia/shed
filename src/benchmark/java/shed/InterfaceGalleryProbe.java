@@ -180,8 +180,7 @@ public final class InterfaceGalleryProbe {
         }
 
         edt(() -> { editor.hideToolWindow(); editor.treeGitController.showFileTree(project.toString()); return null; });
-        await("file explorer", () -> editor.treePane != null && editor.treePane.getAlternateComponent() instanceof FileTreePanel
-            && editor.treePane.getAlternateComponent().isShowing());
+        await("file explorer", () -> editor.fileExplorer != null && editor.fileExplorer.isShowing());
         settle();
         capture(editor, "explorer", true);
         edt(() -> {

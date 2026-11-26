@@ -297,6 +297,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'CliChatProtocolTest',
             'AgentCliChatPanelTest',
             'AgentChatTranscriptTest',
+            'FileExplorerSidebarTest',
             'InlineCompletionSessionTest',
             'InlineCompletionKeymapTest',
             'InlineCompletionDisplayTest',

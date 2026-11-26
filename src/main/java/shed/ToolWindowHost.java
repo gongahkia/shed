@@ -157,6 +157,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
 
     void observeAgentFiles(java.nio.file.Path root,java.util.List<ExternalChangeSnapshot.Change> changes,java.util.Set<String> recent){
         var marks=FileChangeMarks.from(root,changes);var pulses=FileChangeMarks.recent(root,recent);
+        if(editor.fileExplorer!=null)editor.fileExplorer.observeChanges(marks,pulses);
         for(var pane:editor.editorPanes)if(pane.getAlternateComponent() instanceof FileTreePanel tree)tree.observeChanges(marks,pulses);
         if(surfaces.get(Tab.GIT) instanceof GitChangesToolPanel git)git.observeExternalChanges(root,recent);
     }

@@ -244,7 +244,7 @@ public final class DensityPerformanceProbe {
                 if (sidebar) {
                     EditorPane sourcePane = editor.getActivePane();
                     String treeResult = editor.showFileTree(file.getParent().toString());
-                    if (!treeResult.equals("Tree pane opened")) throw new AssertionError(treeResult);
+                    if (!treeResult.equals("File sidebar opened")) throw new AssertionError(treeResult);
                     editor.editorUiController.renderWindowLayout(); editor.activateEditorPane(sourcePane);
                 }
                 FileBuffer source = editor.getCurrentBuffer();

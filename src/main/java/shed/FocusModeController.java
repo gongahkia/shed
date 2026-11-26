@@ -204,6 +204,7 @@ final class FocusModeController {
 
     void syncChrome() {
         if (closed) return;
+        if (editor.explorerSidebar != null) editor.explorerSidebar.focusMode(editor.goyoModeEnabled);
         if (!editor.goyoModeEnabled || focusState == null) {
             boolean current = editor.configManager.getOpenEditorsVisible();
             if (tabsPreference != current && editor.openEditorsBar != null) editor.openEditorsBar.setVisible(current);

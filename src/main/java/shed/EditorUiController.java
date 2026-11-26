@@ -205,16 +205,21 @@ final class EditorUiController {
         editor.editorToolSplit.setDividerSize(0);
         editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
         // Add components
-        editor.add(editor.editorToolSplit, BorderLayout.CENTER);
+
         JPanel documentHeader = new JPanel(new BorderLayout());
         editor.openEditorsBar = new OpenEditorsBar(editor);
         editor.workbenchHeader = new WorkbenchHeader(editor);
         JPanel navigation = new JPanel(new BorderLayout());
-        navigation.add(editor.workbenchHeader, BorderLayout.NORTH);
+
         navigation.add(editor.openEditorsBar, BorderLayout.CENTER);
         documentHeader.add(navigation, BorderLayout.NORTH);
         documentHeader.add(editor.inlineFindBar, BorderLayout.SOUTH);
-        editor.add(documentHeader, BorderLayout.NORTH);
+        JPanel documentArea = new JPanel(new BorderLayout());
+        documentArea.add(documentHeader, BorderLayout.NORTH);
+        documentArea.add(editor.editorToolSplit, BorderLayout.CENTER);
+        editor.explorerSidebar = new FileExplorerSidebar(documentArea, UiZoom.scale(260, editor.configManager.getUiZoom()), UiZoom.scale(6, editor.configManager.getUiZoom()));
+        editor.add(editor.explorerSidebar, BorderLayout.CENTER);
+        editor.add(editor.workbenchHeader, BorderLayout.NORTH);
         if (!editor.stagedStartupPending) editor.add(editor.footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
@@ -1092,6 +1097,8 @@ final class EditorUiController {
         // Keep source TextUI/View instances, colors, fonts and layout ownership intact.
         if (editor.workbenchHeader != null) editor.workbenchHeader.refreshDensity();
         if (editor.openEditorsBar != null) editor.openEditorsBar.refreshDensity();
+        if (editor.explorerSidebar != null) editor.explorerSidebar.dividerSize(UiZoom.scale(6, editor.configManager.getUiZoom()));
+        if (editor.fileExplorer != null) editor.fileExplorer.refreshDensity();
         if (editor.toolWindowHost != null) editor.toolWindowHost.refreshDensity();
         for (EditorPane pane : editor.editorPanes) {
             if (pane.getAlternateComponent() instanceof FileTreePanel tree) tree.refreshDensity();

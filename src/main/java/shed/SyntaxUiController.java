@@ -511,6 +511,7 @@ final class SyntaxUiController {
         editor.commandBar.setBackground(editor.configManager.getCommandBarBackground());
         editor.commandBar.setForeground(editor.configManager.getCommandBarForeground());
 
+        if (editor.fileExplorer != null) editor.fileExplorer.refreshAppearance();
         for (EditorPane pane : editor.editorPanes) {
             JTextArea area = pane.getTextArea();
             pane.getSearchManager().setHighlightColors(editor.configManager.getSearchHighlightColor(),

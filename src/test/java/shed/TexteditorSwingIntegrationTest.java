@@ -3,6 +3,7 @@ package shed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
@@ -2149,8 +2150,11 @@ public class TexteditorSwingIntegrationTest {
         try {
             assertEquals(workspace.toRealPath(), onEdt(() -> editor.workspaceController.activeRoot()));
             assertEquals(workspace.toRealPath().toFile(), onEdt(() -> editor.treeRoot));
-            assertNotNull(onEdt(() -> editor.treePane));
-            assertTrue(onEdt(() -> editor.treePane.getAlternateComponent() instanceof FileTreePanel));
+            assertNotNull(onEdt(() -> editor.fileExplorer));
+            assertNull(onEdt(() -> editor.treePane));
+            assertEquals(1, onEdt(() -> editor.editorPanes.size()));
+            assertTrue(onEdt(() -> editor.explorerSidebar.showingExplorer()));
+            assertTrue(onEdt(() -> editor.buffers.stream().noneMatch(buffer -> buffer.getDisplayName().startsWith("[tree "))));
         } finally {
             disposeEditor(editor);
         }
@@ -2171,7 +2175,8 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, workspace, first, second);
         try {
             assertEquals(workspace.toRealPath(), onEdt(() -> editor.workspaceController.activeRoot()));
-            assertTrue(onEdt(() -> editor.treePane.getAlternateComponent() instanceof FileTreePanel));
+            assertTrue(onEdt(() -> editor.explorerSidebar.showingExplorer()));
+            assertTrue(onEdt(() -> editor.buffers.stream().noneMatch(buffer -> buffer.getDisplayName().startsWith("[tree "))));
             List<String> filePaths = onEdt(() -> editor.buffers.stream()
                 .filter(FileBuffer::hasFilePath).map(FileBuffer::getFilePath).toList());
             assertTrue(filePaths.contains(first.toAbsolutePath().toString()));
@@ -2487,8 +2492,8 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEmptyEditor(home);
         try {
             javax.swing.JTextArea area = onEdt(() -> editor.getActivePane().getTextArea());
-            assertEquals("Tree pane opened", onEdt(() -> editor.showFileTree(workspace.toString())));
-            FileTreePanel explorer = onEdt(() -> (FileTreePanel) editor.treePane.getComponent());
+            assertEquals("File sidebar opened", onEdt(() -> editor.showFileTree(workspace.toString())));
+            FileTreePanel explorer = onEdt(() -> editor.fileExplorer);
 
             assertEquals("Theme set to dracula", onEdt(() -> editor.setThemeFromCommand("dracula")));
             assertEquals(onEdt(() -> editor.getModeBackground(editor.editorState.mode)), onEdt(area::getBackground));
@@ -3899,17 +3904,18 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, source);
         try {
             EditorPane targetPane = onEdt(editor::getActivePane);
-            assertEquals("Tree pane opened", onEdt(() -> editor.showFileTree(workspace.toString())));
+            assertEquals("File sidebar opened", onEdt(() -> editor.showFileTree(workspace.toString())));
 
             String result = onEdt(() -> editor.openFileInSplit(dropped.toFile(), targetPane,
                 WindowLayoutNode.Orientation.HORIZONTAL, false));
 
             assertEquals("Opening in split: " + dropped.toAbsolutePath(), result);
             assertTrue(awaitCurrentFile(editor, dropped));
-            assertEquals(3, onEdt(() -> editor.editorPanes.size()));
+            assertEquals(2, onEdt(() -> editor.editorPanes.size()));
             assertEquals(source.toAbsolutePath().toString(), onEdt(() -> targetPane.getBuffer().getFilePath()));
             assertEquals(dropped.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
-            assertTrue(onEdt(() -> editor.treePane.getAlternateComponent() instanceof FileTreePanel));
+            assertTrue(onEdt(() -> editor.explorerSidebar.showingExplorer()));
+            assertTrue(onEdt(() -> editor.buffers.stream().noneMatch(buffer -> buffer.getDisplayName().startsWith("[tree "))));
             assertEquals(WindowLayoutNode.Orientation.HORIZONTAL, onEdt(() -> editor.windowLayoutRoot.getOrientation()));
         } finally {
             disposeEditor(editor);

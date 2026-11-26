@@ -324,12 +324,12 @@ public final class AgentWorkflowDesktopProbe {
         events.add(Map.of("phase","same_file_conflict_view_both_save_undo_redo","exact",true));
         delayedFollow(project,human);
         String source=edt(human::getContent);long sourceRevision=edt(human::documentRevision);boolean dirtyBeforeVisuals=edt(human::isModified);
-        var treeBuffer=edt(()->editor.treePane==null?null:editor.treePane.getBuffer());
+        var explorer=edt(()->editor.fileExplorer);
         edt(()->{editor.splitWindow(true);editor.splitWindow(false);return null;});
         for(String theme:List.of("shed-light","dracula")){
             edt(()->{editor.setThemeFromCommand(theme);editor.setSize(theme.equals("dracula")?850:1400,900);editor.configManager.set("ui.density",theme.equals("dracula")?"compact":"comfortable");editor.sessionConfigController.applySetting("ui.density");return null;});
             edt(()->null);capture(theme.equals("dracula")?"12-dark-narrow-splits":"11-light-comfortable-splits");
-            edt(()->{check(human.getContent().equals(source)&&human.documentRevision()==sourceRevision&&human.isModified()==dirtyBeforeVisuals,"Visual changes modified source");int sources=0;for(var pane:editor.editorPanes){if(pane==editor.treePane)check(pane.getBuffer()==treeBuffer&&pane.getAlternateComponent() instanceof FileTreePanel,"Explorer lost its own document/surface");else{sources++;check(pane.getBuffer()==human,"Split lost document owner");}}check(sources==3,"Expected three shared source splits");return null;});
+            edt(()->{check(human.getContent().equals(source)&&human.documentRevision()==sourceRevision&&human.isModified()==dirtyBeforeVisuals,"Visual changes modified source");int sources=0;for(var pane:editor.editorPanes){sources++;check(pane.getBuffer()==human,"Split lost document owner");}check(sources==3,"Expected three shared source splits");check(editor.fileExplorer==explorer&&editor.explorerSidebar.showingExplorer(),"Persistent Explorer lost its surface");check(editor.buffers.stream().noneMatch(b->b.getDisplayName().startsWith("[tree ")),"Explorer became a document");return null;});
         }
         edt(()->{editor.commandHandler.execute("focus on");editor.commandHandler.execute("center on");return null;});
         capture("13-focus-centered-live-changes");

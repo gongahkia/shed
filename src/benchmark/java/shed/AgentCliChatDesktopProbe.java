@@ -70,7 +70,37 @@ public final class AgentCliChatDesktopProbe {
         Thread watchdog=Thread.ofPlatform().daemon().start(()->{try{Thread.sleep(100000);System.exit(124);}catch(InterruptedException ended){}});int exit=1;var events=new ArrayList<String>();
         try{
             Files.writeString(project.resolve("Demo.txt"),"Initial source.\n");editor=ui(()->new Texteditor(new String[]{project.toString()}));await(()->!editor.stagedStartupPending&&editor.isShowing());
+            ui(()->{
+                if(editor.fileExplorer==null||!editor.explorerSidebar.showingExplorer()||editor.editorPanes.size()!=1||editor.buffers.stream().anyMatch(b->b.getDisplayName().startsWith("[tree ")))throw new AssertionError("Explorer must own no document or editor pane");
+                var explorer=editor.fileExplorer;var pane=editor.getActivePane();var buffer=editor.getCurrentBuffer();int count=editor.buffers.size();editor.explorerSidebar.setDividerLocation(230);
+                var toggle=(JCheckBoxMenuItem)find(editor.getJMenuBar(),"workbench.explorer.toggle");toggle.doClick();if(editor.explorerSidebar.showingExplorer())throw new AssertionError("Explorer did not hide");toggle.doClick();
+                if(editor.fileExplorer!=explorer||!editor.explorerSidebar.showingExplorer()||editor.explorerSidebar.getDividerLocation()!=230||editor.getActivePane()!=pane||editor.getCurrentBuffer()!=buffer||editor.buffers.size()!=count)throw new AssertionError("Explorer toggle changed editor ownership or width");
+                editor.splitWindow(true);if(editor.editorPanes.size()!=2)throw new AssertionError("Explorer counted as a split");editor.closeActiveWindow();
+                if(editor.editorPanes.size()!=1||!editor.explorerSidebar.showingExplorer())throw new AssertionError("Closing an editor closed Explorer");
+                editor.focusModeController.handleFocusCommand("on");if(editor.explorerSidebar.showingExplorer())throw new AssertionError("Focus did not hide Explorer");editor.focusModeController.handleFocusCommand("off");
+                if(!editor.explorerSidebar.showingExplorer()||editor.explorerSidebar.getDividerLocation()!=230)throw new AssertionError("Focus did not restore Explorer width");
+                return null;
+            });events.add("Persistent Explorer owns no document/pane; menu toggle and editor closure retain its surface, source context and width; focus restores it");
+            Path alternate=Files.createDirectory(project.resolveSibling("alternate-project"));
+            ui(()->{
+                var pane=editor.getActivePane();var buffer=editor.getCurrentBuffer();int count=editor.buffers.size();
+                editor.workspaceController.addFolder(alternate,true);
+                if(!editor.treeRoot.toPath().equals(alternate)||!editor.explorerSidebar.showingExplorer())throw new AssertionError("Explorer did not switch project");
+                editor.workspaceController.activateFolder(project,true);
+                var tree=(JTree)find(editor.fileExplorer,"agent.explorer");
+                if(!((FileTreeModel.Node)tree.getModel().getRoot()).file().toPath().equals(project)||editor.getActivePane()!=pane||editor.getCurrentBuffer()!=buffer||editor.buffers.size()!=count)throw new AssertionError("Project switch changed document ownership");
+                String theme=editor.configManager.get("theme","shed-light"),density=editor.configManager.get("ui.density","default");
+                editor.setThemeFromCommand("dracula");String changed=editor.settingsApplication.update("ui.density","compact");
+                if(changed.startsWith("Error")||!editor.fileExplorer.getBackground().equals(editor.configManager.getNormalColor()))throw new AssertionError("Explorer appearance did not update");
+                editor.setThemeFromCommand(theme);editor.settingsApplication.update("ui.density",density);
+                if(editor.getActivePane()!=pane||editor.getCurrentBuffer()!=buffer||editor.buffers.size()!=count||!editor.explorerSidebar.showingExplorer())throw new AssertionError("Appearance changed Explorer ownership");return null;
+            });events.add("Workspace switching and theme/density changes update the sidebar independently of source ownership");
             ui(()->{editor.setSize(1440,960);editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("delegate");return null;});await(()->find(editor.getRootPane(),"agent.chat")!=null);
+            ui(()->{
+                var tree=(JTree)find(editor.fileExplorer,"agent.explorer");var root=tree.getModel().getRoot();
+                for(int i=0;i<tree.getModel().getChildCount(root);i++){var node=tree.getModel().getChild(root,i);if(node instanceof FileTreeModel.Node entry&&entry.file().getName().equals("Demo.txt")){tree.setSelectionPath(new javax.swing.tree.TreePath(new Object[]{root,node}));tree.getActionMap().get("shed.tree.open").actionPerformed(new java.awt.event.ActionEvent(tree,0,"open"));break;}}
+                if(editor.getCurrentBuffer().getFile()==null||!editor.getCurrentBuffer().getFile().toPath().equals(project.resolve("Demo.txt"))||!editor.explorerSidebar.showingExplorer()||editor.editorPanes.size()!=1)throw new AssertionError("Explorer opening did not target the content pane");return null;
+            });events.add("Explorer Enter action opens the real file in the active source pane while the sidebar remains visible");
             picture("00-chat-layout");ui(()->{
                 if(editor.editorToolSplit.getOrientation()!=JSplitPane.HORIZONTAL_SPLIT||find(editor.toolWindowHost,"workbench.tools")!=null)throw new AssertionError("Chat must be a single right-hand surface");
                 for(int i=0;i<editor.getJMenuBar().getMenuCount();i++){var menu=editor.getJMenuBar().getMenu(i);if(menu!=null)for(var item:menu.getMenuComponents())if(item instanceof JMenuItem m&&"AI Assistant".equals(m.getText()))throw new AssertionError("Duplicate Assistant entry remains");}
@@ -110,6 +140,7 @@ public final class AgentCliChatDesktopProbe {
             if("1".equals(System.getenv("SHED_DELEGATION_DEMO")))Thread.sleep(1800);
             ui(()->{
                 editor.hideToolWindow();if(editor.toolWindowHost.isVisible())throw new AssertionError("Chat close failed");editor.toolWindowHost.showAgentChat();
+                var originalDocument=editor.documents.activeDocument().id();editor.openEmptyBuffer();editor.documents.activate(originalDocument);editor.openEditorsBar.refresh();
                 var list=(JList<?>)find(editor.getRootPane(),"workbench.openEditors");int selected=list.getSelectedIndex(),index=-1;for(int i=0;i<list.getModel().getSize();i++)if(i!=selected){index=i;break;}if(index<0)throw new AssertionError("Need inactive tab fixture");
                 int count=list.getModel().getSize();var active=editor.documents.activeDocument().id();var cell=list.getCellBounds(index,index);
                 list.dispatchEvent(new java.awt.event.MouseEvent(list,java.awt.event.MouseEvent.MOUSE_PRESSED,System.currentTimeMillis(),0,cell.x+cell.width-12,cell.y+cell.height/2,1,false,java.awt.event.MouseEvent.BUTTON1));

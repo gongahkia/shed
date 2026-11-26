@@ -64,7 +64,16 @@ final class ShedMenuBar {
         item(view, "Focus Open Editors", -1, 0, () -> editor.openEditorsBar.focusEditors());
         item(view, "Toggle Open Editors", -1, 0, () -> show(editor.sessionConfigController.setConfigOptionPersistent(
             "ui.open_editors.visible", Boolean.toString(!editor.configManager.getOpenEditorsVisible()))));
-        item(view, "Toggle File Tree", -1, 0, () -> command("tree toggle"));
+        var explorer = new javax.swing.JCheckBoxMenuItem("File Explorer");
+        explorer.setName("workbench.explorer.toggle");
+        explorer.setSelected(editor.explorerSidebar != null && editor.explorerSidebar.isOpen());
+        explorer.addActionListener(e -> { command("tree toggle"); explorer.setSelected(editor.explorerSidebar.isOpen()); });
+        view.add(explorer);
+        view.addMenuListener(new javax.swing.event.MenuListener() {
+            public void menuSelected(javax.swing.event.MenuEvent e) { explorer.setSelected(editor.explorerSidebar.isOpen()); }
+            public void menuDeselected(javax.swing.event.MenuEvent e) { }
+            public void menuCanceled(javax.swing.event.MenuEvent e) { }
+        });
         item(view, "Toggle Minimap", -1, 0, () -> command("minimap toggle"));
         view.addSeparator();
         item(view, "Problems", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS));

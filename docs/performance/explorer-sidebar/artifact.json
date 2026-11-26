@@ -1,0 +1,8 @@
+{
+  "jar_sha256": "3f26be1d17de2adbc221cb2163906097bc655d33d61ede802b0db0537f4508cc",
+  "main_classes": 1583,
+  "mismatches": [],
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "head_before": "b34ba9bf15bdfb03c3ae2d53e85afd7f3a5c7a37",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e"
+}

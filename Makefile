@@ -13,7 +13,7 @@ SOURCES := $(shell find src/main assets -type f 2>/dev/null)
 RUN_GOALS := $(if $(filter run,$(MAKECMDGOALS)),$(filter-out run,$(MAKECMDGOALS)),)
 RUN_ARGS := $(strip $(ARGS) $(RUN_GOALS))
 
-.PHONY: all build run demo demo-delegation demo-chat demo-list $(DEMO_TARGETS) profile-startup test check clean install uninstall help $(RUN_GOALS)
+.PHONY: all build run demo demo-delegation demo-chat demo-completion demo-list $(DEMO_TARGETS) profile-startup test check clean install uninstall help $(RUN_GOALS)
 
 all: build
 
@@ -36,11 +36,11 @@ demo $(DEMO_TARGETS): $(JAR)
 
 demo-chat: demo-delegation
 
-demo-delegation: $(JAR)
+demo-delegation demo-completion: $(JAR)
 	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
 	 output="$$(pwd -P)/target/agent-delegation-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
 	 printf 'Running the ongoing CLI chat demo with a fixed Java test agent; no cloud model.\nResults: %s\n' "$$output"; \
-	 python3 scripts/test-agent-delegation.py --jdk "$$java_home" --jar "$(abspath $(JAR))" --output "$$output" --chat --demo
+	 python3 scripts/test-agent-delegation.py --jdk "$$java_home" --jar "$(abspath $(JAR))" --output "$$output" --chat $(if $(filter demo-completion,$@),--inline,) --demo
 
 demo-list:
 	@python3 scripts/test-agent-desktop.py --list-animations
@@ -75,6 +75,7 @@ help:
 	@printf '%s\n' 'make run [path ...]     rebuild if needed, then launch files or folders (make run . opens this folder)'
 	@printf '%s\n' 'make demo               show the complete agent animation tour'
 	@printf '%s\n' 'make demo-delegation    show ongoing chat, automatic visualization and follow-up turns'
+	@printf '%s\n' 'make demo-completion    interactive fixed-response completion tour; click the editor when prompted'
 	@printf '%s\n' 'make demo-list          list individual animation demos'
 	@printf '%s\n' 'make demo-reading LOOP=1 replay continuously in one window; close the window to stop'
 	@printf '%s\n' 'make demo-<name>        run one animation (for example, make demo-deletion)'

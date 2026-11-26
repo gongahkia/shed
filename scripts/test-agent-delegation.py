@@ -20,8 +20,11 @@ def main():
     parser.add_argument('--jar', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--chat', action='store_true', help='Exercise the ongoing CLI chat and editor visualization')
+    parser.add_argument('--inline', action='store_true', help='With --chat: opt into the interactive completion demo; click the owned editor and avoid typing')
     parser.add_argument('--demo', action='store_true', help='Pause on the owned dialogs and reading stage for a visible demonstration')
     args = parser.parse_args()
+    if args.inline and not args.chat:
+        parser.error('--inline requires --chat; it is an explicitly interactive fixture')
     jdk, jar = args.jdk.resolve(strict=True), args.jar.resolve(strict=True)
     output = args.output.absolute()
     if output.exists() or output.resolve() != output:
@@ -45,6 +48,8 @@ def main():
         env = dict(f.env, PATH=str(f.run_root / 'no-executables'), SHED_PORTABLE_FIXTURE_ROOT=str(f.root), SHED_LIVE_VISUAL_ONLY='1')
         if args.demo:
             env['SHED_DELEGATION_DEMO'] = '1'
+        if args.inline:
+            env['SHED_INLINE_DEMO'] = '1'
         props = ['-Duser.home=' + env['HOME'], '-Djava.io.tmpdir=' + env['TMPDIR'], '-Djava.util.prefs.userRoot=' + str(f.run_root / 'config')]
         probe = 'AgentCliChatDesktopProbe' if args.chat else 'AgentDelegationDesktopProbe'
         source = ROOT / 'src/benchmark/java/shed' / (probe + '.java')

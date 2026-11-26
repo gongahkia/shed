@@ -1,0 +1,11 @@
+{
+  "jar_sha256": "d694826a066599dff232f418b3f4ab611123c970c315671cafa0946df37bfcc7",
+  "main_classes": 1581,
+  "mismatches": [],
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "cpu_count": 8,
+  "recorded_at": "2026-11-26T08:06:45.416041+00:00",
+  "head_before": "60e23b8aec96f9f81b50eda973524b175594a8b0",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e"
+}

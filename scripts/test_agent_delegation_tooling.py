@@ -24,8 +24,8 @@ class AgentDelegationAdmissionTest(unittest.TestCase):
         self.jar = self.root / 'fixture.jar'
         self.jar.write_bytes(b'synthetic; never executed')
 
-    def reject(self, output):
-        argv = ['test-agent-delegation.py', '--jdk', str(self.jdk), '--jar', str(self.jar), '--output', str(output)]
+    def reject(self, output, extra=()):
+        argv = ['test-agent-delegation.py', '--jdk', str(self.jdk), '--jar', str(self.jar), '--output', str(output), *extra]
         with patch('sys.argv', argv), patch.object(driver.subprocess, 'run') as run, patch.object(driver.subprocess, 'Popen') as launch, contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as failure:
                 driver.main()
@@ -55,4 +55,14 @@ class AgentDelegationAdmissionTest(unittest.TestCase):
         (self.jdk / 'bin/javac').unlink()
         output = self.root / 'not-created'
         self.reject(output)
+        self.assertFalse(output.exists())
+
+    def test_interactive_completion_retains_existing_output_protection(self):
+        output = self.root / 'existing-completion'
+        output.mkdir()
+        self.reject(output, ('--chat', '--inline'))
+
+    def test_completion_requires_explicit_chat_fixture_before_any_process(self):
+        output = self.root / 'not-created'
+        self.reject(output, ('--inline',))
         self.assertFalse(output.exists())

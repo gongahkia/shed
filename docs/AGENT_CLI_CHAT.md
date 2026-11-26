@@ -5,14 +5,18 @@ Shed's normal agent surface is a single right-hand Chat panel for a conversation
 ## Use it
 
 1. Open the intended project and choose **View → Agent Chat…**, or run `:agent chat`. `:agent delegate` opens the same surface.
-2. Choose **Codex**, **Claude Code** or **OpenCode**. Shed uses the CLI's configured model, login and permissions. If needed, expand **CLI path** and select its executable (not a shell command).
+2. Choose **Codex**, **Claude Code** or **OpenCode**. Shed uses the CLI's configured model, login and permissions. The provider picker sits in the composer. If needed, open the settings icon at the top to set its executable (not a shell command).
 3. Type a message. **Enter** sends; **Shift+Enter** inserts a newline. Approve the existing control dialog before the first process starts. Save unsaved buffers and finish pending saves/reloads first.
 4. Read the reply and send follow-ups in the same conversation. **Stop** or **Take Back Control** interrupts a turn. Drafting the next message remains possible while the current turn runs.
-5. **Changes** opens the existing session summary and diffs after a turn; **Back to Chat** returns to the conversation. **New chat** cancels any active turn and clears the visible conversation; the CLI's own stored session history is not deleted.
+5. **Changes** opens the existing session summary and diffs after a turn; **Back to Chat** returns to the conversation. The **New chat** icon cancels any active turn and clears the visible conversation; the CLI's own stored session history is not deleted.
 
 The editor stays visible and source input pauses only while a turn is running. It returns between replies; bridge commands are suspended during that interval. The approved lease lasts up to eight minutes. Expiration/revocation ends control, not the visible conversation: a later message needs a new approval and resumes the known native conversation ID. Changing projects requires New chat. A dirty buffer prevents the next turn until it is saved or otherwise resolved.
 
 Run the controlled demonstration with `make demo-chat` or `make demo-delegation`. Both show two conversation turns, actual source reading/editing and cancellation with a fixed Java CLI double. This is a live application test, not a real cloud-model run. The general animation tour remains `make demo`.
+
+## Conversation presentation
+
+The compact composer groups the provider picker with Send/Stop. Changes, New chat and CLI settings stay in the header; executable configuration is hidden until requested. Completed replies use selectable native styled text for paragraphs, emphasis, lists, inline code and fenced code blocks. Code uses the configured editor font; body text uses the configured UI font. No model HTML executes and images are not fetched. Streaming appends only new text; completion formats the current reply without rebuilding the entire conversation. Scrolling follows only near the end and without a transcript selection.
 
 ## Add selected source to a message
 
@@ -50,7 +54,7 @@ The command/event forms follow the providers' [Codex noninteractive](https://dev
 
 ## Ownership and resource boundaries
 
-`AgentCliChatPanel` runs one turn on the existing `AsyncJobService`. `ManagedAgentTask` supplies bounded stdin, streamed output, deadline/cancellation and tracked child cleanup. Parsing runs off the EDT; a 60 ms Swing timer installs bounded text updates only during a turn. Transcript retention is limited to 98,304 characters, replies to 65,536, JSONL lines to 131,072 and prompts to 32 KiB. The existing eight-minute process/session bounds remain.
+`AgentCliChatPanel` runs one turn on the existing `AsyncJobService`. `ManagedAgentTask` supplies bounded stdin, streamed output, deadline/cancellation and tracked child cleanup. Parsing runs off the EDT; a 60 ms Swing timer installs bounded text updates only during a turn. Transcript retention is limited to 98,304 raw message characters and 128 completed messages, replies to 65,536, JSONL lines to 131,072 and prompts to 32 KiB. The existing eight-minute process/session bounds remain.
 
 The existing delegation controller reuses consent and one change baseline across turns. A turn's input shield exempts the chat surface and Take Back strip. Machine navigation from those surfaces is admitted only while the approved chat owns source input; all existing source/context checks remain. This addresses the reproduced live failure in which the old focus guard rejected file opening with `CONTEXT_CHANGED` while focus was in Chat. Preparation failure, Stop, expiry, closure and stale callbacks release/cancel the turn rather than retargeting it.
 
@@ -60,6 +64,6 @@ The normal surface has no Chat/Review/Live/Advanced tab strip and no duplicate A
 
 ## Qualification
 
-See [original chat commands, counts, failures and captures](performance/agent-cli-chat/INDEX.md) and [the unified Chat refinement checks](performance/agent-chat-ui/INDEX.md). Safe component/transport tests and the controlled macOS Swing workflow cover native-ID continuation, hidden context on every turn, real file opening/highlighting, exact disk/editor source, source ownership restoration, idle bridge suspension, draft preservation, Stop and child/IO retirement.
+See [chat polish and inline-completion qualification](performance/agent-chat-polish/INDEX.md), [original chat commands, counts, failures and captures](performance/agent-cli-chat/INDEX.md) and [the unified Chat refinement checks](performance/agent-chat-ui/INDEX.md). Safe component/transport tests and the controlled macOS Swing workflow cover native-ID continuation, hidden context on every turn, real file opening/highlighting, exact disk/editor source, source ownership restoration, idle bridge suspension, draft preservation, Stop and child/IO retirement.
 
 Real cloud CLI compatibility, Windows/Linux desktops, OS keyboard-to-screen latency, complete native-memory attribution and detached-service confinement remain unqualified. B0.1's native-shell harness remains NO-GO and was not used. The Unicode/glyph and HTML-preview limitations remain open. No README, theme/font default, document ownership, saved preference migration or new dependency is part of this change.

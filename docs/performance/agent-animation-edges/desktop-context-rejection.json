@@ -1,0 +1,36 @@
+{
+  "boundary": "fixed direct Java workbench/client; disposable files/preferences; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "jar_sha256": "a8e1ab8d36f7027d854b2e94f1460d4be2b59562cc8eb44ac48678953e3acfbc",
+  "jdk": "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home",
+  "fixture": "/private/tmp/shed-native-h6195znk",
+  "git_fixture": "fixed system git; empty owned config/hooks; terminal prompts and signing disabled",
+  "probe_sha256": "0e71e09ab24dcf33d38f50225828a402d5d6ac4c5785ff7000708553997c4daf",
+  "compile_exit": 0,
+  "compile_output": "",
+  "edge_cases": true,
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Djava.awt.headless=false",
+    "-Duser.home=/private/tmp/shed-native-h6195znk/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-h6195znk/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-h6195znk/run/config",
+    "-cp",
+    "/private/tmp/shed-native-h6195znk/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.AgentAnimationDesktopProbe",
+    "/private/tmp/shed-native-h6195znk/run/live",
+    "/private/tmp/shed-native-h6195znk/run/project",
+    "--edge-cases"
+  ],
+  "pid": 38924,
+  "exit": 1,
+  "log": "READY: watch the Shed window\njava.lang.IllegalStateException: {\"jsonrpc\":\"2.0\",\"id\":\"ctl\",\"error\":{\"data\":{\"code\":\"CONTEXT_CHANGED\",\"outcome\":\"rejected\"},\"code\":-32000,\"message\":\"Control request failed\"}}\n\n\tat shed.AgentAnimationDesktopProbe.cli(AgentAnimationDesktopProbe.java:46)\n\tat shed.AgentAnimationDesktopProbe.read(AgentAnimationDesktopProbe.java:51)\n\tat shed.AgentAnimationDesktopProbe.desktopEdges(AgentAnimationDesktopProbe.java:399)\n\tat shed.AgentAnimationDesktopProbe.main(AgentAnimationDesktopProbe.java:414)\n",
+  "result": {
+    "error": "java.lang.IllegalStateException: {\"jsonrpc\":\"2.0\",\"id\":\"ctl\",\"error\":{\"data\":{\"code\":\"CONTEXT_CHANGED\",\"outcome\":\"rejected\"},\"code\":-32000,\"message\":\"Control request failed\"}}\n",
+    "state": "FAIL"
+  },
+  "generated_source_compile_exit": 0,
+  "generated_source_compile_output": "",
+  "fixture_removed": true,
+  "elapsed_s": 14.666596666997066
+}

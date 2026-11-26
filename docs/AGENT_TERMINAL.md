@@ -121,3 +121,10 @@ It is scripted and makes
 no model call. This feature demo does not qualify unrestricted native-shell
 benchmarks. Headless command-driver and authenticated transport tests use the
 portable fixture runner and do not launch a shell.
+
+The subsequent [animation edge-case checks](performance/agent-animation-edges/INDEX.md)
+exercise cancellation immediately before Enter, terminal closure at each phase,
+queued completion after cancellation, repeated retirement, overlapping badge owners,
+scrollback, selection, IME and alternate-screen suppression using in-memory terminal
+fixtures. This coverage does not qualify real shell process confinement or detached
+process cancellation.

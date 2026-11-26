@@ -129,4 +129,6 @@ The probe asserts source/revision/dirty/Undo/caret/selection stability during ca
 
 ## Qualification
 
+Subsequent [edge-case qualification](performance/agent-animation-edges/INDEX.md) covers overlapping owners, theme/highlighter replacement, geometry changes, bounded repeated disposal and terminal handoff. The opt-in `--edge-cases` desktop probe uses source-only fixtures; it does not launch the terminal shell demo.
+
 See [the evidence index](performance/adaptive-agent-animation/INDEX.md) for exact commands, source/artifact identities, tests, captures and measurements. The earlier broad live runs hit file-open/context timing failures; those remain recorded rather than bypassed. The paced earlier workflow completed before implementation began. The animation qualification is bounded to supported layouts and the safely exercised macOS direct-Java path; it is not general IDE release, Windows/Linux desktop or native-shell qualification.

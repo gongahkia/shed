@@ -1,0 +1,41 @@
+{
+  "recorded_at_utc": "2026-11-26T01:08:10.479454+00:00",
+  "starting_head": "ecb07684d1c84aa3a20f50970ffae3f86e96b471",
+  "implementation_commit": "8f9b66772e0b877b466668ff7276ceeb5ff15cc9",
+  "tooling_commit": "339f0b4c34dc739263aa3ef70bc61da3cbb122fa",
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "cpu": "Apple M3",
+    "memory_bytes": 17179869184,
+    "jdk": "21.0.13.1+2",
+    "maven": "3.9.11"
+  },
+  "source_sha256": {
+    "scripts/test-agent-desktop.py": "4282cb667ce09ea5c88295d1d2dfadcf15cbbf9e32200942121ed11ff149d780",
+    "scripts/test_live_agent_tooling.py": "d70227ae1d4f5b5f164041884465eeb8b2b3cb1657417ea5d239591ca81a2a03",
+    "scripts/test_native_fixture.py": "7cb99e8e49c33ce2294b67339c8d93c14b9daf04ff1def4fc548edffa3bf4930",
+    "src/benchmark/java/shed/AgentAnimationDesktopProbe.java": "a1e08fd853e358414fb9f586c77ff9c157f437b4e701d2aea2ead1dc78e57b6d",
+    "src/main/java/shed/AgentChangeTour.java": "3869cf6338b05c289ac86b157c3baf2ef6451e5e05765740a190580cb7299d16",
+    "src/main/java/shed/AgentEditPresentation.java": "cc65bd46770b69592dcfe903095ad546f6ba280109dd1797329b1a3ea3fc4f24",
+    "src/main/java/shed/AgentSourceHandoff.java": "e4ea80adc14d9e9f592e106d01b52226d7b57e9f6bd6cab7c371a68ca4169963",
+    "src/main/java/shed/AgentTerminalCommand.java": "caa13ffcaeda103c63a53bf892853a07700dc4b20879c1a20941096d3f930506",
+    "src/main/java/shed/AgentTerminalDecoration.java": "bf1bfd1314e7ea6c731fd72cbc719a5a9e425a3575f1601494312a47991147a0",
+    "src/main/java/shed/AnimatedTerminalPanel.java": "afe1508d184e65e003ea854b3788bea591b22d2ce9d5cb5c80c232c90b9ffb93",
+    "src/test/java/shed/AgentAnimationEdgeTest.java": "1f0feceb16b81956de1809fd7faca9ada7571b7ac863e05cb95b41c53e7b6dfb",
+    "src/test/java/shed/AgentTerminalCommandTest.java": "baf27c95dc5773349d573b36821b833caa016ccf1176368dec775761b4fbc993",
+    "src/test/java/shed/AgentTerminalDecorationTest.java": "b66f82b69ca9bb12ae428a3c354c1fb87c73ed02dedbcd07898c647ff23a4cd3",
+    "src/test/resources/shed/portable-fixture-tests.properties": "86d0a0849243d229704436602f14aa04b8c2f3ccdcea827bbaaca6da6cea654c",
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "target/shed-2.0.0.jar": "dc641152c6348e6a7a0be0ef2b7b4cffa138b496073a1b745343d08af9a1336f"
+  },
+  "captures_sha256": {
+    "edges-layout-1.png": "0f3450bd7b4430ff83a4184b17d032261307f618aca002c2cb78415fc5eeee86",
+    "edges-layout-0.png": "943b70a4541b7aedddc3b7aa4196484f2596e88b0c5ccec051ff7e3edb3897fd",
+    "edges-layout-2.png": "03ec84b615399c7d50fa2acb31a1b2d72a3382ded5010fb308cb796c48e51b2a",
+    "single-interrupt.png": "53210c6574315c974abda07aa937e7a1f092ca23150ddbc1b4915e446ced6216",
+    "interrupt-before-read.png": "d81a9c506e99428df86992d7ede723493607cfee79578d67778829ee22dd0697",
+    "edges-final.png": "52c48a6f473403225a2866d5f911dfbfa317503a155a879483aba6d4bf8f66e8"
+  },
+  "note": "Host recorded after measurements; no cold-cache, native-memory or OS scanout claim. Starting tree clean; existing user commits preserved."
+}

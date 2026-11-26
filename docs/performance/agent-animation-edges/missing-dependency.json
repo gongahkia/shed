@@ -1,0 +1,63 @@
+{
+  "boundary": "source-reviewed non-native tests, not general process confinement",
+  "tests": [
+    "AgentAnimationEdgeTest",
+    "AgentTerminalCommandTest"
+  ],
+  "fixture": "/private/tmp/shed-native-_lf02mv4",
+  "native_benchmarks": "BLOCKED",
+  "phase": "test",
+  "dependency_copy": {
+    "entries": 1808,
+    "bytes": 98080024
+  },
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-_lf02mv4/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-_lf02mv4/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-_lf02mv4/run/config",
+    "-Djava.awt.headless=true",
+    "-Dmaven.home=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed",
+    "-cp",
+    "/private/tmp/shed-a222c1-tgamqlld/tools/apache-maven-3.9.11/boot/plexus-classworlds-2.9.0.jar",
+    "org.codehaus.plexus.classworlds.launcher.Launcher",
+    "-B",
+    "-o",
+    "-s",
+    "/private/tmp/shed-native-_lf02mv4/run/config/settings.xml",
+    "-gs",
+    "/private/tmp/shed-native-_lf02mv4/run/config/settings.xml",
+    "-Dmaven.repo.local=/private/tmp/shed-native-_lf02mv4/run/dependencies",
+    "-Duser.home=/private/tmp/shed-native-_lf02mv4/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-_lf02mv4/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-_lf02mv4/run/config",
+    "-Djava.awt.headless=true",
+    "-DforkCount=0",
+    "-Dtest=AgentAnimationEdgeTest,AgentTerminalCommandTest",
+    "test"
+  ],
+  "exit": 1,
+  "log": "[INFO] Scanning for projects...\n[INFO] \n[INFO] ---------------------------< dev.shed:shed >----------------------------\n[INFO] Building shed 2.0.0\n[INFO]   from pom.xml\n[INFO] --------------------------------[ jar ]---------------------------------\n[WARNING] The POM for org.swinglabs.swingx:swingx-painters:jar:1.6.5-1 is missing, no dependency information available\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  0.175 s\n[INFO] Finished at: 2026-11-26T00:46:49Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal on project shed: Could not resolve dependencies for project dev.shed:shed:jar:2.0.0\n[ERROR] dependency: org.swinglabs.swingx:swingx-painters:jar:1.6.5-1 (compile)\n[ERROR] \tCannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.swinglabs.swingx:swingx-painters:jar:1.6.5-1 has not been downloaded from it before.\n[ERROR] \tCannot access jetbrains-intellij-dependencies (https://packages.jetbrains.team/maven/p/ij/intellij-dependencies) in offline mode and the artifact org.swinglabs.swingx:swingx-painters:jar:1.6.5-1 has not been downloaded from it before.\n[ERROR] -> [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/DependencyResolutionException\n",
+  "elapsed_s": 1.6350139580026735,
+  "fixture_removed": true,
+  "metrics": [
+    {
+      "operation": "creation",
+      "ns": 722750
+    },
+    {
+      "operation": "guard",
+      "ns": 430958
+    },
+    {
+      "operation": "guard",
+      "ns": 555541
+    },
+    {
+      "operation": "cleanup",
+      "ns": 82308375
+    }
+  ]
+}

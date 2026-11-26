@@ -1,0 +1,32 @@
+[
+  {
+    "path": "org/swinglabs/swingx/swingx-painters/1.6.5-1/swingx-painters-1.6.5-1.pom",
+    "bytes": 2217,
+    "sha256": "47040418dd1f7114b23b4bc21a36a6d818e065663e0f4d5959c8536ab1555193",
+    "source": "https://repo.maven.apache.org/maven2/org/swinglabs/swingx/swingx-painters/1.6.5-1/swingx-painters-1.6.5-1.pom"
+  },
+  {
+    "path": "org/swinglabs/swingx/swingx-project/1.6.5-1/swingx-project-1.6.5-1.pom",
+    "bytes": 6362,
+    "sha256": "c4244872b6dfad8563c89b56f1d6ebf99379c5797af0dd90551af312b2c0c2c9",
+    "source": "https://repo.maven.apache.org/maven2/org/swinglabs/swingx/swingx-project/1.6.5-1/swingx-project-1.6.5-1.pom"
+  },
+  {
+    "path": "org/swinglabs/swingx/swingx-painters/1.6.5-1/swingx-painters-1.6.5-1.jar",
+    "bytes": 64294,
+    "sha256": "a995e448037951ad82e079f44fe135ad6cff8c4832da57861cff87efb50fcba5",
+    "source": "https://repo.maven.apache.org/maven2/org/swinglabs/swingx/swingx-painters/1.6.5-1/swingx-painters-1.6.5-1.jar"
+  },
+  {
+    "path": "org/swinglabs/swingx/swingx-common/1.6.5-1/swingx-common-1.6.5-1.pom",
+    "bytes": 890,
+    "sha256": "0ce0750ece7efd3a334e89101b9b667455ecf598d02dffbfa04f8466c010c486",
+    "source": "https://repo.maven.apache.org/maven2/org/swinglabs/swingx/swingx-common/1.6.5-1/swingx-common-1.6.5-1.pom"
+  },
+  {
+    "path": "org/swinglabs/swingx/swingx-common/1.6.5-1/swingx-common-1.6.5-1.jar",
+    "bytes": 32259,
+    "sha256": "df9eea773e3fe1588e321c38793ff7ad6c218e0cf59775ba120009114a478958",
+    "source": "https://repo.maven.apache.org/maven2/org/swinglabs/swingx/swingx-common/1.6.5-1/swingx-common-1.6.5-1.jar"
+  }
+]

@@ -15,6 +15,8 @@ final class AgentDelegationController implements AutoCloseable {
     private long generation;
     private Runnable onActive=()->{},onEnd=()->{};
     private boolean closed,handedBack;
+    private String launchDescription="External CLI; Shed does not own its process.";
+    void launchDescription(String value){launchDescription=value;}
     AgentDelegationController(Texteditor editor) {
         this.editor=editor;timer=new javax.swing.Timer(100,e->tick());
     }
@@ -41,7 +43,7 @@ final class AgentDelegationController implements AutoCloseable {
         if(root==null||editor.buffers.stream().anyMatch(FileBuffer::isModified)){lease.revoke("rejected");handBack();editor.showMessage("Save or resolve unsaved buffers before delegating control.");return;}
         var body=new JPanel(new java.awt.BorderLayout(8,10));
         var task=new JTextArea(lease.task(),6,52);task.setEditable(false);task.setLineWrap(true);task.setWrapStyleWord(true);task.setCaretPosition(0);body.add(new JScrollPane(task));
-        var notice=new JTextArea("Allow "+lease.agent()+" to control this Shed window for up to 8 minutes?\nProject: "+root+"\n\nTyping and navigation pause while the agent works. Take Back Control is always available.\nA fresh change baseline starts now. An external CLI keeps its own filesystem permissions.");
+        var notice=new JTextArea("Allow "+lease.agent()+" to control this Shed window for up to 8 minutes?\nProject: "+root+"\nCLI: "+launchDescription+"\n\nTyping and navigation pause while the agent works. Take Back Control is always available.\nA fresh change baseline starts now. An external CLI keeps its own filesystem permissions.");
         notice.setEditable(false);notice.setLineWrap(true);notice.setWrapStyleWord(true);notice.setOpaque(false);body.add(notice,java.awt.BorderLayout.SOUTH);
         var pane=new JOptionPane(body,JOptionPane.QUESTION_MESSAGE,JOptionPane.YES_NO_OPTION,null,new String[]{"Allow Control","Cancel"},"Cancel");
         approval=pane.createDialog(editor,"Delegate control to "+lease.agent()+"?");approval.setName("agent.approval");
@@ -65,11 +67,13 @@ final class AgentDelegationController implements AutoCloseable {
         if(state.equals("preparing")) {
             var watch=editor.toolWindowHost.watchAgentChanges("state",lease.agent());
             if(watch.get("error") instanceof String error&&!error.isEmpty())lease.revoke("failed");
-            else if(Boolean.TRUE.equals(watch.get("ready"))){lease.activate(lease.id());try{onActive.run();}catch(RuntimeException failure){lease.revoke("failed");editor.showMessage("Agent task could not start; control returned to you.");}}
+            else if(editor.visualAttachmentFailed())lease.revoke("failed");
+            else if(editor.visualAttachment()!=null&&Boolean.TRUE.equals(watch.get("ready"))){lease.activate(lease.id());try{onActive.run();}catch(RuntimeException failure){lease.revoke("failed");editor.showMessage("Agent task could not start; control returned to you.");}}
         }
         if(ownership!=null)ownership.refresh();
         if(!lease.running())handBack();
     }
+    void finishTask(String id,String summary,boolean succeeded){lease.finish(id,summary,succeeded);handBack();}
     void takeBack(){lease.revoke("cancelled");handBack();}
     private void disposeApproval(){if(approval!=null){var dialog=approval;approval=null;dialog.dispose();}}
     private void handBack() {
@@ -77,7 +81,7 @@ final class AgentDelegationController implements AutoCloseable {
         boolean worked=ownership!=null;
         if(ownership!=null){ownership.close();ownership=null;}
         if(handedBack)return;handedBack=true;
-        try{onEnd.run();}finally{onActive=()->{};onEnd=()->{};}
+        try{onEnd.run();}finally{onActive=()->{};onEnd=()->{};launchDescription="External CLI; Shed does not own its process.";}
         editor.clearAgentActivity();
         if(worked&&!closed){editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());editor.toolWindowHost.showAgentChanges();editor.showMessage(lease.agent()+" · "+lease.state()+" · control returned to you. Changes are available for review.");
             var status=lease.status(lease.id());if(status.get("summary") instanceof String summary&&!summary.isBlank()){var text=new JTextArea(summary,8,52);text.setEditable(false);text.setLineWrap(true);text.setWrapStyleWord(true);text.setCaretPosition(0);SwingUtilities.invokeLater(()->{if(!closed)JOptionPane.showMessageDialog(editor,new JScrollPane(text),"Agent-reported session summary",JOptionPane.INFORMATION_MESSAGE);});}}

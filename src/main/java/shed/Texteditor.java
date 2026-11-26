@@ -3724,6 +3724,9 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Main method
     public static void main(String[] args) {
+        if(args.length>0&&args[0].equals("delegate")) {
+            try{ShedDelegateCli.run(args);}catch(Exception failure){System.err.println(MiniJson.stringify(java.util.Map.of("error","Delegation failed","detail",java.util.Objects.toString(failure.getMessage(),"Unavailable"))));System.exit(1);}return;
+        }
         if(ShedVisualize.handles(args)){
             try{ShedVisualize.run(args);}catch(Exception failure){System.err.println(MiniJson.stringify(java.util.Map.of("error","Visualization launch failed","detail",java.util.Objects.toString(failure.getMessage(),"Unavailable"))));System.exit(1);}return;
         }

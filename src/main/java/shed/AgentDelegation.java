@@ -28,10 +28,11 @@ final class AgentDelegation {
     }
     synchronized void approve(String request) { check(request); if(!state.equals("awaiting-approval"))throw fail(WorkspaceApiException.Code.SESSION_INVALID);state="preparing";deadline=clock.getAsLong()+45_000; }
     synchronized void activate(String request) { check(request);if(!state.equals("preparing"))throw fail(WorkspaceApiException.Code.SESSION_INVALID);state="active";deadline=clock.getAsLong()+8*60_000; }
-    synchronized void finish(String request,String result) {
+    synchronized void finish(String request,String result) { finish(request,result,true); }
+    synchronized void finish(String request,String result,boolean succeeded) {
         check(request);if(result==null||result.length()>4096||result.codePoints().anyMatch(c->Character.isISOControl(c)&&c!='\n'&&c!='\t'))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
         if (!state.equals("active")) throw fail(WorkspaceApiException.Code.SESSION_INVALID);
-        state="completed";summary=result;
+        state=succeeded?"completed":"failed";summary=result;
     }
     synchronized void revoke(String reason) { if(running()){state=Set.of("rejected","failed","expired").contains(reason)?reason:"cancelled";} }
     synchronized boolean allowed(String request) { expire(); return !required || state.equals("active") && id.equals(request); }

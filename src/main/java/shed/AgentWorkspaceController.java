@@ -37,6 +37,7 @@ final class AgentWorkspaceController implements AutoCloseable {
         if (active != null && !active.running()) { active = null; status = "Agent API connection has stopped."; }
         String value = argument == null ? "" : argument.trim();
         return switch (value) {
+            case "delegate" -> {AgentTaskLauncher.show(editor);yield "Agent delegation setup.";}
             case "takeback" -> {delegation.takeBack();yield "Control returned to you.";}
             case "complete" -> editor.requestAiCompletion();
             case "edit", "ask", "run" -> {

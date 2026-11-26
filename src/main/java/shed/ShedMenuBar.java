@@ -71,6 +71,7 @@ final class ShedMenuBar {
         item(view, "Git Changes", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.GIT));
         item(view, "Tasks", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TASKS));
         item(view, "Tests", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TESTS));
+        item(view, "Delegate Task…", -1, 0, () -> command("agent delegate"));
         item(view, "AI Assistant", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.AGENT));
 
         JMenu navigate = menu("Navigate");

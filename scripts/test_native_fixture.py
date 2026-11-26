@@ -293,6 +293,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'EditorControlTest',
             'EditorFreshnessTest',
             'AgentDelegationTest',
+            'AgentTaskLaunchTest',
             'ShedControlCliTest',
             'AgentActivityStateTest',
             'EditorProjectChangesTest',

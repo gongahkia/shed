@@ -8,29 +8,32 @@ import javax.swing.*;
 /** Explicit launch-and-return helper. Starts only the current Java application, never a shell or agent. */
 final class ShedVisualize {
     private ShedVisualize() { }
-    static boolean handles(String[] args){return args.length>0&&(args[0].equals("visualize")||args[0].equals("--visualize-window"));}
+    static boolean handles(String[] args){return args.length>0&&(args[0].equals("visualize")||(args[0].equals("--visualize-window")||args[0].equals("--delegate-window")));}
     static void run(String[] args)throws Exception {
-        if(args[0].equals("--visualize-window")){window(args);return;}
+        if((args[0].equals("--visualize-window")||args[0].equals("--delegate-window"))){window(args);return;}
         String project=".",agent="Agent";boolean path=false;
         for(int i=1;i<args.length;i++){
             if(args[i].equals("--agent")&&i+1<args.length)agent=args[++i];
             else if(!path&&!args[i].startsWith("--")){project=args[i];path=true;}else throw new IllegalArgumentException("Usage: shed visualize [project] [--agent <display-name>]");
         }
         if(agent.isBlank()||agent.length()>40||agent.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException("Invalid agent label");
-        Path root=Path.of(project).toRealPath();if(!Files.isDirectory(root))throw new IllegalArgumentException("Expected a project directory");
+        System.out.println(MiniJson.stringify(launch(Path.of(project),agent,false)));
+    }
+    static Map<String,Object> launch(Path project,String agent,boolean delegation)throws Exception {
+        Path root=project.toRealPath();if(!Files.isDirectory(root))throw new IllegalArgumentException("Expected a project directory");
         Path base=PrivateWorkspaceFiles.directory(Path.of(System.getProperty("user.home"),".shed","sessions","visualize"));
         Path directory=PrivateWorkspaceFiles.directory(base.resolve("launch-"+UUID.randomUUID()));Path ready=directory.resolve("ready.json");
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name","").startsWith("Windows")?"java.exe":"java").toString();
         var command=new ArrayList<String>(List.of(javaExecutable,"-Djava.awt.headless=false","-Duser.home="+System.getProperty("user.home"),"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir")));
         String prefs=System.getProperty("java.util.prefs.userRoot");if(prefs!=null)command.add("-Djava.util.prefs.userRoot="+prefs);
-        command.addAll(List.of("-cp",absoluteClassPath(System.getProperty("java.class.path"),Path.of(System.getProperty("user.dir"))),"shed.Texteditor","--visualize-window",root.toString(),agent,directory.toString()));
+        command.addAll(List.of("-cp",absoluteClassPath(System.getProperty("java.class.path"),Path.of(System.getProperty("user.dir"))),"shed.Texteditor",delegation?"--delegate-window":"--visualize-window",root.toString(),agent,directory.toString()));
         Process child=new ProcessBuilder(command).directory(root.toFile()).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();boolean success=false;
         try{
             long until=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(45);
             while(child.isAlive()&&System.nanoTime()<until){
                 if(Files.exists(ready,LinkOption.NOFOLLOW_LINKS)){
                     byte[] bytes=PrivateWorkspaceFiles.read(ready,8192);
-                    try{var response=validateResponse(bytes,child.pid(),root);System.out.println(MiniJson.stringify(response));success=true;return;}
+                    try{var response=validateResponse(bytes,child.pid(),root);success=true;return response;}
                     finally{PrivateWorkspaceFiles.deleteIfMatching(ready,bytes);}
                 }Thread.sleep(50);
             }throw new IllegalStateException(child.isAlive()?"Visualization startup timed out; open Shed normally to inspect local diagnostics":"Visualization exited before readiness (exit "+child.exitValue()+")");
@@ -77,13 +80,15 @@ final class ShedVisualize {
                 if(!editor.isDisplayable()||System.nanoTime()>deadline){timer.stop();publish(directory,failure(project,editor.isDisplayable()?"STARTUP_TIMEOUT":"WINDOW_CLOSED",editor.isDisplayable()?"Window initialization timed out":"Visualization window closed before readiness"));return;}
                 if(editor.stagedStartupPending)return;
                 if(!ready.getAndSet(true)){
-                    editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("api start control");editor.toolWindowHost.watchAgentChanges("start",args[2]);
+                    editor.workspaceController.addFolder(project,true);
+                    if(args[0].equals("--delegate-window"))editor.agentDelegation().requireApproval();
+                    editor.handleAgentCommand("api start control");if(!args[0].equals("--delegate-window"))editor.toolWindowHost.watchAgentChanges("start",args[2]);
                 }
                 var attachment=editor.visualAttachment();
                 var watch=editor.toolWindowHost.watchAgentChanges("state",args[2]);
                 if(watch.get("error") instanceof String message&&!message.isEmpty()){timer.stop();publish(directory,failure(project,"WATCH_START_FAILED",message));return;}
                 if(attachment==null&&editor.visualAttachmentFailed()){timer.stop();publish(directory,failure(project,"ATTACHMENT_FAILED","Local control attachment could not start; check local diagnostics and session directory permissions"));return;}
-                if(attachment==null||!Boolean.TRUE.equals(watch.get("ready")))return;
+                if(attachment==null||!args[0].equals("--delegate-window")&&!Boolean.TRUE.equals(watch.get("ready")))return;
                 Map<String,Object> result=Map.of("schemaVersion",1,"ready",true,"project",project.toString(),"descriptor",attachment.descriptor().toString(),"credential",attachment.credential().toString(),"pid",ProcessHandle.current().pid(),"agent",args[2]);
                 editor.showMessage("Watching project changes · "+args[2]);
                 timer.stop();publish(directory,result);

@@ -1,8 +1,12 @@
 # Use Shed with an external coding agent
 
-## Delegate an ordinary CLI task
+## Chat with a local coding CLI
 
-Open a project and use **View → Delegate Task…** (or `:agent delegate`). Choose a local coding CLI, describe the task, then approve the control dialog. Shed supplies the authenticated attachment, bounded permission lease and vendor-neutral instructions. It starts the CLI only after approval and a fresh change baseline. Reads using `ctl read <path>` open and highlight the actual file; ordinary writes use the existing watcher and animations. **Take Back Control** (also Ctrl+Shift+Escape) returns human input. Normal completion opens the session's existing change summary.
+Open a project and choose **View → Agent Chat…**, or run `:agent chat` (`:agent delegate` is an alias). Choose Codex, Claude Code or OpenCode, type a message, and press Enter. Shift+Enter inserts a newline. The selected CLI must already be installed and signed in; **CLI path** lets you select its executable when the GUI's PATH cannot find it.
+
+Approve the existing control dialog on the first turn. Shed adds its visualization instructions and current authenticated attachment automatically to every message. Replies appear in Chat; follow-ups resume that exact CLI conversation. No manual environment export or prompt pasting is needed for this route. Source input pauses during a turn while the chat remains usable, then returns between replies. **Stop** or **Take Back Control** cancels the current turn; **New chat** starts a separate conversation. **Changes** opens the existing session summary/diffs when the turn is finished.
+
+Reads performed through the instructed `ctl read <path>` open and highlight the real file. Ordinary writes use the existing watcher and animations. Agent instruction compliance still matters: ordinary filesystem reads cannot be inferred by the watcher. Native tool permissions and login remain those of the selected CLI; Shed adds no permission-bypass flags. See [CLI chat, supported protocols and qualification limits](AGENT_CLI_CHAT.md). The original one-shot launcher is available explicitly through `:agent task`.
 
 For an already-running external agent, one command launches a normal Shed window and waits for your approval:
 

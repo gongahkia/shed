@@ -1,10 +1,12 @@
 # Explicit agent delegation and handback
 
+The normal in-app entry is now [ongoing CLI Chat](AGENT_CLI_CHAT.md), opened by **View → Agent Chat…** or `:agent chat`. This report preserves the original one-shot delegation implementation and its evidence; use `:agent task` for that advanced launcher. `make demo-delegation` now demonstrates chat and follow-ups (`make demo-chat` is an alias); the original controlled one-shot probe remains available without `--chat`.
+
 The four requested workflow improvements are implemented over Shed's existing authenticated workspace bridge and actual editor. There is no additional server, model-owned daemon, document model, Undo engine or persistent agent worker.
 
 ## Try it
 
-Open a project and choose **View → Delegate Task…**, or run `:agent delegate`. Describe the task, choose the already-installed CLI and inspect its direct argument array. The default Codex command is `codex exec --sandbox workspace-write -`; Claude uses `claude -p`. Other CLIs can be used when they accept a task on standard input. Executables are resolved to a concrete path before consent; shell command strings are not evaluated. No login or installation is performed.
+For the original one-shot launcher, open a project and run `:agent task`. Describe the task, choose the already-installed CLI and inspect its direct argument array. The default Codex command is `codex exec --sandbox workspace-write -`; Claude uses `claude -p`. Other CLIs can be used when they accept a task on standard input. Executables are resolved to a concrete path before consent; shell command strings are not evaluated. No login or installation is performed.
 
 The second dialog names the agent, task, project and exact command. **Allow Control** is required before a managed CLI starts. Cancel is the default. Save dirty buffers and finish pending saves/reloads first. Approval starts a fresh change baseline; the client is admitted after the baseline and existing control attachment are ready.
 

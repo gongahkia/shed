@@ -1,0 +1,18 @@
+{
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "starting_head": "ab8b899c3e89290123d325d5daa66b7b06b3bb8c",
+  "code_head": "8d2942689e7f60f6ce9441888160de127bd3c52d",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "jdk_release": "IMPLEMENTOR=\"Eclipse Adoptium\"\nIMPLEMENTOR_VERSION=\"Temurin-21.0.13.1+2\"\nJAVA_RUNTIME_VERSION=\"21.0.13.1+2-LTS\"\nJAVA_VERSION=\"21.0.13.1\"\nJAVA_VERSION_DATE=\"2026-11-17\"\nLIBC=\"default\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.internal.opt jdk.zipfs jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.vector jdk.internal.le jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom\"\nOS_ARCH=\"aarch64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:8799347eca78\"\nBUILD_SOURCE=\"git:8d9fd6fa96e5066571a13823b07c2934e5958d8b\"\nBUILD_SOURCE_REPO=\"https://github.com/adoptium/temurin-build.git\"\nSOURCE_REPO=\"https://github.com/adoptium/jdk21u.git\"\nFULL_VERSION=\"21.0.13.1+2-LTS\"\nSEMANTIC_VERSION=\"21.0.13.1+2\"\nBUILD_INFO=\"OS: macOS Version: 14.1 23B74\"\nJVM_VARIANT=\"Hotspot\"\nJVM_VERSION=\"21.0.13.1+2-LTS\"\nIMAGE_TYPE=\"JDK\"\n",
+  "native_shell": "NOT_USED",
+  "real_model": "NOT_RUN",
+  "load_average_at_recording": [
+    2.6650390625,
+    3.84765625,
+    3.7685546875
+  ],
+  "memory_attribution": "NOT_MEASURED",
+  "jar_sha256": "1279f95cbeb4b5fdf0ab1640f6f187269ef017c1df70a5a2eef1cfa9fe6d2b63",
+  "supported_native_workflow": "Controlled macOS Swing window with fixed direct-Java agent, not provider/native-shell qualification"
+}

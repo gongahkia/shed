@@ -1,0 +1,47 @@
+{
+  "boundary": "fixed direct Java; disposable home, preferences and source; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "registry_smoke": false,
+  "jar_sha256": "ab122936f3a935f0efccd7427980d7ed7d28d44c88ba9232ba21b0f05326adc1",
+  "probe_sha256": "b4178af7604a179ce47e69327b4967c1d1f0dbf50e819eeca46beed7680a3550",
+  "fixture": "/private/tmp/shed-native-msjf4l9r",
+  "compile_command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/javac",
+    "-J-Duser.home=/private/tmp/shed-native-msjf4l9r/run/home",
+    "-J-Djava.io.tmpdir=/private/tmp/shed-native-msjf4l9r/run/tmp",
+    "-J-Djava.util.prefs.userRoot=/private/tmp/shed-native-msjf4l9r/run/config",
+    "-proc:none",
+    "-encoding",
+    "UTF-8",
+    "-cp",
+    "/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "-d",
+    "/private/tmp/shed-native-msjf4l9r/run/classes",
+    "/Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/ThemeMarketplaceProbe.java"
+  ],
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-msjf4l9r/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-msjf4l9r/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-msjf4l9r/run/config",
+    "-Djava.awt.headless=false",
+    "-cp",
+    "/private/tmp/shed-native-msjf4l9r/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.ThemeMarketplaceProbe",
+    "/private/tmp/shed-native-msjf4l9r/run/evidence",
+    "/private/tmp/shed-native-msjf4l9r/run/project"
+  ],
+  "pid": 3025,
+  "exit": 1,
+  "log": "java.util.concurrent.ExecutionException: java.lang.AssertionError: Installed theme selection is outside the viewport\n\tat java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)\n\tat java.base/java.util.concurrent.FutureTask.get(FutureTask.java:191)\n\tat shed.ThemeMarketplaceProbe.edt(ThemeMarketplaceProbe.java:38)\n\tat shed.ThemeMarketplaceProbe.desktop(ThemeMarketplaceProbe.java:136)\n\tat shed.ThemeMarketplaceProbe.main(ThemeMarketplaceProbe.java:222)\nCaused by: java.lang.AssertionError: Installed theme selection is outside the viewport\n\tat shed.ThemeMarketplaceProbe.lambda$desktop$12(ThemeMarketplaceProbe.java:140)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:308)\n\tat java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)\n\tat java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:400)\n\tat java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)\n\tat java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)\n\tat java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)\n\tat java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)\n\tat java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)\n",
+  "result": {
+    "checks": [
+      "no-network-before-search"
+    ],
+    "state": "FAIL"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 2.720765833997575
+}

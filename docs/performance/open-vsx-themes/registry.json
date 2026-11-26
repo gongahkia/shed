@@ -1,0 +1,56 @@
+{
+  "boundary": "fixed direct Java; disposable home, preferences and source; not an OS sandbox",
+  "native_shell_benchmarks": "BLOCKED",
+  "registry_smoke": true,
+  "jar_sha256": "4502ab68b7b12410720890eaf5acaf3cc9e0f2b096de6291559a9d3ab418a412",
+  "probe_sha256": "b4178af7604a179ce47e69327b4967c1d1f0dbf50e819eeca46beed7680a3550",
+  "fixture": "/private/tmp/shed-native-x_20i4av",
+  "compile_command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/javac",
+    "-J-Duser.home=/private/tmp/shed-native-x_20i4av/run/home",
+    "-J-Djava.io.tmpdir=/private/tmp/shed-native-x_20i4av/run/tmp",
+    "-J-Djava.util.prefs.userRoot=/private/tmp/shed-native-x_20i4av/run/config",
+    "-proc:none",
+    "-encoding",
+    "UTF-8",
+    "-cp",
+    "/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "-d",
+    "/private/tmp/shed-native-x_20i4av/run/classes",
+    "/Users/gongahkia/Desktop/coding/projects/shed/src/benchmark/java/shed/ThemeMarketplaceProbe.java"
+  ],
+  "compile_exit": 0,
+  "compile_output": "",
+  "command": [
+    "/private/tmp/shed-a222c1-tgamqlld/tools/jdk-21.0.13.1+2/Contents/Home/bin/java",
+    "-Duser.home=/private/tmp/shed-native-x_20i4av/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-x_20i4av/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-x_20i4av/run/config",
+    "-Djava.awt.headless=true",
+    "-cp",
+    "/private/tmp/shed-native-x_20i4av/run/classes:/Users/gongahkia/Desktop/coding/projects/shed/target/shed-2.0.0.jar",
+    "shed.ThemeMarketplaceProbe",
+    "/private/tmp/shed-native-x_20i4av/run/evidence",
+    "/private/tmp/shed-native-x_20i4av/run/project",
+    "--registry-smoke"
+  ],
+  "pid": 5297,
+  "exit": 0,
+  "log": "",
+  "result": {
+    "checks": [
+      "real-registry-search-checksum-translation-no-install"
+    ],
+    "state": "PASS"
+  },
+  "registry": {
+    "variants": 4,
+    "package": "Catppuccin.catppuccin-vsc",
+    "version": "3.19.0",
+    "sha256": "ebf347664837edbe91c9920ff3d14c96d4a28beeec0b95137c76058326329780",
+    "elapsed_ms": 1250.662459,
+    "license": "MIT"
+  },
+  "fixture_removed": true,
+  "elapsed_s": 2.262055999999575
+}

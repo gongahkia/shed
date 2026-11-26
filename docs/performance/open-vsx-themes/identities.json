@@ -1,0 +1,32 @@
+{
+  "recorded_utc": "2026-11-26T01:43:48.385392+00:00",
+  "starting_head": "4e97831ecc8a6b31833956b820982c660bba8ce9",
+  "backend_commit": "a42b3fccda72fc70e56ece656798da11c93ebe89",
+  "gallery_commit": "e7534045071ff6de67a1d0547507c5690d394fd7",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M3",
+  "memory_bytes": 17179869184,
+  "jdk": "21.0.13.1+2",
+  "maven": "3.9.11",
+  "source_sha256": {
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "scripts/test-theme-marketplace.py": "dacaab8ab3e912cbdebb6118cb3e009ca8a73f3571bbd73acbc11beaa5107882",
+    "scripts/test_native_fixture.py": "38f7ae4cd91ccdae0889142e7e68435ec7168f507de7632c500d85282115da20",
+    "scripts/test_theme_marketplace_tooling.py": "7c96fda8a2d6f98c29375d2cf49b816f097dabeb32d2f98a2055d57072fd3dc2",
+    "src/benchmark/java/shed/ThemeMarketplaceProbe.java": "b4178af7604a179ce47e69327b4967c1d1f0dbf50e819eeca46beed7680a3550",
+    "src/main/java/shed/ConfigManager.java": "24775148ac366102bb055d4049955e70071616242a29344a6aacc229acc468ac",
+    "src/main/java/shed/ImportedTheme.java": "bf415d80479579cef994d4e8fc94d53c452fd9f0f2beea06f9e30bfa76d6941c",
+    "src/main/java/shed/ImportedThemeStore.java": "edee5cb54ef97fc0c49f43ec114d8ab943b8820b1e7532d919f796807a4f3de1",
+    "src/main/java/shed/OpenVsxThemeService.java": "f0c440a9c54447fc4b25d28d83c16af5dfb23a17443709b99ddb980b38ebe862",
+    "src/main/java/shed/ThemeGalleryDialog.java": "c0b1115a153f6a7002869d98e5c3c9125fa5beca9df0af876839be0cb00c7223",
+    "src/main/java/shed/VsCodeThemeImporter.java": "3a68468f3439f574a578118a9ef39407bd7be7fcbf7fbbf5ca86d6472c765594",
+    "src/test/java/shed/OpenVsxThemeTest.java": "4ec73d79026d623acade875709d8c633e0eb7df79584f603125cf6e11d815c1f",
+    "src/test/resources/shed/portable-fixture-tests.properties": "1482d6e9391329ab6eeb7d833e19df44e7359e458192f517762a601ea54a48f3",
+    "target/shed-2.0.0.jar": "4502ab68b7b12410720890eaf5acaf3cc9e0f2b096de6291559a9d3ab418a412"
+  },
+  "capture_sha256": {
+    "discover.png": "5bdf5cdeacbb0223639d81bbdddae8fb839abce3f385756b262337b6b3d31c1f",
+    "installed-narrow.png": "3404d84676f761e110360f052b80a140a2cade212927349d9ce3fea9e6b6926a",
+    "preview-dark.png": "efb853285b10d7f3f1a7cadc73786e11c836c8ecf6c721bafef630db42b180c6"
+  }
+}

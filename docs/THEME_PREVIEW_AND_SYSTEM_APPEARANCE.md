@@ -10,6 +10,8 @@ Live workbench preview supports **one main Shed window**, including its editor s
 
 Evidence: [index](performance/appearance-tranche8e/INDEX.md), [verification](performance/appearance-tranche8e/verification.json), [measurements](performance/appearance-tranche8e/summary.json).
 
+Subsequent [Open VSX theme discovery/import](OPEN_VSX_THEMES.md) adds offline imported palettes to this same gallery and preview lease. Its compatibility subset, installation safeguards and qualification are documented separately; automatic system appearance remains deferred.
+
 ## B. Existing infrastructure reuse
 
 The audit found these existing owners and paths:

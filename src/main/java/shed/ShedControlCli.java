@@ -37,6 +37,7 @@ final class ShedControlCli {
                     if(command.equals("session-request")) { agent=required(options,"--agent");String file=required(options,"--task-file");task=WorkspaceFrames.decode(file.equals("-")?input.readNBytes(4097):boundedFile(Path.of(file),4096)); }
                     if(command.equals("session-finish") && options.containsKey("--task-file")){String file=required(options,"--task-file");task=WorkspaceFrames.decode(file.equals("-")?input.readNBytes(4097):boundedFile(Path.of(file),4096));}
                     if(!id.matches("[A-Za-z0-9_-]{1,64}")||!options.isEmpty())throw new IllegalArgumentException();
+                    mutationSent=!command.equals("session-status");
                     return emit(client.exchange(request("editor/delegation",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),"windowId",identity.windowId(),"projectId",identity.projectId(),"action",command.substring(8),"requestId",id,"agent",agent,"task",task))),out);
                 }
                 if (command.equals("sync")) {
@@ -173,7 +174,7 @@ final class ShedControlCli {
             boolean unknown=mutationSent && Set.of(WorkspaceApiException.Code.TIMEOUT,WorkspaceApiException.Code.SESSION_INVALID,WorkspaceApiException.Code.SESSION_EXPIRED,WorkspaceApiException.Code.OUTCOME_UNKNOWN).contains(failure.code());
             out.println(WorkspaceRpc.error("ctl",-32000,"Control request failed",Map.of("code",unknown?"OUTCOME_UNKNOWN":failure.code().name(),"outcome",unknown?"unknown":"rejected")));return unknown?79:65;
         } catch(IllegalArgumentException invalid) {
-            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|intent|activity|propose|replace|terminal-run|terminal-status|terminal-cancel [options]",Map.of("code","INVALID_REQUEST")));return 64;
+            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|sync|session-request|session-status|session-finish|intent|activity|propose|replace|terminal-run|terminal-status|terminal-cancel [options]",Map.of("code","INVALID_REQUEST")));return 64;
         } catch(IOException failure) {
             out.println(WorkspaceRpc.error("ctl",-32000,"Control connection or input unavailable",Map.of("code",mutationSent?"OUTCOME_UNKNOWN":"TRANSPORT_ERROR","outcome",mutationSent?"unknown":"rejected")));return mutationSent?79:74;
         }

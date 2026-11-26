@@ -36,21 +36,32 @@ class AgentDelegationTest {
         try(var f=new EditorControlTest.Fixture(temporary)) {
             EditorControlTest.edt(()->{
                 var root=new JRootPane();root.getContentPane().add(f.pane.getScrollPane());var bar=new JMenuBar();var enabled=new JMenu("File");var disabled=new JMenu("Disabled");disabled.setEnabled(false);bar.add(enabled);bar.add(disabled);root.setJMenuBar(bar);
-                var old=root.getGlassPane();var area=f.pane.getTextArea();area.select(2,6);var before=f.pane.getBuffer().getContent();long revision=f.pane.getBuffer().documentRevision();
+                var old=root.getGlassPane();var area=f.pane.getTextArea();int listeners=area.getPropertyChangeListeners("editable").length;area.select(2,6);var before=f.pane.getBuffer().getContent();long revision=f.pane.getBuffer().documentRevision();
                 try(var owner=new AgentEditorOwnership(root,()->List.of(f.pane),"Agent",()->{})) {
-                    assertFalse(area.isEditable());assertFalse(enabled.isEnabled());assertTrue(root.getGlassPane().isVisible());owner.refresh();
+                    assertFalse(area.isEditable());assertFalse(enabled.isEnabled());assertTrue(root.getGlassPane().isVisible());owner.refresh();area.setEditable(true);assertFalse(area.isEditable());
                     assertEquals(before,area.getText());assertEquals(revision,f.pane.getBuffer().documentRevision());assertFalse(f.pane.getBuffer().isModified());assertFalse(f.pane.getBuffer().getUndoManager().canUndo());
                 }
+                assertEquals(listeners,area.getPropertyChangeListeners("editable").length);
+                for(int i=0;i<24;i++)try(var owner=new AgentEditorOwnership(root,()->List.of(f.pane),"Agent",()->{})){owner.refresh();}
+                assertEquals(listeners,area.getPropertyChangeListeners("editable").length);
                 assertSame(old,root.getGlassPane());assertTrue(enabled.isEnabled());assertFalse(disabled.isEnabled());assertTrue(area.isEditable());assertEquals(2,area.getSelectionStart());assertEquals(6,area.getSelectionEnd());return null;
             });
         }
     }
     static final class DelegatedFixture extends EditorControlTest.Fixture {
         final AgentDelegation lease=new AgentDelegation();
+        volatile boolean revokeOnCapture;
+        @Override public EditorMetadata.Context capture(){if(revokeOnCapture)lease.revoke("cancelled");return super.capture();}
         DelegatedFixture(Path p)throws Exception{super(p);lease.requireApproval();}
         public boolean delegationAllowed(String id){return lease!=null&&lease.allowed(id);}
         public Map<String,Object> delegation(String action,String id,String agent,String task){
             switch(action){case "request"->lease.request(id,agent,task);case "status"->{}case "finish"->lease.finish(id,task);default->throw WorkspaceApiException.invalidRequest("action");}return lease.status(id);
+        }
+    }
+    @Test void revocationDuringQueuedContextObservationCannotReturnNewHumanContext() throws Exception {
+        try(var f=new DelegatedFixture(temporary);var c=WorkspaceBridgeClient.control(f.server.descriptor(),f.server.credential())) {
+            f.lease.request("one","Agent","Task");f.lease.approve("one");f.lease.activate("one");c.delegation("one");f.revokeOnCapture=true;
+            assertEquals("AUTHORIZATION_REVOKED",EditorControlTest.code(MiniJson.asObject(MiniJson.parseStrict(c.exchange(c.navigationContextRequest())))));
         }
     }
     @Test void realAuthenticatedBridgeRequiresLiveSessionIncludingContextAndQueuedAuthorization() throws Exception {

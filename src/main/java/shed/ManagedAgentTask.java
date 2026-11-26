@@ -63,11 +63,18 @@ final class ManagedAgentTask {
                 finally {
                     for(var owned:new ArrayList<>(descendants.values()).reversed())if(owned.owned())owned.handle().destroyForcibly();
                     if(child.isAlive())child.destroyForcibly();
-                    child.waitFor(2,TimeUnit.SECONDS);
-                    child.getOutputStream().close();
-                    reader.join(1000);writer.join(1000);
-                    child.getInputStream().close();child.getErrorStream().close();
-                    if(reader.isAlive()||writer.isAlive())throw new IOException("Agent task pipes did not retire");
+                    try {
+                        if(!child.waitFor(2,TimeUnit.SECONDS))throw new IOException("Agent process did not retire");
+                        for(var owned:descendants.values()) {
+                            try { owned.handle().onExit().get(2,TimeUnit.SECONDS); }
+                            catch(TimeoutException pending){throw new IOException("Agent child did not retire",pending);}
+                        }
+                    } finally {
+                        child.getOutputStream().close();
+                        reader.join(1000);writer.join(1000);
+                        child.getInputStream().close();child.getErrorStream().close();
+                        if(reader.isAlive()||writer.isAlive())throw new IOException("Agent task pipes did not retire");
+                    }
                 }
             } finally {if(interrupted)Thread.currentThread().interrupt();}
         }

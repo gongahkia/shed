@@ -27,6 +27,8 @@ final class FormatOnSaveController {
 
     FormatOnSaveController(Texteditor editor) { this.editor = editor; }
 
+    boolean busy() { return running; }
+
     String requestCurrent(String targetPath, boolean closeWindowAfterSave, boolean force) {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null) return "Error: No file open";

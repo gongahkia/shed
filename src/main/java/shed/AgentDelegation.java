@@ -10,9 +10,10 @@ final class AgentDelegation {
     private boolean required;
     private String id = "", agent = "", task = "", state = "idle", summary = "";
     private long deadline;
-    AgentDelegation() { this(System::currentTimeMillis); }
+    AgentDelegation() { this(()->java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime())); }
     AgentDelegation(LongSupplier clock) { this.clock = clock; }
     synchronized void requireApproval() { required = true; }
+    synchronized boolean approvalRequired() { return required; }
     synchronized boolean request(String request, String name, String description) {
         validate(request,name,description);
         expire();

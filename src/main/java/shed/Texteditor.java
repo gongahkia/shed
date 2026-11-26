@@ -247,6 +247,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private EditorWorkspaceDocuments workspaceDocumentSource;
     private AgentWorkspaceController agentWorkspaceController;
+    private AgentDelegationController agentDelegationController;
     private InlineCompletionController inlineCompletionController;
 
     void installAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.install(area); }
@@ -277,8 +278,13 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void ownAgentSession(AgentSessionService session) { agentWorkspaceController.ownSession(session); }
 
-    AgentDelegationController agentDelegation(){return agentWorkspaceController.delegation;}
-    boolean agentOwnsEditor(){return agentWorkspaceController!=null&&agentWorkspaceController.delegation.ownsEditor();}
+    AgentDelegationController agentDelegation(){return agentDelegationController;}
+    boolean canDelegateWindow(){return !closingDown&&!stagedStartupPending&&!reloadPromptActive&&!formatOnSaveController.busy()&&buffers.stream().noneMatch(FileBuffer::isModified);}
+    void takeBackAgentControl(){if(agentDelegationController!=null)agentDelegationController.takeBack();}
+    boolean agentApprovalRequired(){return agentDelegationController!=null&&agentDelegationController.lease.approvalRequired();}
+    boolean agentDelegationAllowed(String id){return agentDelegationController!=null&&agentDelegationController.lease.allowed(id);}
+    java.util.Map<String,Object> agentDelegationCommand(String action,String id,String agent,String task){return agentDelegationController.command(action,id,agent,task);}
+    boolean agentOwnsEditor(){return agentDelegationController!=null&&agentDelegationController.ownsEditor();}
 
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
@@ -482,12 +488,14 @@ public class Texteditor extends JFrame implements KeyListener {
         editorPanes = new ArrayList<>();
         workspaceDocumentSource = new EditorWorkspaceDocuments(() -> List.copyOf(buffers), workspaceController::roots,
             workspaceController::activeRoot, Path.of("."), this::applyWorkspaceTextBatch);
+        agentDelegationController = new AgentDelegationController(this);
         agentWorkspaceController = new AgentWorkspaceController(this);
         inlineCompletionController = new InlineCompletionController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {
                 if (focusModeController != null) focusModeController.close();
                 if (workbenchHeader != null) workbenchHeader.close();
+                if (agentDelegationController != null) agentDelegationController.close();
                 if (toolWindowHost != null) toolWindowHost.close();
                 workspaceDocumentSource.close(); agentWorkspaceController.close(); inlineCompletionController.close();
             }
@@ -3663,6 +3671,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         closingDown = true;
         if (workspaceDocumentSource != null) workspaceDocumentSource.close();
+        if (agentDelegationController != null) agentDelegationController.close();
         if (agentWorkspaceController != null) agentWorkspaceController.close();
         if (windowPlacementStore != null) windowPlacementStore.save(this);
         disposeMarkdownPreviews();

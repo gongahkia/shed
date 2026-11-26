@@ -11,7 +11,6 @@ import javax.swing.SwingUtilities;
 /** Human-owned start/stop lifecycle. Machine requests never route through editor commands. */
 final class AgentWorkspaceController implements AutoCloseable {
     private final Texteditor editor;
-    final AgentDelegationController delegation;
     private final Set<WorkspaceBridgeServer> owned = ConcurrentHashMap.newKeySet();
     private final Set<WorkspaceBridgeServer> releasing = ConcurrentHashMap.newKeySet();
     private final AtomicLong generation = new AtomicLong();
@@ -26,7 +25,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     private ApplicationStatus applicationStatus;
     private String status = "Agent API is stopped; no listener is running.";
 
-    AgentWorkspaceController(Texteditor editor) { this.editor = editor; delegation=new AgentDelegationController(editor); }
+    AgentWorkspaceController(Texteditor editor) { this.editor = editor; }
 
     void ownSession(AgentSessionService session) { sessions.own(session); }
     WorkspaceBridgeServer visualAttachment(){return active!=null&&active.controlEnabled()&&active.running()?active:null;}
@@ -38,7 +37,7 @@ final class AgentWorkspaceController implements AutoCloseable {
         String value = argument == null ? "" : argument.trim();
         return switch (value) {
             case "delegate" -> {AgentTaskLauncher.show(editor);yield "Agent delegation setup.";}
-            case "takeback" -> {delegation.takeBack();yield "Control returned to you.";}
+            case "takeback" -> {editor.takeBackAgentControl();yield "Control returned to you.";}
             case "complete" -> editor.requestAiCompletion();
             case "edit", "ask", "run" -> {
                 if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentAction(
@@ -144,7 +143,7 @@ final class AgentWorkspaceController implements AutoCloseable {
                 if (live != null && !live.disposed.get()) SwingUtilities.invokeLater(() -> {
                     var controller = owner.get();
                     if (controller != null && !controller.disposed.get() && controller.active == server) {
-                        controller.delegation.takeBack(); controller.active = null; controller.status = "Agent API attachment has stopped or expired.";
+                        controller.editor.takeBackAgentControl(); controller.active = null; controller.status = "Agent API attachment has stopped or expired.";
                     }
                 });
             });
@@ -167,7 +166,7 @@ final class AgentWorkspaceController implements AutoCloseable {
                 status = statusOnly || metadataMode ? mode + " attachment. Descriptor: " + server.descriptor() + ". Credential file: " + server.credential()
                     : mode + " agent API for " + root + ". Connection descriptor: " + server.descriptor();
             }
-            editor.showMessage(status);
+            editor.showMessage(editor.agentApprovalRequired()?"Agent attachment ready; control requires your approval.":status);
         });
         return status;
     }
@@ -241,18 +240,18 @@ final class AgentWorkspaceController implements AutoCloseable {
             }
             public void revokeTerminals(){var live=editorOwner.get();if(live!=null)live.revokeAgentTerminalRequests(terminalOwner);}
             public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(owner().workspaceController.activeRoot(),owner().workspaceRoots.generation());}
-            public java.util.Map<String,Object> watch(String action,String agent){return owner().toolWindowHost.watchAgentChanges(action,agent);}
+            public java.util.Map<String,Object> watch(String action,String agent){var app=owner();if(app.agentOwnsEditor()&&java.util.Set.of("start","stop").contains(action))throw EditorMetadata.failure(WorkspaceApiException.Code.PERMISSION_DENIED);return app.toolWindowHost.watchAgentChanges(action,agent);}
             public java.util.Map<String,Object> observe(String operation){return EditorObservation.read(owner(),operation);}
             public java.awt.image.BufferedImage capturePreview(){return EditorObservation.capture(owner());}
             public void review(String proposal) { owner().toolWindowHost.showAgentProposal(proposal); }
-            public java.util.Map<String,Object> delegation(String action,String id,String agent,String task){return owner().agentDelegation().command(action,id,agent,task);}
-            public boolean delegationAllowed(String id){var app=editorOwner.get();return app!=null&&app.agentDelegation().lease.allowed(id);}
+            public java.util.Map<String,Object> delegation(String action,String id,String agent,String task){return owner().agentDelegationCommand(action,id,agent,task);}
+            public boolean delegationAllowed(String id){var app=editorOwner.get();return app!=null&&app.agentDelegationAllowed(id);}
             public void clearActivity() { var live = editorOwner.get(); if (live != null) live.clearAgentActivity(); }
         };
     }
 
     private String stop() {
-        delegation.takeBack();
+        editor.takeBackAgentControl();
         stopping = true;
         generation.incrementAndGet();
         if (startingJob >= 0) editor.asyncJobService.cancel(startingJob);
@@ -284,6 +283,6 @@ final class AgentWorkspaceController implements AutoCloseable {
 
     @Override public void close() {
         if (applicationStatus != null) applicationStatus.stopping();
-        disposed.set(true); delegation.close(); sessions.close(); stop();
+        disposed.set(true); sessions.close(); stop();
     }
 }

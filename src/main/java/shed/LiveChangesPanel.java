@@ -65,7 +65,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
     }
     private JButton button(String title,Icon icon,Runnable action){var b=new JButton(icon);b.setToolTipText(title);AccessibilitySupport.describe(b,title,title);WorkbenchStyle.quiet(b);b.addActionListener(e->{try{action.run();}catch(WorkspaceApiException invalid){state.setText(invalid.getMessage());}});return b;}
     Map<String,Object> command(String action,String name){
-        switch(action){case "start"->start(name);case "stop"->stop();case "follow"->follow.setSelected(true);case "pause"->follow.setSelected(false);case "refresh"->requestRefresh();case "state"->{}default->throw WorkspaceApiException.invalidRequest("Unknown watch action");}
+        switch(action){case "session-start"->{stop();baseline.setSelectedIndex(0);follow.setSelected(true);start(name);}case "start"->start(name);case "stop"->stop();case "follow"->follow.setSelected(true);case "pause"->follow.setSelected(false);case "refresh"->requestRefresh();case "state"->{}default->throw WorkspaceApiException.invalidRequest("Unknown watch action");}
         return Map.of("kind","watch","watching",watcher!=null&&watcher.watching(),"ready",watcher!=null&&!busy,"following",follow.isSelected(),"files",rows.size(),"baseline",Objects.toString(baseline.getSelectedItem()),"agent",watcherName,"error",startupError);
     }
     void start(String name){

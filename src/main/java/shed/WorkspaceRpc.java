@@ -68,7 +68,9 @@ public final class WorkspaceRpc {
                 if (params == null) throw WorkspaceApiException.invalidRequest("Control parameters must be an object");
                 params = new java.util.LinkedHashMap<>(params);
                 var authorized = method.equals("editor/delegation") ? connection : metadata.control.authorizeDelegation(params,connection);
-                return result(id, metadata.control.dispatch(method, params, authorized));
+                var value=metadata.control.dispatch(method, params, authorized);
+                if(!authorized.getAsBoolean())throw EditorMetadata.failure(EditorControl.mutation(method)?WorkspaceApiException.Code.OUTCOME_UNKNOWN:WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+                return result(id,value);
             } catch (WorkspaceApiException unavailable) {
                 return error(id, -32000, "Editor control request failed", Map.of("code", unavailable.code().name(),
                     "outcome", unavailable.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN ? "unknown" : "rejected"));
@@ -82,7 +84,9 @@ public final class WorkspaceRpc {
                 if (params == null) throw WorkspaceApiException.invalidRequest("Navigation parameters must be an object");
                 params = new java.util.LinkedHashMap<>(params);
                 var authorized = metadata.control == null ? connection : metadata.control.authorizeDelegation(params,connection);
-                return result(id, metadata.navigation.dispatch(method, params, id, authorized));
+                var value=metadata.navigation.dispatch(method, params, id, authorized);
+                if(!authorized.getAsBoolean())throw EditorMetadata.failure(EditorNavigation.MUTATIONS.contains(method)?WorkspaceApiException.Code.OUTCOME_UNKNOWN:WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+                return result(id,value);
             } catch (WorkspaceApiException unavailable) {
                 return error(id, -32000, unavailable.getMessage(), Map.of("code", unavailable.code().name(),
                     "outcome", unavailable.code() == WorkspaceApiException.Code.OUTCOME_UNKNOWN ? "unknown" : "rejected"));
@@ -95,8 +99,10 @@ public final class WorkspaceRpc {
                 var params = MiniJson.asObject(request.get("params"));
                 if (params == null) throw EditorMetadata.failure(WorkspaceApiException.Code.INVALID_REQUEST);
                 params = new java.util.LinkedHashMap<>(params);
-                if(metadata.control != null) metadata.control.authorizeDelegation(params,connection);
-                return MiniJson.stringify(response(id, "result", metadata.observe(params)));
+                var authorized=metadata.control==null?connection:metadata.control.authorizeDelegation(params,connection);
+                var value=metadata.observe(params);
+                if(!authorized.getAsBoolean())throw EditorMetadata.failure(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+                return MiniJson.stringify(response(id, "result", value));
             } catch (WorkspaceApiException unavailable) { return error(id, -32000, unavailable.getMessage(), Map.of("code", unavailable.code().name())); }
             catch (RuntimeException invalid) { return error(id, -32603, "Editor context is unavailable", Map.of("code", "INVALID_CONTEXT")); }
         }

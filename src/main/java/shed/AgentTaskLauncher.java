@@ -14,11 +14,12 @@ final class AgentTaskLauncher {
         var provider=new JComboBox<>(new String[]{"Codex CLI","Claude Code CLI","Other CLI (task on stdin)"});
         var command=new JTextField("[\"codex\",\"exec\",\"--sandbox\",\"workspace-write\",\"-\"]",48);command.setName("agent.launchCommand");
         provider.addActionListener(e->{command.setText(provider.getSelectedIndex()==0?"[\"codex\",\"exec\",\"--sandbox\",\"workspace-write\",\"-\"]":provider.getSelectedIndex()==1?"[\"claude\",\"-p\"]":"[\"/path/to/agent-cli\"]");});
-        var name=new JTextField("Codex",16);provider.addActionListener(e->name.setText(provider.getSelectedIndex()==0?"Codex":provider.getSelectedIndex()==1?"Claude":"Agent"));
-        var task=new JTextArea(7,52);task.setLineWrap(true);task.setWrapStyleWord(true);task.setName("agent.task");
+        var name=new JTextField("Codex",16);name.setName("agent.launchName");provider.addActionListener(e->name.setText(provider.getSelectedIndex()==0?"Codex":provider.getSelectedIndex()==1?"Claude":"Agent"));
+        var task=new JTextArea(7,52);task.setFont(UIManager.getFont("Label.font"));task.setLineWrap(true);task.setWrapStyleWord(true);task.setName("agent.task");
         var panel=new JPanel();panel.setLayout(new BoxLayout(panel,BoxLayout.Y_AXIS));
         panel.add(new JLabel("Project: "+root));panel.add(Box.createVerticalStrut(8));panel.add(provider);panel.add(new JLabel("Display name"));panel.add(name);panel.add(new JLabel("CLI argument array · task is sent on standard input"));panel.add(command);panel.add(Box.createVerticalStrut(8));panel.add(new JLabel("Task"));panel.add(new JScrollPane(task));
-        var note=new JTextArea("Uses this CLI's existing login and tool permissions. No permission bypass flags are added. You will approve window control before the CLI starts.");note.setEditable(false);note.setOpaque(false);note.setLineWrap(true);note.setWrapStyleWord(true);panel.add(Box.createVerticalStrut(8));panel.add(note);
+        var note=new JTextArea("Uses this CLI's existing login and tool permissions. No permission bypass flags are added. You will approve window control before the CLI starts.");note.setFont(UIManager.getFont("Label.font"));note.setEditable(false);note.setOpaque(false);note.setLineWrap(true);note.setWrapStyleWord(true);panel.add(Box.createVerticalStrut(8));panel.add(note);
+        for(java.awt.Component child:panel.getComponents())if(child instanceof JComponent component)component.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
         while(JOptionPane.showConfirmDialog(editor,panel,"Delegate Task",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION){
             try {
                 var argv=ManagedAgentTask.command(command.getText());String description=task.getText(),agent=name.getText();

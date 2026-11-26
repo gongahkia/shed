@@ -32,6 +32,9 @@ public class ConfigManager {
 
     private final Map<String, String> config;
     private ThemePreviewLease themePreview;
+    private Map<String, ImportedTheme> importedThemes = Map.of();
+    private Map<String, ThemePalette> importedPalettes = Map.of();
+    private String importedThemeFailure = "";
     private final Map<String, String> defaultConfig;
     private final Map<String, String> persistedConfig;
     private final Map<String, String> projectConfig;
@@ -294,6 +297,8 @@ public class ConfigManager {
 
         loadDefaults();
         loadConfig();
+        try { replaceImportedThemes(importedThemeStore().load()); }
+        catch (IOException | SecurityException error) { importedThemeFailure = "Installed themes could not be loaded; built-in themes remain available."; }
     }
 
     // Load default configuration
@@ -971,8 +976,8 @@ public class ConfigManager {
     }
 
     ThemePreviewLease previewTheme(String requestedTheme) {
-        String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme == null ? "" : requestedTheme));
-        if (themePreview != null || alias == null || !THEMES.containsKey(alias)) return null;
+        String alias = themeAlias(requestedTheme);
+        if (themePreview != null || alias == null) return null;
         themePreview = new ThemePreviewLease(alias);
         return themePreview;
     }
@@ -984,8 +989,8 @@ public class ConfigManager {
         private ThemePreviewLease(String theme) { this.theme = theme; }
 
         boolean select(String requestedTheme) {
-            String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme == null ? "" : requestedTheme));
-            if (themePreview != this || alias == null || !THEMES.containsKey(alias)) return false;
+            String alias = themeAlias(requestedTheme);
+            if (themePreview != this || alias == null) return false;
             theme = alias;
             return true;
         }
@@ -1017,8 +1022,8 @@ public class ConfigManager {
         if (requestedTheme == null || requestedTheme.trim().isEmpty()) {
             return null;
         }
-        String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme));
-        if (alias == null || !THEMES.containsKey(alias)) {
+        String alias = themeAlias(requestedTheme);
+        if (alias == null) {
             return null;
         }
         config.put("theme", alias);
@@ -1027,21 +1032,55 @@ public class ConfigManager {
     }
 
     public List<String> getThemeIds() {
-        return new ArrayList<>(THEMES.keySet());
+        List<String> ids = new ArrayList<>(THEMES.keySet());
+        ids.addAll(importedPalettes.keySet());
+        return ids;
     }
 
-    /** Ordered built-in theme data for visual selection surfaces. */
+    /** Built-ins retain their ordering; installed palettes follow them. */
     List<ThemePreview> getThemePreviews() {
-        return THEMES.values().stream().map(ThemePalette::preview).toList();
+        List<ThemePreview> previews = new ArrayList<>(THEMES.values().stream().map(ThemePalette::preview).toList());
+        previews.addAll(importedPalettes.values().stream().map(ThemePalette::preview).toList());
+        return List.copyOf(previews);
+    }
+
+    ImportedThemeStore importedThemeStore() { return new ImportedThemeStore(Path.of(shedDirectoryPath)); }
+    ImportedTheme importedTheme(String id) { return importedThemes.get(id); }
+    String importedThemeFailure() { return importedThemeFailure; }
+
+    void replaceImportedThemes(List<ImportedTheme> themes) {
+        Map<String, ImportedTheme> definitions = new LinkedHashMap<>();
+        Map<String, ThemePalette> palettes = new LinkedHashMap<>();
+        for (ImportedTheme theme : themes) {
+            String background = theme.colors().get("normal");
+            ThemePalette palette = new ThemePalette(theme.id(), theme.displayName(), background, background, background,
+                background, background, theme.colors().get("foreground"), theme.colors().get("accent"), theme.colors().get("string"));
+            Map<String, Color> overrides = new HashMap<>();
+            theme.colors().forEach((key, value) -> { if (key.startsWith("ui.") || key.startsWith("theme.")) overrides.put(key, Color.decode(value)); });
+            palette.setOverrides(overrides);
+            definitions.put(theme.id(), theme);
+            palettes.put(theme.id(), palette);
+        }
+        importedThemes = Collections.unmodifiableMap(definitions);
+        importedPalettes = Collections.unmodifiableMap(palettes);
+        importedThemeFailure = "";
+    }
+
+    boolean usesImportedPackage(String packageId) {
+        for (String id : List.of(getThemeId(), getAuthoritativeThemeId(), resolveTheme(persistedConfig.getOrDefault("theme", "")).id)) {
+            ImportedTheme theme = importedThemes.get(id);
+            if (theme != null && theme.packageId().equals(packageId)) return true;
+        }
+        return false;
     }
 
     public String getThemeListText() {
         StringBuilder builder = new StringBuilder();
         builder.append("Themes\n\n");
         int index = 1;
-        for (ThemePalette palette : THEMES.values()) {
-            builder.append(index++).append(". ").append(palette.id);
-            if (palette.id.equals(getThemeId())) {
+        for (ThemePreview palette : getThemePreviews()) {
+            builder.append(index++).append(". ").append(palette.id());
+            if (palette.id().equals(getThemeId())) {
                 builder.append("  (active)");
             }
             builder.append("\n");
@@ -2472,15 +2511,27 @@ public class ConfigManager {
     }
 
     private ThemePalette resolveTheme(String raw) {
-        String alias = THEME_ALIASES.get(normalizeThemeName(raw));
+        String alias = themeAlias(raw);
         if (alias == null) {
             alias = DEFAULT_THEME;
         }
-        ThemePalette palette = THEMES.get(alias);
+        ThemePalette palette = importedPalettes.getOrDefault(alias, THEMES.get(alias));
         if (palette == null) {
             palette = THEMES.get(DEFAULT_THEME);
         }
         return palette;
+    }
+
+    private String themeAlias(String requested) {
+        if (requested == null) return null;
+        if (importedPalettes.containsKey(requested)) return requested;
+        String normalized = normalizeThemeName(requested);
+        String builtin = THEME_ALIASES.get(normalized);
+        if (builtin != null) return builtin;
+        for (ImportedTheme theme : importedThemes.values()) {
+            if (normalizeThemeName(theme.displayName()).equals(normalized)) return theme.id();
+        }
+        return null;
     }
 
     private static String normalizeThemeName(String raw) {

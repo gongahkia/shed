@@ -14,9 +14,9 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal");
+    static final Set<String> OPERATIONS = Set.of("editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal");
     static boolean mutation(String method) {
-        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
+        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/source/sync","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
     }
     static final int MAX_READ = 2048, MAX_REPLACEMENT = 8192, MAX_DOCUMENT = 1024 * 1024;
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
@@ -70,6 +70,7 @@ final class EditorControl implements AutoCloseable {
     Map<String, Object> dispatch(String method, Map<String, Object> params, BooleanSupplier connection) {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Control dispatch belongs off the EDT");
         if (!OPERATIONS.contains(method)) throw fail(WorkspaceApiException.Code.UNSUPPORTED);
+        if (method.equals("editor/source/sync")) return sync(params, connection);
         if(method.equals("editor/watch"))return watch(params,connection);
         if(method.equals("editor/terminal"))return terminal(params,connection);
         boolean initialOpen=method.equals("editor/file/open")&&params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","path"));
@@ -216,6 +217,29 @@ final class EditorControl implements AutoCloseable {
             return Map.of("schemaVersion",1,"instanceId",params.get("instanceId"),"windowId",params.get("windowId"),"projectId",grant.projectId,"operation","editor/watch","observation",observation);
         }finally{active.compareAndSet(lease,null);}
     }
+    private Map<String,Object> sync(Map<String,Object> params, BooleanSupplier connection) {
+        if (!params.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","path","sha256","timeoutMs"))
+            || !Long.valueOf(1).equals(params.get("schemaVersion"))) throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        grant.requireIdentity(text(params,"instanceId",64), text(params,"windowId",64));
+        if (!grant.projectId.equals(text(params,"projectId",64))) throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
+        var lease = new Lease(connection);
+        if (!active.compareAndSet(null,lease)) throw fail(WorkspaceApiException.Code.BUSY);
+        try (lease) {
+            var selected = ui(lease, () -> owner().watchRoot());
+            grant.authorizeProject(selected.root(),selected.generation());
+            var service = services.get();
+            if (service == null) throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
+            long timeout = number(params,"timeoutMs");
+            if (timeout < 50 || timeout > 3000) throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+            var result = EditorFreshness.await(service.workspace(),root,text(params,"path",4096),text(params,"sha256",64),(int)timeout,lease::current);
+            var after = ui(lease, () -> owner().watchRoot());
+            if (!after.equals(selected)) throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
+            grant.authorizeProject(after.root(),after.generation());
+            return Map.of("schemaVersion",1,"instanceId",params.get("instanceId"),"windowId",params.get("windowId"),
+                "projectId",grant.projectId,"operation","editor/source/sync","observation",result);
+        } finally { active.compareAndSet(lease,null); }
+    }
+
     private Map<String,Object> project(Lease lease,String method,Map<String,Object> params,EditorNavigation.State before,Services current) {
         if(method.equals("editor/project/read")) {
             String name=EditorProjectChanges.path(params,"path");authorizePath(name,before,current.workspace(),AgentPolicy.Capability.READ);

@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -31,6 +31,13 @@ final class ShedControlCli {
             String key=options.remove("--credential");
             Path credential=key==null?descriptor.resolveSibling("status-"+identity.attachmentId()+".key"):Path.of(key);
             try(var client=WorkspaceBridgeClient.control(descriptor,credential)) {
+                if (command.equals("sync")) {
+                    if (path == null) throw new IllegalArgumentException();
+                    String hash = required(options,"--sha256"); long timeout = number(options,"--timeout-ms",2500);
+                    if (!hash.matches("[a-fA-F0-9]{64}") || timeout < 50 || timeout > 3000 || !options.isEmpty()) throw new IllegalArgumentException();
+                    return emit(client.exchange(request("editor/source/sync",Map.of("schemaVersion",1,"instanceId",identity.instanceId(),
+                        "windowId",identity.windowId(),"projectId",identity.projectId(),"path",path,"sha256",hash,"timeoutMs",timeout))),out);
+                }
                 if(command.equals("state")) {
                     if(path!=null || !options.isEmpty()) throw new IllegalArgumentException();
                     return emit(client.exchange(client.navigationContextRequest()),out);

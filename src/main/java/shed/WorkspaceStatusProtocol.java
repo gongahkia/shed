@@ -107,6 +107,20 @@ final class WorkspaceStatusProtocol {
         }
 
         boolean acceptsControl(String method, Map<String, Object> value) {
+            if (method.equals("editor/source/sync")) {
+                var observation = value == null ? null : MiniJson.asObject(value.get("observation"));
+                return EditorControl.SCOPE.equals(scope()) && value != null
+                    && value.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","operation","observation"))
+                    && Long.valueOf(1).equals(value.get("schemaVersion")) && target.instanceId().equals(value.get("instanceId"))
+                    && target.windowId().equals(value.get("windowId")) && target.projectId().equals(value.get("projectId"))
+                    && method.equals(value.get("operation")) && observation != null
+                    && observation.keySet().equals(Set.of("kind","path","sha256","documentId","version","synced"))
+                    && "sync".equals(observation.get("kind")) && Boolean.TRUE.equals(observation.get("synced"))
+                    && observation.get("sha256") instanceof String hash && hash.matches("[a-f0-9]{64}")
+                    && observation.get("path") instanceof String path && path.length() <= 4096
+                    && observation.get("documentId") instanceof String id && id.length() <= 8192
+                    && observation.get("version") instanceof String version && version.length() <= 8192;
+            }
             if(method.equals("editor/terminal")){
                 var observation=value==null?null:MiniJson.asObject(value.get("observation"));
                 return EditorControl.SCOPE.equals(scope())&&value!=null&&value.keySet().equals(Set.of("schemaVersion","instanceId","windowId","projectId","operation","observation"))

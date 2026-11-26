@@ -23,6 +23,8 @@ class LiveAgentToolingTest(unittest.TestCase):
                           ['--qualification', '--replay-payload', '/missing/payload'],
                           ['--launch-only', '--qualification'], ['--motion'],
                           ['--loop'], ['--check-terminal-handoff'], ['--animation', 'reading', '--loop', '--check-terminal-handoff'],
+                          ['--edge-cases'], ['--edge-cases', '--animation-demo', '--git-fixture', '--visual-only', '--animation', 'terminal'],
+                          ['--edge-cases', '--animation-demo', '--git-fixture', '--visual-only', '--animation', 'reading', '--loop'],
                           ['--animation-demo', '--git-fixture', '--visual-only', '--loop'],
                           ['--animation', 'reading'], ['--animation', 'unknown'], ['--animation', 'move'], ['--animation', 'rename'], ['--animation', 'format'], ['--animation', 'undo'],
                           ['--animation-demo'], ['--animation-demo', '--git-fixture'],
@@ -83,6 +85,7 @@ class LiveAgentToolingTest(unittest.TestCase):
         paused = {'exit': 0, 'result': {'state': 'PAUSED'}}
         self.assertTrue(desktop.demo_succeeded(paused, loop=True))
         self.assertFalse(desktop.demo_succeeded(paused))
+        self.assertFalse(desktop.demo_succeeded({'exit': 0, 'result': {'state': 'PASS'}, 'log': 'UNCAUGHT_DESKTOP_EXCEPTION'}))
         for result in [{'exit': 0, 'result': {'state': 'FAIL'}}, {'exit': 1, 'result': {'state': 'PASS'}}, {'exit': 130}, {'exit': 0}]:
             self.assertFalse(desktop.demo_succeeded(result, loop=True))
 

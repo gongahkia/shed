@@ -21,6 +21,8 @@ public class AgentAnimationDesktopProbe {
     static String deletedBlock;
     static boolean looping,checkTerminalHandoff;
     static long cycles;
+    static final List<String> edgeChecks=new ArrayList<>();
+    static final java.util.concurrent.atomic.AtomicReference<Throwable> uncaught=new java.util.concurrent.atomic.AtomicReference<>();
     static <T>T ui(Callable<T> action)throws Exception{var task=new FutureTask<T>(action);SwingUtilities.invokeAndWait(task);return task.get(5,TimeUnit.SECONDS);}
     static void await(BooleanSupplier ready)throws Exception{long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(12);while(!ui(ready::getAsBoolean)){if(System.nanoTime()>until)throw new IllegalStateException("Visible stage timed out");Thread.sleep(50);}}
     static void stage(String name,long pause)throws Exception{if(!looping){System.out.println(name);System.out.flush();}Thread.sleep(pause);}
@@ -65,8 +67,9 @@ public class AgentAnimationDesktopProbe {
             Thread.sleep(100);
         }
     }
-    static void measureTyping()throws Exception{
-        ui(()->{editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});cli("open","Demo.java");
+    static void measureTyping()throws Exception{measureTyping(true);}
+    static void measureTyping(boolean open)throws Exception{
+        ui(()->{editor.toolWindowHost.watchAgentChanges("stop","Codex");return null;});if(open)cli("open","Demo.java");
         var buffer=ui(editor::getCurrentBuffer);String before=ui(buffer::getContent);
         var tour=ui(()->{var area=editor.writingArea;var range=new AgentEditPresentation.Range(0,5);var t=new AgentChangeTour(area,editor.getActivePane().agentPresentation(),List.of(range),before,"Codex",()->true,()->{},()->{},List.of(new AgentChangePlayback.Edit(range,"")));t.start();return t;});
         String input="// human typing demo\n";
@@ -366,7 +369,42 @@ public class AgentAnimationDesktopProbe {
             cli("follow","--agent","Codex");
         }
     }
+    static void desktopEdges()throws Exception{
+        ui(()->{editor.toolWindowHost.watchAgentChanges("pause","Codex");return null;});
+        var buffer=ui(editor::getCurrentBuffer);String source=ui(buffer::getContent);long revision=ui(buffer::documentRevision);boolean dirty=ui(buffer::isModified),undo=ui(()->buffer.getUndoManager().canUndo());
+        ui(()->{editor.splitWindow(true);editor.splitWindow(false);return null;});
+        for(int index=0;index<3;index++){
+            final int pass=index;var old=ui(()->{var area=editor.writingArea;var range=new AgentEditPresentation.Range(2000,2010);var tour=new AgentChangeTour(area,editor.getActivePane().agentPresentation(),List.of(range),source,"Codex",()->true,()->{},()->{},List.of(new AgentChangePlayback.Edit(range,"")));tour.start();return tour;});
+            ui(()->{
+                editor.setThemeFromCommand(pass==1?"dracula":"shed-light");editor.configManager.set("ui.density",List.of("compact","default","comfortable").get(pass));editor.sessionConfigController.applySetting("ui.density");
+                editor.configManager.set("font.family","Monospaced");editor.configManager.set("font.size",pass==1?"20":"16");editor.sessionConfigController.applySetting("font.family");editor.setSize(pass==1?850:1400,pass==2?650:900);return null;
+            });
+            Thread.sleep(200);ui(()->{
+                old.advance(System.nanoTime()+700_000_000L);var presentation=editor.getActivePane().agentPresentation();presentation.showReading(2000,2040,"Claude Code");
+                var location=editor.writingArea.modelToView2D(2000);if(location==null)throw new AssertionError("Reading geometry unavailable");editor.writingArea.scrollRectToVisible(location.getBounds());var viewport=editor.editorScrollPane.getViewport().getViewPosition();
+                old.advance(System.nanoTime()+2_000_000_000L);old.close();if(!viewport.equals(editor.editorScrollPane.getViewport().getViewPosition()))throw new AssertionError("Stale callback moved the replacement viewport");
+                if(!"Agent reading".equals(editor.writingArea.getClientProperty("shed.agentActivity"))||editor.writingArea.getClientProperty(AgentChangePlayback.KEY)!=null)throw new AssertionError("Stale tour reclaimed reading after geometry change");
+                if(!source.equals(buffer.getContent())||revision!=buffer.documentRevision()||dirty!=buffer.isModified()||undo!=buffer.getUndoManager().canUndo())throw new AssertionError("Layout changes modified source/history");
+                for(var view:editor.editorPanes)if(view!=editor.treePane&&(view.getBuffer()!=buffer||view.getTextArea().getDocument()!=buffer.getDocument()))throw new AssertionError("Split source ownership changed");return null;
+            });
+            picture("edges-layout-"+pass);edgeChecks.add("layout-"+List.of("compact","default","comfortable").get(pass));
+        }
+        ui(()->{
+            editor.clearAgentActivity();var area=editor.writingArea;var presentation=editor.getActivePane().agentPresentation();var range=new AgentEditPresentation.Range(2000,2010);
+            for(int cycle=0;cycle<24;cycle++){
+                try(var first=new AgentChangeTour(area,presentation,List.of(range),source,"Codex",()->true,()->{},()->{},List.of(new AgentChangePlayback.Edit(range,"")));
+                    var next=new AgentChangeTour(area,presentation,List.of(range),source,"OpenCode",()->true,()->{},()->{},List.of(new AgentChangePlayback.Edit(range,"")))){
+                    first.start();next.start();Object owner=area.getClientProperty(AgentChangePlayback.KEY);first.advance(System.nanoTime());if(area.getClientProperty(AgentChangePlayback.KEY)!=owner||area.getClientProperty("shed.agentTour")==null)throw new AssertionError("Old desktop tour cleared replacement");
+                }
+                if(area.getClientProperty(AgentChangePlayback.KEY)!=null||area.getClientProperty("shed.agentTour")!=null)throw new AssertionError("Desktop tour survived close");
+            }
+            var handoff=AgentSourceHandoff.capture(area);if(handoff==null)throw new AssertionError("Owned viewport capture unavailable");handoff.install();area.setBackground(java.awt.Color.PINK);if(area.getClientProperty("shed.agentSourceHandoff")!=null)throw new AssertionError("Old theme image survived");handoff.close();editor.applyThemeColors();return null;
+        });edgeChecks.add("24-overlapping-tour-retirements");edgeChecks.add("theme-image-retirement");
+        awaitStableContext();var read=cli("read","--offset","2200","--limit","900");if(!source.substring(2200,3100).equals(read.get("content")))throw new AssertionError("Passive read did not return the current source");edgeChecks.add("external-cli-passive-read-after-layout");measureTyping(false);edgeChecks.add("typing-interrupts-playback");
+        ui(()->{if(!source.equals(buffer.getContent())||buffer.isModified())throw new AssertionError("Edge fixture source did not restore");return null;});picture("edges-final");stage("EDGE_PASS: geometry, split ownership, supersession and cleanup",1500);
+    }
     public static void main(String[] args)throws Exception{
+        Thread.setDefaultUncaughtExceptionHandler((thread,failure)->{uncaught.compareAndSet(null,failure);System.err.println("UNCAUGHT_DESKTOP_EXCEPTION");failure.printStackTrace();});
         output=Path.of(args[0]).toRealPath();project=Path.of(args[1]).toRealPath();Path fixture=Path.of(System.getenv("SHED_PORTABLE_FIXTURE_ROOT")).toRealPath();
         if(!output.startsWith(fixture.resolve("run"))||!project.startsWith(fixture.resolve("run"))||!Path.of(System.getProperty("user.home")).toRealPath().startsWith(fixture))throw new IllegalArgumentException("Disposable fixture required");
         looping=Arrays.asList(args).contains("--loop");
@@ -378,7 +416,8 @@ public class AgentAnimationDesktopProbe {
             ui(()->{editor.setTitle("Shed — Live agent demonstration");editor.setSize(1400,900);editor.workspaceController.addFolder(project,true);editor.treeGitController.showFileTree(project.toString());editor.activateEditorPane(editor.resolveTreeContentPaneForOpen());editor.setMode(EditorMode.INSERT);editor.hideToolWindow();editor.toFront();editor.writingArea.requestFocusInWindow();editor.handleAgentCommand(args.length>=3&&args[2].equals("terminal")?"api start terminal":"api start control");editor.toolWindowHost.watchAgentChanges("start","Codex");return null;});
             await(()->editor.visualAttachment()!=null&&Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Codex").get("ready")));
             descriptor=ui(()->editor.visualAttachment().descriptor().toString());stage("READY: watch the Shed window",2500);
-            if(looping)loopDemo(args[2]);
+            if(Arrays.asList(args).contains("--edge-cases"))desktopEdges();
+            else if(looping)loopDemo(args[2]);
             else if(args.length==3)singleDemo(args[2]);
             else{
                 read("Demo.java",0);read("Demo.java",2200);read("Demo.java",4400);
@@ -412,9 +451,12 @@ public class AgentAnimationDesktopProbe {
                 if(!modes.containsAll(Set.of("typing","chunks","deleting")))throw new AssertionError("Missing animation modes: "+modes);
                 if(!directions.containsAll(Set.of("left-to-right","right-to-left","top-to-bottom")))throw new AssertionError("Missing motion directions: "+directions);
             }
-            Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("animation",args.length==3?args[2]:"all","state","PASS","modes",modes.stream().toList(),"directions",directions.stream().toList(),"intents",intents.stream().toList(),"intent_client_ms",intentMs,"source_unchanged_by_animation",true,"typing_paint_ms",typingMs,"scope","direct Java/Swing, real authenticated CLI, disposable filesystem writes; no actual model")));
+            if(uncaught.get()!=null)throw new AssertionError("Uncaught desktop exception",uncaught.get());
+            Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("animation",args.length==3?args[2]:"all","state","PASS","modes",modes.stream().toList(),"directions",directions.stream().toList(),"intents",intents.stream().toList(),"intent_client_ms",intentMs,"source_unchanged_by_animation",true,"typing_paint_ms",typingMs,"edge_checks",edgeChecks,"scope","direct Java/Swing, real authenticated CLI, disposable filesystem writes; no actual model")));
             System.out.println("DEMO_PASS: "+(args.length==3?args[2]:"reads, edits, creation, modification, rename, deletion and Git presentation"));
-        }catch(Exception|AssertionError failure){failure.printStackTrace();Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("state","FAIL","error",failure.toString())));throw failure;}finally{if(editor!=null)ui(()->{editor.dispatchEvent(new java.awt.event.WindowEvent(editor,java.awt.event.WindowEvent.WINDOW_CLOSING));return null;});}
+        }catch(Exception|AssertionError failure){failure.printStackTrace();Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("state","FAIL","error",failure.toString(),"edge_checks",edgeChecks)));throw failure;}finally{if(editor!=null)ui(()->{editor.dispatchEvent(new java.awt.event.WindowEvent(editor,java.awt.event.WindowEvent.WINDOW_CLOSING));return null;});}
+        ui(()->null);
+        if(uncaught.get()!=null){Files.writeString(output.resolve("result.json"),MiniJson.stringify(Map.of("state","FAIL","error",uncaught.get().toString(),"edge_checks",edgeChecks)));System.exit(1);}
         System.exit(0);
     }
 }

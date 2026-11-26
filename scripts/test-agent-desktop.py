@@ -115,6 +115,8 @@ def run_codex(binary, fixture, project, work, environment):
 
 
 def demo_succeeded(report, loop=False):
+    if 'UNCAUGHT_DESKTOP_EXCEPTION' in report.get('log', ''):
+        return False
     states = {'PASS', 'PAUSED'} if loop else {'PASS'}
     return report.get('exit') == 0 and report.get('result', {}).get('state') in states
 
@@ -136,6 +138,7 @@ def main():
     parser.add_argument('--animation', choices=[*ANIMATIONS, 'deletion,insertion'], help='Run one animation or the deletion,insertion sequence; requires --animation-demo')
     parser.add_argument('--loop', action='store_true', help='Repeat the selected animation or sequence in the same window until closed')
     parser.add_argument('--check-terminal-handoff', action='store_true', help='Exercise terminal loop handoff once inside the disposable demo')
+    parser.add_argument('--edge-cases', action='store_true', help='Bounded source-animation layout and handoff checks; no terminal or model')
     args = parser.parse_args()
     if args.list_animations:
         for name, description in ANIMATIONS.items():
@@ -143,6 +146,8 @@ def main():
         return 0
     if not all((args.jdk, args.jar, args.output)):
         parser.error('--jdk, --jar and --output are required')
+    if args.edge_cases and (not args.animation_demo or args.animation or args.loop or args.check_terminal_handoff):
+        parser.error('--edge-cases requires the source-only animation demo without an animation selection or loop')
     if args.check_terminal_handoff and not (args.loop and args.animation == 'terminal'):
         parser.error('--check-terminal-handoff requires --animation terminal --loop')
     if args.loop and not args.animation:
@@ -242,6 +247,9 @@ class FormatFixture {
         session.chmod(0o600)
         command = [str(jdk / 'bin/java'), '-Djava.awt.headless=false', *props, '-cp', str(classes) + ':' + str(jar),
                    f'shed.{probe}', str(work), str(project)]
+        if args.edge_cases:
+            command.append('--edge-cases')
+            report['edge_cases'] = True
         if args.animation:
             command.append(args.animation)
             report['animation'] = args.animation

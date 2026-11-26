@@ -159,7 +159,7 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
         String area = "Editor";
         if (owner != null) {
             if (editor.openEditorsBar != null && SwingUtilities.isDescendingFrom(owner, editor.openEditorsBar)) area = "Documents";
-            else if (editor.toolWindowHost != null && SwingUtilities.isDescendingFrom(owner, editor.toolWindowHost)) area = "Tools";
+            else if (editor.toolWindowHost != null && (SwingUtilities.isDescendingFrom(owner, editor.toolWindowHost)||SwingUtilities.isDescendingFrom(owner,editor.toolWindowHost.rightDock()))) area = "Tools";
             else if (SwingUtilities.isDescendingFrom(owner, this)) area = "Navigation";
             else if (SwingUtilities.getWindowAncestor(owner) instanceof JDialog dialog && dialog.getOwner() == editor) area = dialog.getTitle();
         }

@@ -59,6 +59,7 @@ final class EditorUiController {
     private long pendingPaintNanos;
     private long pendingDocumentNanos;
     private JTextArea pendingPaintArea;
+    private ReadOnlyComparisonPanel comparison;
 
     EditorUiController(Texteditor editor) {
         this.editor = editor;
@@ -199,11 +200,10 @@ final class EditorUiController {
         if (!editor.stagedStartupPending) editor.toolWindowHost = new ToolWindowHost(editor);
         profile.mark("UI tool window host");
         if (editor.toolWindowHost != null) editor.toolWindowHost.setVisible(false);
-        editor.editorToolSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editor.editorHostPanel,
-            editor.toolWindowHost == null ? new JPanel() : editor.toolWindowHost);
-        editor.editorToolSplit.setResizeWeight(1.0);
-        editor.editorToolSplit.setDividerSize(0);
-        editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
+        editor.workbenchDocks = new WorkbenchDocks(editor.editorHostPanel,
+            editor.toolWindowHost == null ? new JPanel() : editor.toolWindowHost,
+            editor.toolWindowHost == null ? new JPanel() : editor.toolWindowHost.rightDock());
+        editor.editorToolSplit = editor.workbenchDocks.bottomSplit();
         // Add components
 
         JPanel documentHeader = new JPanel(new BorderLayout());
@@ -216,7 +216,7 @@ final class EditorUiController {
         documentHeader.add(editor.inlineFindBar, BorderLayout.SOUTH);
         JPanel documentArea = new JPanel(new BorderLayout());
         documentArea.add(documentHeader, BorderLayout.NORTH);
-        documentArea.add(editor.editorToolSplit, BorderLayout.CENTER);
+        documentArea.add(editor.workbenchDocks, BorderLayout.CENTER);
         editor.explorerSidebar = new FileExplorerSidebar(documentArea, UiZoom.scale(260, editor.configManager.getUiZoom()), UiZoom.scale(6, editor.configManager.getUiZoom()));
         editor.add(editor.explorerSidebar, BorderLayout.CENTER);
         editor.add(editor.workbenchHeader, BorderLayout.NORTH);
@@ -881,6 +881,13 @@ final class EditorUiController {
     }
 
 
+    void showComparison(String title,String text){
+        comparison=new ReadOnlyComparisonPanel(title,text,editor.resolveEditorFont(),()->{dismissComparison();editor.requestActivePaneFocus();},editor::showScratchBuffer);
+        renderWindowLayout();
+    }
+    void refreshComparisonAppearance(){if(comparison!=null)comparison.appearance(editor.resolveEditorFont());}
+    void dismissComparison(){if(comparison!=null){comparison=null;renderWindowLayout();}}
+
     void renderWindowLayout() {
         if (editor.focusModeController != null) editor.focusModeController.syncChrome();
         int width = editor.editorHostPanel.getWidth() > 0 ? editor.editorHostPanel.getWidth() : editor.getWidth();
@@ -888,6 +895,7 @@ final class EditorUiController {
         Component next = editor.windowLayoutRoot == null ? new JPanel()
             : editor.windowLayoutRoot.render(getActivePane(), width, height);
         if (next == null) next = new JPanel();
+        if (comparison != null) next = comparison;
         if (editor.renderedLayoutComponent != next) {
             if (editor.renderedLayoutComponent != null) editor.editorHostPanel.remove(editor.renderedLayoutComponent);
             editor.renderedLayoutComponent = next;
@@ -900,24 +908,15 @@ final class EditorUiController {
     }
 
     void showToolWindow() {
-        if (editor.toolWindowHost == null || editor.editorToolSplit == null) return;
-        boolean wasVisible = editor.toolWindowHost.isVisible();
-        editor.toolWindowHost.setVisible(true);
-        editor.editorToolSplit.setDividerSize(UiZoom.scale(6, editor.configManager.getUiZoom()));
-        if (!wasVisible && !editor.toolWindowHost.restoreDockSize()) {
-            int extent=editor.toolWindowHost.isChatDock()?editor.editorToolSplit.getWidth():Math.max(editor.getHeight(),editor.editorToolSplit.getHeight());
-            editor.editorToolSplit.setDividerLocation(Math.max(180,(int)(extent*.62)));
-        }
+        if (editor.toolWindowHost == null) return;
+        editor.workbenchDocks.showBottom(true);
         editor.toolWindowHost.refreshActive();
-        editor.editorToolSplit.revalidate();
     }
 
     void hideToolWindow() {
-        if (editor.toolWindowHost == null || editor.editorToolSplit == null) return;
-        editor.toolWindowHost.rememberDockSize();
-        editor.toolWindowHost.setVisible(false);
-        editor.editorToolSplit.setDividerSize(0);
-        editor.editorToolSplit.setDividerLocation(1.0);
+        if (editor.toolWindowHost == null) return;
+        editor.workbenchDocks.showBottom(false);
+        editor.workbenchDocks.showRight(false);
         editor.requestActivePaneFocus();
     }
 
@@ -1017,7 +1016,7 @@ final class EditorUiController {
         applyUiFont();
         editor.toolWindowHost = new ToolWindowHost(editor);
         editor.toolWindowHost.setVisible(false);
-        editor.editorToolSplit.setBottomComponent(editor.toolWindowHost);
+        editor.workbenchDocks.install(editor.toolWindowHost, editor.toolWindowHost.rightDock());
         editor.editorToolSplit.setDividerSize(0);
         editor.editorToolSplit.setDividerLocation(1.0);
         Font editorFont = resolveEditorFont();
@@ -1041,6 +1040,8 @@ final class EditorUiController {
             }
         }
         editor.pendingStartupProblemsFilter = null;
+        var report=editor.pendingStartupReport;editor.pendingStartupReport=null;
+        if(report!=null)editor.toolWindowHost.showReport(report.tab(),report.title(),report.text());
         if (editorHadFocus) editor.writingArea.requestFocusInWindow();
     }
 
@@ -1095,11 +1096,13 @@ final class EditorUiController {
 
     void applyDensity() {
         // Keep source TextUI/View instances, colors, fonts and layout ownership intact.
+        if (comparison != null) comparison.appearance(editor.resolveEditorFont());
         if (editor.workbenchHeader != null) editor.workbenchHeader.refreshDensity();
         if (editor.openEditorsBar != null) editor.openEditorsBar.refreshDensity();
         if (editor.explorerSidebar != null) editor.explorerSidebar.dividerSize(UiZoom.scale(6, editor.configManager.getUiZoom()));
         if (editor.fileExplorer != null) editor.fileExplorer.refreshDensity();
         if (editor.toolWindowHost != null) editor.toolWindowHost.refreshDensity();
+        if (editor.workbenchDocks != null) editor.workbenchDocks.dividerSize(UiZoom.scale(6, editor.configManager.getUiZoom()));
         for (EditorPane pane : editor.editorPanes) {
             if (pane.getAlternateComponent() instanceof FileTreePanel tree) tree.refreshDensity();
         }

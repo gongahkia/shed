@@ -20,6 +20,8 @@ final class WorkbenchLayout {
         REPLACE,
         SEARCH,
         AGENT,
+        LANGUAGE,
+        QUICKFIX,
         STATUS
     }
 

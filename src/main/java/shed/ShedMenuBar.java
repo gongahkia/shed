@@ -77,10 +77,10 @@ final class ShedMenuBar {
         item(view, "Toggle Minimap", -1, 0, () -> command("minimap toggle"));
         view.addSeparator();
         item(view, "Problems", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS));
-        item(view, "Git Changes", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.GIT));
+        dockToggle(view,"Git Changes",ToolWindowHost.Tab.GIT);
         item(view, "Tasks", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TASKS));
         item(view, "Tests", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TESTS));
-        item(view, "Agent Chat…", -1, 0, () -> command("agent delegate"));
+        dockToggle(view,"Agent Chat…",ToolWindowHost.Tab.AGENT);
         var inline=new javax.swing.JCheckBoxMenuItem("Inline Code Suggestions");inline.setName("editor.inlineSuggestions");inline.setSelected(Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled","false")));inline.setToolTipText("Opt in to bounded source context through OpenCode. Tab accepts; Ctrl/Command+Right accepts a word; Escape dismisses.");
         inline.addActionListener(e->{if(!editor.agentOwnsEditor())show(editor.setAiCompletionEnabled(inline.isSelected()));inline.setSelected(Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled","false")));});view.add(inline);
         view.addMenuListener(new javax.swing.event.MenuListener(){public void menuSelected(javax.swing.event.MenuEvent e){inline.setSelected(Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled","false")));}public void menuDeselected(javax.swing.event.MenuEvent e){}public void menuCanceled(javax.swing.event.MenuEvent e){}});
@@ -132,6 +132,11 @@ final class ShedMenuBar {
         if (key == KeyEvent.VK_X && editor.writingArea.isEditable()) editor.writingArea.cut();
         else if (key == KeyEvent.VK_C) editor.writingArea.copy();
         else if (key == KeyEvent.VK_V && editor.writingArea.isEditable()) editor.writingArea.paste();
+    }
+
+    private void dockToggle(JMenu menu,String title,ToolWindowHost.Tab tab){
+        var toggle=new javax.swing.JCheckBoxMenuItem(title);toggle.setSelected(editor.toolWindowHost!=null&&editor.toolWindowHost.isSelected(tab));toggle.addActionListener(e->{if(editor.toolWindowHost!=null)editor.toolWindowHost.toggleRight(tab);else editor.showToolWindow(tab);});
+        menu.add(toggle);menu.addMenuListener(new javax.swing.event.MenuListener(){public void menuSelected(javax.swing.event.MenuEvent e){toggle.setSelected(editor.toolWindowHost!=null&&editor.toolWindowHost.isSelected(tab));}public void menuDeselected(javax.swing.event.MenuEvent e){}public void menuCanceled(javax.swing.event.MenuEvent e){}});
     }
 
     private void command(String value) { show(editor.commandHandler.execute(value)); }

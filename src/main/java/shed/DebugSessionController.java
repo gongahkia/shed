@@ -375,7 +375,7 @@ final class DebugSessionController {
         }
         if (!report.validationErrors().isEmpty()) output.append("\nValidation:\n  ").append(String.join("\n  ", report.validationErrors())).append("\n");
         appendVsCodeLaunchReports(output, vsCode);
-        editor.showScratchBuffer("[debug configurations]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug configurations]", output.toString());
         return "Showing debug configurations";
     }
 
@@ -384,7 +384,7 @@ final class DebugSessionController {
         VsCodeLaunchReports reports = vsCodeLaunchReports(workspace, baseValidation(workspace));
         StringBuilder output = new StringBuilder("VS Code launch compatibility\n\nWorkspace: ").append(workspace).append('\n');
         appendVsCodeLaunchReports(output, reports);
-        editor.showScratchBuffer("[VS Code launch.json]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[VS Code launch.json]", output.toString());
         return reports.folder().present() || reports.workspace().present()
             ? "Showing VS Code launch compatibility" : "No .vscode/launch.json or imported workspace launch configuration was found for this workspace.";
     }
@@ -426,7 +426,7 @@ final class DebugSessionController {
                 output.append(profile.name()).append("  ").append(unavailable == null ? "available" : unavailable).append('\n');
             }
         }
-        editor.showScratchBuffer("[persisted debug profiles]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[persisted debug profiles]", output.toString());
         return report.usable() ? "Showing persisted debug profiles" : "Persisted debug profile storage is unavailable.";
     }
 
@@ -992,7 +992,7 @@ final class DebugSessionController {
                 if (!details.typeName().isBlank()) output.append("\nType: ").append(details.typeName());
                 if (!details.fullTypeName().isBlank()) output.append("\nFull type: ").append(details.fullTypeName());
                 if (!details.stackTrace().isBlank()) output.append("\n\nStack trace:\n").append(details.stackTrace());
-                editor.showScratchBuffer("[debug exception details]", output.toString());
+                editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug exception details]", output.toString());
                 editor.showMessage(result.snapshot().detail());
             });
         return "Exception details requested (job " + jobId + ").";
@@ -1028,7 +1028,7 @@ final class DebugSessionController {
                     output.append("\n");
                     if (!module.path().isBlank()) output.append("  ").append(module.path()).append("\n");
                 }
-                editor.showScratchBuffer("[debug modules]", output.toString());
+                editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug modules]", output.toString());
                 editor.showMessage(result.snapshot().detail());
             });
         return "Module inspection requested (job " + jobId + ").";
@@ -1053,7 +1053,7 @@ final class DebugSessionController {
                     output.append("\n");
                     if (!source.path().isBlank()) output.append("  ").append(source.path()).append("\n");
                 }
-                editor.showScratchBuffer("[debug loaded sources]", output.toString());
+                editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug loaded sources]", output.toString());
                 editor.showMessage(result.snapshot().detail());
             });
         return "Loaded-source inspection requested (job " + jobId + ").";
@@ -1080,7 +1080,7 @@ final class DebugSessionController {
                     editor.showMessage("Memory inspection failed; inspect :debug status.");
                     return;
                 }
-                editor.showScratchBuffer("[debug memory]", formatMemory(result.memory()));
+                editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug memory]", formatMemory(result.memory()));
                 editor.showMessage(result.snapshot().detail());
             });
         return "Memory inspection requested (job " + jobId + ").";
@@ -1138,7 +1138,7 @@ final class DebugSessionController {
                     if (!instruction.symbol().isBlank()) output.append("  ; ").append(instruction.symbol());
                     output.append('\n');
                 }
-                editor.showScratchBuffer("[debug disassembly]", output.toString());
+                editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug disassembly]", output.toString());
                 editor.showMessage(result.snapshot().detail());
             });
         return "Disassembly requested (job " + jobId + ").";
@@ -1310,7 +1310,7 @@ final class DebugSessionController {
         }
         text.append("\nAdd a displayed variable with :debug data add <variables-reference> <name> [-- read|write|readWrite].\n")
             .append("Use the listed opaque id for later enable, disable, access, condition, hit, or remove commands.\n");
-        editor.showScratchBuffer("[debug data breakpoints]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug data breakpoints]", text.toString());
     }
 
     private String instructionBreakpoint(String argument) {
@@ -1408,7 +1408,7 @@ final class DebugSessionController {
             text.append("Unable to read instruction breakpoints: ").append(error.getMessage()).append("\n");
         }
         text.append("\nUse opaque adapter instruction references; Shed does not infer addresses from source or expressions.\n");
-        editor.showScratchBuffer("[debug instruction breakpoints]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug instruction breakpoints]", text.toString());
     }
 
     private static InstructionTarget instructionTarget(String value) {
@@ -1453,7 +1453,7 @@ final class DebugSessionController {
         }
         text.append("\nActions: :debug function add <name> | enable <name> | disable <name> | remove <name>\n")
             .append("         :debug function condition <name> -- <value> | hit <name> -- <value>\n");
-        editor.showScratchBuffer("[debug function breakpoints]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug function breakpoints]", text.toString());
     }
 
     private String configureExceptionBreakpoint(DebugSessionService.ExceptionFilter filter, boolean enabled) {
@@ -1488,7 +1488,7 @@ final class DebugSessionController {
             }
         }
         text.append("\nActions: :debug exception enable <filter> | :debug exception disable <filter>\n");
-        editor.showScratchBuffer("[debug exception breakpoints]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug exception breakpoints]", text.toString());
     }
 
     private BreakpointStore.Breakpoint breakpointAtActiveFile(String value) {
@@ -1534,7 +1534,7 @@ final class DebugSessionController {
             if (!breakpoint.message().isBlank()) text.append("  ").append(breakpoint.message());
             text.append("\n");
         }
-        editor.showScratchBuffer("[debug breakpoints]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug breakpoints]", text.toString());
     }
 
     void toggleBreakpoint(FileBuffer buffer, int zeroBasedLine) {
@@ -1623,7 +1623,7 @@ final class DebugSessionController {
             output.append("\n");
         }
         output.append("\nActions: :debug stack | :debug variables [reference] | :debug frame <id> | :debug eval <expression> | :debug watch add <expression> | :debug watch remove <expression>\n");
-        editor.showScratchBuffer("[debug inspector]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug inspector]", output.toString());
     }
 
     private static void appendVariable(StringBuilder output, DebugInspection.Variable variable, Map<Integer, List<DebugInspection.Variable>> expanded,
@@ -1664,7 +1664,7 @@ final class DebugSessionController {
         else output.append(snapshot.output());
         if (!snapshot.output().isEmpty() && !snapshot.output().endsWith("\n")) output.append("\n");
         output.append("\nActions: :debug eval <expression> | :debug console clear\n");
-        editor.showScratchBuffer("[debug console]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug console]", output.toString());
     }
 
     private void showStatus(Path workspace) {
@@ -1685,7 +1685,7 @@ final class DebugSessionController {
         output.append("Console: ").append(console.state()).append(" — ").append(console.detail()).append("\n");
         if (!snapshot.diagnostics().isEmpty()) output.append("\nDiagnostics:\n  ").append(String.join("\n  ", snapshot.diagnostics())).append("\n");
         output.append("\nActions: :debug configurations | :debug select <name> | :debug start [name] | :debug stop | :debug restart [name]\n");
-        editor.showScratchBuffer("[debug status]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.DEBUG, "[debug status]", output.toString());
     }
 
     private Path workspace() {

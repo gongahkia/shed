@@ -65,8 +65,8 @@ final class AgentCliChatPanel implements ToolWindowHost.ToolSurface {
                 var d=editor.agentDelegation();
                 if(owned==null||!d.lease.id().equals(owned)||!d.lease.state().equals("active"))owned=UUID.randomUUID().toString();
                 String id=owned;editor.handleAgentCommand("api start control");
-                // keep the dock's close button usable alongside the composer during a turn
-                d.chatTurn(id,agent,message,editor.toolWindowHost,()->{var server=editor.visualAttachment();if(server==null)throw new IllegalStateException("Shed attachment unavailable");ready.accept(new Attachment(root(),server.descriptor(),id));},ended);
+                // exempt only Chat; Git and bottom tools remain behind the input shield during a turn
+                d.chatTurn(id,agent,message,surface,()->{var server=editor.visualAttachment();if(server==null)throw new IllegalStateException("Shed attachment unavailable");ready.accept(new Attachment(root(),server.descriptor(),id));},ended);
             }
             public boolean current(Attachment a){return editor.agentDelegation().lease.id().equals(a.id())&&editor.agentDelegationAllowed(a.id());}
             public void done(Attachment a){editor.agentDelegation().chatTurnDone(a.id());}

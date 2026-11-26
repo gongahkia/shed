@@ -2130,6 +2130,12 @@ public class TexteditorSwingIntegrationTest {
         }
     }
 
+    private static String currentToolReport(Texteditor editor) {
+        return descendants(editor.toolWindowHost, javax.swing.JTextArea.class).stream()
+            .filter(area -> "tool.report.text".equals(area.getName()) && area.isShowing())
+            .findFirst().orElseThrow(() -> new AssertionError("No visible tool report")).getText();
+    }
+
     private static JMenuItem contextItem(JPopupMenu menu, String label) {
         for (Component component : menu.getComponents()) {
             if (component instanceof JMenuItem item && label.equals(item.getText())) return item;
@@ -4229,7 +4235,7 @@ public class TexteditorSwingIntegrationTest {
             });
 
             assertEquals("Dev Container task dry run shown (not started)", result);
-            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String output = onEdt(() -> currentToolReport(editor));
             assertTrue(output.contains("Connected Dev Container task dry run: check"));
             assertTrue(output.contains("container workspace: /workspaces/project"));
             assertTrue(output.contains("this dry run starts nothing"));
@@ -4255,15 +4261,15 @@ public class TexteditorSwingIntegrationTest {
             String result = onEdt(() -> editor.handleTaskCommand("cmake dry-run build \"debug local\""));
 
             assertEquals("Task dry run shown (not started)", result);
-            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String output = onEdt(() -> currentToolReport(editor));
             assertTrue(output.contains("Task dry run: cmake-preset-build"));
             assertTrue(output.contains("command: \"cmake\" \"--build\" \"--preset\" \"debug local\""));
             assertTrue(output.contains("shell: direct"));
 
             assertEquals("Task dry run shown (not started)", onEdt(() -> editor.handleTaskCommand("cmake dry-run package release")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("command: \"cpack\" \"--preset\" \"release\""));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("command: \"cpack\" \"--preset\" \"release\""));
             assertEquals("Task dry run shown (not started)", onEdt(() -> editor.handleTaskCommand("cmake dry-run workflow ci")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("command: \"cmake\" \"--workflow\" \"--preset\" \"ci\""));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("command: \"cmake\" \"--workflow\" \"--preset\" \"ci\""));
         } finally {
             disposeEditor(editor);
         }
@@ -4328,7 +4334,7 @@ public class TexteditorSwingIntegrationTest {
             String result = onEdt(() -> editor.handleTaskCommand("dry-run vscode-check-source"));
 
             assertEquals("Task dry run shown (not started)", result);
-            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String output = onEdt(() -> currentToolReport(editor));
             assertTrue(output.contains("Task dry run: vscode-check-source"));
             assertTrue(output.contains("shell: direct"));
             assertTrue(output.contains(source.toString()));
@@ -4367,7 +4373,7 @@ public class TexteditorSwingIntegrationTest {
             });
 
             assertEquals("Remote task dry run shown (not started)", result);
-            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String output = onEdt(() -> currentToolReport(editor));
             assertTrue(output.contains("Remote task dry run: check"));
             assertTrue(output.contains("connection: ssh-project"));
             assertTrue(output.contains("This dry run starts nothing."));
@@ -4408,7 +4414,7 @@ public class TexteditorSwingIntegrationTest {
             });
 
             assertEquals("Remote task dry run shown (not started)", result);
-            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String output = onEdt(() -> currentToolReport(editor));
             assertTrue(output.contains("connection: ssh-project"));
             assertFalse(output.contains("Connected Dev Container task dry run"));
         } finally {
@@ -4660,7 +4666,7 @@ public class TexteditorSwingIntegrationTest {
         try {
             String result = onEdt(() -> editor.handleLspCommand("status"));
             assertEquals("Showing LSP status", result);
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("LSP Server Status"));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("LSP Server Status"));
         } finally {
             disposeEditor(editor);
         }
@@ -4677,8 +4683,8 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             assertEquals("Showing debug status", onEdt(() -> editor.commandHandler.execute("debug status")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Debug Lifecycle"));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("State: IDLE"));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("Debug Lifecycle"));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("State: IDLE"));
         } finally {
             disposeEditor(editor);
         }
@@ -4735,7 +4741,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("count > 0", breakpoint.condition());
             assertEquals("3", breakpoint.hitCondition());
             assertEquals("Showing function breakpoints.", onEdt(() -> editor.commandHandler.execute("debug function list")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("main.main"));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("main.main"));
         } finally {
             disposeEditor(editor);
         }
@@ -4760,7 +4766,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("Instruction breakpoint 'module!0x100' updated.",
                 onEdt(() -> editor.commandHandler.execute("debug instruction disable module!0x100 4")));
             assertEquals("Showing instruction breakpoints.", onEdt(() -> editor.commandHandler.execute("debug instruction list")));
-            String content = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String content = onEdt(() -> currentToolReport(editor));
             assertTrue(content.contains("module!0x100"));
             assertTrue(content.contains("offset=4"));
             assertTrue(content.contains("counter > 0"));
@@ -5090,7 +5096,7 @@ public class TexteditorSwingIntegrationTest {
             });
             int listingJob = Integer.parseInt(listing.replaceAll(".*\\(job ([0-9]+)\\).*", "$1"));
             assertTrue(awaitJobCompletion(editor, listingJob));
-            String listedPresets = onEdt(() -> editor.getCurrentBuffer().getContent());
+            String listedPresets = onEdt(() -> currentToolReport(editor));
             assertTrue(listedPresets.contains("Available test presets"));
             assertTrue(listedPresets.contains("shed-test"));
 
@@ -5125,13 +5131,13 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             assertEquals("Showing managed LSP support", onEdt(() -> editor.handleLspCommand("manage status")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Managed LSP Support"));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains(":lsp manage detect <ext>"));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("Managed LSP Support"));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains(":lsp manage detect <ext>"));
 
             assertEquals("Opened language services for install", onEdt(() -> editor.handleLspCommand("manage install py")));
 
             assertEquals("Showing manual LSP setup", onEdt(() -> editor.handleLspCommand("manage manual py")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("\"lsp.py.command\""));
+            assertTrue(onEdt(() -> currentToolReport(editor)).contains("\"lsp.py.command\""));
         } finally {
             disposeEditor(editor);
         }
@@ -5961,16 +5967,16 @@ public class TexteditorSwingIntegrationTest {
             var queries = new WorkspaceQueryService(root, AgentPolicy.readOnly(), scope.documents());
             scope.service().propose("review fixture", "task", "turn", List.of(new WorkspaceProposalService.Input("source.txt", queries.snapshot(queries.workspaceId(), "source.txt").version(), "reviewed\n")));
             onEdt(() -> { editor.toolWindowHost.showAgentReview(); return null; });
-            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().anyMatch(b -> "agent.apply".equals(b.getName()) && b.isEnabled())));
+            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost.rightDock(), javax.swing.JButton.class).stream().anyMatch(b -> "agent.apply".equals(b.getName()) && b.isEnabled())));
             assertEquals("original\n", Files.readString(source));
             onEdt(() -> {
                 assertEquals("original\n", editor.getCurrentBuffer().getContent());
-                var state = descendants(editor.toolWindowHost, javax.swing.JLabel.class).stream().filter(label -> "agent.reviewState".equals(label.getName())).findFirst().orElseThrow();
+                var state = descendants(editor.toolWindowHost.rightDock(), javax.swing.JLabel.class).stream().filter(label -> "agent.reviewState".equals(label.getName())).findFirst().orElseThrow();
                 assertTrue(state.getText().contains("Review"));
-                var apply = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "agent.apply".equals(b.getName())).findFirst().orElseThrow();
+                var apply = descendants(editor.toolWindowHost.rightDock(), javax.swing.JButton.class).stream().filter(b -> "agent.apply".equals(b.getName())).findFirst().orElseThrow();
                 editor.settingsApplication.update("ui.zoom", "1.5"); editor.setSize(760, 780); editor.validate();
                 for (String name : List.of("agent.apply", "agent.reject")) {
-                    var decision = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> name.equals(b.getName())).findFirst().orElseThrow();
+                    var decision = descendants(editor.toolWindowHost.rightDock(), javax.swing.JButton.class).stream().filter(b -> name.equals(b.getName())).findFirst().orElseThrow();
                     Rectangle control = new Rectangle(0, 0, decision.getWidth(), decision.getHeight());
                     ToolViewport.reveal(decision, control);
                     Rectangle bounds = javax.swing.SwingUtilities.convertRectangle(decision.getParent(), decision.getBounds(), editor.getRootPane());
@@ -5982,10 +5988,10 @@ public class TexteditorSwingIntegrationTest {
             });
             assertTrue(awaitUiState(() -> editor.getCurrentBuffer().getContent().equals("reviewed\n") && editor.getCurrentBuffer().isModified()));
             assertEquals("original\n", Files.readString(source), "Apply to an open document must preserve the existing unsaved-apply policy");
-            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost, javax.swing.JButton.class).stream()
+            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost.rightDock(), javax.swing.JButton.class).stream()
                 .anyMatch(b -> "agent.undo".equals(b.getName()) && b.isEnabled())));
             onEdt(() -> {
-                var undo = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "agent.undo".equals(b.getName())).findFirst().orElseThrow();
+                var undo = descendants(editor.toolWindowHost.rightDock(), javax.swing.JButton.class).stream().filter(b -> "agent.undo".equals(b.getName())).findFirst().orElseThrow();
                 assertTrue(undo.isEnabled()); undo.doClick(); return null;
             });
             assertTrue(awaitUiState(() -> editor.getCurrentBuffer().getContent().equals("original\n")));

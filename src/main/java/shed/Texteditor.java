@@ -66,6 +66,7 @@ public class Texteditor extends JFrame implements KeyListener {
     JScrollPane editorScrollPane;
     JPanel editorHostPanel;
     JSplitPane editorToolSplit;
+    WorkbenchDocks workbenchDocks;
     ToolWindowHost toolWindowHost;
 
     // Managers
@@ -155,6 +156,8 @@ public class Texteditor extends JFrame implements KeyListener {
     final Font stagedStartupFont;
     boolean stagedStartupPending;
     ToolWindowHost.Tab pendingStartupToolTab;
+    record PendingToolReport(ToolWindowHost.Tab tab,String title,String text){}
+    PendingToolReport pendingStartupReport;
     String pendingStartupProblemsFilter;
     List<String> recentFiles;
     File recentFilesStore;
@@ -786,11 +789,21 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void hideToolWindow() {
         pendingStartupToolTab = null;
+        pendingStartupReport = null;
         pendingStartupProblemsFilter = null;
         editorUiController.hideToolWindow();
     }
 
+    void showComparison(String title,String text){editorUiController.showComparison(title,text);}
+
+    void showToolReport(ToolWindowHost.Tab tab, String title, String text) {
+        if (toolWindowHost != null) toolWindowHost.showReport(tab, title, text);
+        else if(stagedStartupPending){pendingStartupReport=new PendingToolReport(tab,title,ToolReportPanel.bounded(text));pendingStartupToolTab=tab;}
+        else showMessage("Report unavailable: tool host is closed");
+    }
+
     void showToolWindow(ToolWindowHost.Tab tab) {
+        pendingStartupReport=null;
         if (toolWindowHost != null) toolWindowHost.showTab(tab);
         else if (stagedStartupPending) pendingStartupToolTab = tab;
     }

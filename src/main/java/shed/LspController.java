@@ -255,7 +255,7 @@ final class LspController {
             }
         }
         sb.append("\nManaged support: :lsp manage (detect/install/update/remove/retry/manual)\n");
-        editor.showScratchBuffer("[lsp status]", sb.toString());
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp status]", sb.toString());
         return "Showing LSP status";
     }
 
@@ -316,7 +316,7 @@ final class LspController {
                 sb.append("  .").append(ext).append(" -> ").append(String.join(" ", cmd)).append("\n");
             }
         }
-        editor.showScratchBuffer("[lsp servers]", sb.toString());
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp servers]", sb.toString());
         return "Showing LSP servers";
     }
 
@@ -327,7 +327,7 @@ final class LspController {
             return "Opened language services";
         }
         if ("status".equalsIgnoreCase(trimmed) || "list".equalsIgnoreCase(trimmed)) {
-            editor.showScratchBuffer("[lsp manage]", managedLanguageSupport.overview());
+            editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp manage]", managedLanguageSupport.overview());
             return "Showing managed LSP support";
         }
         int split = trimmed.indexOf(' ');
@@ -363,7 +363,7 @@ final class LspController {
     }
 
     private String showManagedLspText(String title, String text, String result) {
-        editor.showScratchBuffer(title, text);
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, title, text);
         return result;
     }
 
@@ -379,7 +379,7 @@ final class LspController {
             if (key.workspaceRoot() != null) sb.append("  ").append(key.workspaceRoot());
             sb.append(": ").append(entry.getValue()).append("\n");
         }
-        editor.showScratchBuffer("[lsp log]", sb.toString());
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp log]", sb.toString());
         return "Showing LSP log";
     }
 
@@ -602,7 +602,7 @@ final class LspController {
         for (LspClient.SemanticToken token : tokens) text.append(token.line() + 1).append(":").append(token.character() + 1)
             .append(" length ").append(token.length()).append(" type ").append(token.type()).append("\n");
         if (tokens.isEmpty()) text.append("No semantic tokens\n");
-        editor.showScratchBuffer("[lsp semantic]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp semantic]", text.toString());
         return "Showing semantic tokens";
     }
 
@@ -625,7 +625,7 @@ final class LspController {
             for (LspClient.InlayHint hint : hints) text.append(hint.line() + 1).append(":").append(hint.character() + 1)
                 .append("  ").append(hint.label()).append("\n");
             if (hints.isEmpty()) text.append("No inlay hints\n");
-            editor.showScratchBuffer("[lsp inlay]", text.toString());
+            editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp inlay]", text.toString());
             return "Showing inlay hints";
         } catch (BadLocationException error) {
             return "LSP inlay hints failed: " + error.getMessage();
@@ -657,7 +657,7 @@ final class LspController {
                     .append("  ").append(title).append(lens.hasCommand() ? "\n" : "  (no executable command)\n");
             }
             text.append("\nRun :lsp codelens <index> to execute an available lens.\n");
-            editor.showScratchBuffer("[lsp code lenses]", text.toString());
+            editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp code lenses]", text.toString());
             return "Showing " + lenses.size() + " code lens" + (lenses.size() == 1 ? "" : "es");
         }
         if (requestedIndex > lenses.size()) return "Code lens index out of range: " + requestedIndex;
@@ -747,7 +747,7 @@ final class LspController {
                 text.append('\n');
             }
             text.append("\nRun :lsp links <index> to open a resolved link.\n");
-            editor.showScratchBuffer("[lsp document links]", text.toString());
+            editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp document links]", text.toString());
             return "Showing " + links.size() + " document link" + (links.size() == 1 ? "" : "s");
         }
         if (requestedIndex > links.size()) return "Document link index out of range: " + requestedIndex;
@@ -804,7 +804,7 @@ final class LspController {
                 .append("  ").append(color.hexValue()).append('\n');
         }
         if (colors.isEmpty()) text.append("No document colors\n");
-        editor.showScratchBuffer("[lsp document colors]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp document colors]", text.toString());
         return "Showing " + colors.size() + " document color" + (colors.size() == 1 ? "" : "s");
     }
 
@@ -878,7 +878,7 @@ final class LspController {
         }
         if (ranges.isEmpty()) text.append("No folding ranges\n");
         text.append("\nThese ranges are informational; the current editor fold model remains Markdown-heading-only.\n");
-        editor.showScratchBuffer("[lsp folding ranges]", text.toString());
+        editor.showToolReport(ToolWindowHost.Tab.LANGUAGE, "[lsp folding ranges]", text.toString());
         return "Showing " + ranges.size() + " folding range" + (ranges.size() == 1 ? "" : "s");
     }
 
@@ -1044,7 +1044,7 @@ final class LspController {
             }
             editor.pendingLspRenameEdits = new ArrayList<>(edits);
             editor.pendingLspRenameTarget = newName.trim();
-            editor.showScratchBuffer("[lsp rename preview]", buildLspRenamePreview(editor.pendingLspRenameTarget, editor.pendingLspRenameEdits));
+            editor.showComparison("Rename preview", buildLspRenamePreview(editor.pendingLspRenameTarget, editor.pendingLspRenameEdits));
             return "Prepared rename preview (" + edits.size() + " edit" + (edits.size() == 1 ? "" : "s") + "). Run :lsp renameapply to confirm.";
         } catch (BadLocationException e) {
             return "LSP rename failed: " + e.getMessage();

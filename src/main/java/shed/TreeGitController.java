@@ -546,12 +546,12 @@ final class TreeGitController {
 
     public String handleGitCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
+        if(trimmed.isEmpty()||"status".equalsIgnoreCase(trimmed)){editor.showToolWindow(ToolWindowHost.Tab.GIT);return "Git sidebar opened";}
         if ("conflict".equalsIgnoreCase(trimmed) || "conflicts".equalsIgnoreCase(trimmed)) {
             return showGitConflictResolutionDocument();
         }
-        if ("history".equalsIgnoreCase(trimmed) || "remote".equalsIgnoreCase(trimmed)) {
-            return showGitHistoryRemoteDocument();
-        }
+        if ("history".equalsIgnoreCase(trimmed)) return showGitHistoryRemoteDocument();
+        if ("remote".equalsIgnoreCase(trimmed)) return showGitRemoteActionsDialog();
         if ("worktree".equalsIgnoreCase(trimmed) || "worktrees".equalsIgnoreCase(trimmed)
             || "stash".equalsIgnoreCase(trimmed) || "stashes".equalsIgnoreCase(trimmed)) {
             return showGitRepositoryToolsDocument();
@@ -698,6 +698,11 @@ final class TreeGitController {
     }
 
     String showGitHistoryRemoteDocument() {
+        if(!editor.configManager.getGitHistoryEnabled()||!editor.configManager.getGitPanelPresentationEnabled())return "Git history presentation disabled";
+        editor.showToolWindow(ToolWindowHost.Tab.GIT);if(editor.toolWindowHost!=null)editor.toolWindowHost.gitPanel().showHistory();return "Git sidebar history opened";
+    }
+
+    String showGitRemoteActionsDialog() {
         if (!editor.configManager.getGitHistoryEnabled()) {
             return "Git history disabled by git.history.enabled=false";
         }
@@ -815,11 +820,18 @@ final class TreeGitController {
         return output.isBlank() ? fallback : output;
     }
 
-    private GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token) {
+    String loadGitCommitComparison(File root,String hash,AsyncJobService.JobToken token){
+        if(root==null||hash==null||!hash.matches("[0-9a-fA-F]{7,64}"))throw new IllegalArgumentException("Commit unavailable");
+        var result=runCommand(root,List.of("git","show","--no-ext-diff","--no-textconv","--format=fuller","--stat","--patch",hash),token);
+        if(result.exitCode!=0)throw new IllegalStateException(gitError(result));return result.stdout;
+    }
+
+    GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token) {return loadGitHistory(token,100);}
+    GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token,int count) {
         File root = resolveGitRoot();
         if (root == null) return GitHistoryModel.unavailable("Not inside a Git repository.");
         CommandResult history = runCommand(root,
-            List.of("git", "log", "-z", "--format=%H%x00%D%x00%s%x00%an%x00%aI", "-n", "100"), token);
+            List.of("git", "log", "-z", "--format=%H%x00%D%x00%s%x00%an%x00%aI", "-n", Integer.toString(Math.max(1,Math.min(200,count)))), token);
         if (token.isCancelled()) return GitHistoryModel.unavailable("Git history refresh cancelled.");
         CommandResult remotes = runCommand(root, List.of("git", "remote"), token);
         return GitHistoryModel.fromCommands(root, history, remotes);
@@ -1105,7 +1117,7 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "(no diff)";
         }
-        editor.showScratchBuffer("[git diff]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        editor.showComparison("Git diff", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
         return "Showing git diff";
     }
 
@@ -1201,7 +1213,13 @@ final class TreeGitController {
     }
 
 
-    String showGitLog(File gitRoot, String args) {
+    String showGitLog(File gitRoot,String args){
+        int count=20;try{if(args!=null&&!args.isBlank())count=Math.max(1,Math.min(200,Integer.parseInt(args.trim())));}catch(NumberFormatException invalid){return "Usage: :git log [count]";}
+        if(!editor.configManager.getGitHistoryEnabled()||!editor.configManager.getGitPanelPresentationEnabled())return showAsciiGitLog(gitRoot,count);
+        editor.showToolWindow(ToolWindowHost.Tab.GIT);if(editor.toolWindowHost!=null)editor.toolWindowHost.gitPanel().showHistory(count);return "Git sidebar history opened";
+    }
+
+    String showGitGraph(File gitRoot, String args) {
         int count = 20;
         if (args != null && !args.isBlank()) {
             try {
@@ -1273,10 +1291,8 @@ final class TreeGitController {
         interactiveGitBuffer = null;
         interactiveGitRoot = null;
         interactiveGitView = null;
-        editor.showScratchBuffer(title, content);
-        interactiveGitBuffer = editor.getCurrentBuffer();
-        interactiveGitRoot = gitRoot;
-        interactiveGitView = view;
+        editor.showToolReport(ToolWindowHost.Tab.GIT, title, content);
+
     }
 
     boolean isInteractiveGitBufferActive() {
@@ -1352,7 +1368,7 @@ final class TreeGitController {
             return gitError(result);
         }
         String body = result.stdout.strip();
-        editor.showScratchBuffer("[git commit " + hash + "]", body.isEmpty() ? "(no commit details)\n" : body + "\n");
+        editor.showComparison("Commit " + hash, body.isEmpty() ? "(no commit details)\n" : body + "\n");
         interactiveGitBuffer = null;
         interactiveGitRoot = null;
         interactiveGitView = null;
@@ -1448,7 +1464,7 @@ final class TreeGitController {
             body = "commit created";
         }
         if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT)) {
-            editor.showScratchBuffer("[git commit]", body + "\n");
+            editor.showToolReport(ToolWindowHost.Tab.GIT, "[git commit]", body + "\n");
         }
         return "Commit complete";
     }
@@ -1481,7 +1497,7 @@ final class TreeGitController {
             body = "commit amended";
         }
         if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT)) {
-            editor.showScratchBuffer("[git amend]", body + "\n");
+            editor.showToolReport(ToolWindowHost.Tab.GIT, "[git amend]", body + "\n");
         }
         return "Amend complete";
     }
@@ -1507,7 +1523,7 @@ final class TreeGitController {
         }
         String output = result.stdout.strip();
         if (!output.isEmpty() && (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT))) {
-            editor.showScratchBuffer("[git checkout]", output + "\n");
+            editor.showToolReport(ToolWindowHost.Tab.GIT, "[git checkout]", output + "\n");
         }
         editor.gitBranch = resolveBranchName(gitRoot);
         editor.clearGitBlameCache();
@@ -1530,7 +1546,7 @@ final class TreeGitController {
         }
         String output = result.stdout.strip();
         if (!output.isEmpty() && (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT))) {
-            editor.showScratchBuffer("[git switch]", output + "\n");
+            editor.showToolReport(ToolWindowHost.Tab.GIT, "[git switch]", output + "\n");
         }
         editor.gitBranch = resolveBranchName(gitRoot);
         editor.clearGitBlameCache();
@@ -1563,7 +1579,7 @@ final class TreeGitController {
         if (revision.exitCode != 0 || revision.stdout == null || revision.stdout.isBlank()) return "Git permalink requires a committed HEAD";
         try {
             String link = GitPermalink.create(remote.stdout.strip(), revision.stdout.strip(), relativePath.replace(File.separatorChar, '/'), startLine, endLine);
-            editor.showScratchBuffer("[git permalink]", link + "\n");
+            editor.showToolReport(ToolWindowHost.Tab.GIT, "[git permalink]", link + "\n");
             return "Showing immutable Git permalink";
         } catch (IllegalArgumentException error) {
             return "Git permalink unavailable: " + error.getMessage();
@@ -1738,7 +1754,7 @@ final class TreeGitController {
 
 
     String showGitHelp() {
-        editor.showScratchBuffer("[git help]",
+        editor.showToolReport(ToolWindowHost.Tab.GIT, "[git help]",
             "Git commands\n\n"
                 + ":git                  Show status\n"
                 + ":git status|st        Show status\n"

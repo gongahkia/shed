@@ -179,7 +179,7 @@ final class TestController {
             String output = stdout.isBlank() ? stderr : stderr.isBlank() ? stdout : stdout + "\n" + stderr;
             state.output = output.isBlank() ? "ctest exited " + result.exitCode : output;
             if (!listed.diagnostics().isEmpty()) state.output += "\n" + String.join("\n", listed.diagnostics());
-            editor.showScratchBuffer("[CTest test presets]", state.output);
+            editor.showToolReport(ToolWindowHost.Tab.TESTS, "[CTest test presets]", state.output);
         }
         refreshPanel();
     }
@@ -193,7 +193,7 @@ final class TestController {
         }
         if ("clear".equalsIgnoreCase(value)) return clearCoverage(root);
         if ("text".equalsIgnoreCase(value)) {
-            editor.showScratchBuffer("[coverage]", coverageText(root));
+            editor.showToolReport(ToolWindowHost.Tab.TESTS, "[coverage]", coverageText(root));
             return "Showing coverage";
         }
         if (value.regionMatches(true, 0, "import ", 0, 7)) value = value.substring(7).trim();
@@ -662,7 +662,7 @@ final class TestController {
         StringBuilder output = new StringBuilder("Tests\n\nroot: ").append(snapshot.root()).append('\n');
         for (String diagnostic : snapshot.diagnostics()) output.append("config: ").append(diagnostic).append('\n');
         for (TestService.TestCase test : snapshot.tests()) output.append(test.status().name().toLowerCase(Locale.ROOT)).append("  ").append(test.adapterId()).append("  ").append(test.label()).append('\n');
-        editor.showScratchBuffer("[tests]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TESTS, "[tests]", output.toString());
         return "Showing tests";
     }
 

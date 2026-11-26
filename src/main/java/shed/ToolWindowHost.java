@@ -15,16 +15,14 @@ import javax.swing.JTabbedPane;
 
 /** Shared docked tool area; controllers remain the source of truth. */
 final class ToolWindowHost extends JPanel implements AutoCloseable {
-    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE, SEARCH, AGENT }
+    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE, SEARCH, LANGUAGE, QUICKFIX, AGENT }
 
     private final Texteditor editor;
     private final JTabbedPane tabs = new JTabbedPane();
     private JPanel headerPanel;
-    private javax.swing.JLayeredPane toolBody;
     private final JPanel chatDock=new JPanel(new BorderLayout());
-    private boolean chatDocked;
-    private int rememberedWidth=-1;
-    private boolean rememberedChatAutomatic;
+    private final JTabbedPane rightTabs=new JTabbedPane();
+    private final Map<Tab,ToolReportPanel> reports=new EnumMap<>(Tab.class);
     private final Map<Tab, ToolSurface> surfaces = new EnumMap<>(Tab.class);
     private final Map<Tab, ToolViewport> presentations = new EnumMap<>(Tab.class);
     private final java.beans.PropertyChangeListener toolFocus = event -> {
@@ -36,14 +34,10 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     };
     private final Map<Tab, JDialog> detached = new EnumMap<>(Tab.class);
     private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
-    private java.awt.Component selectedSurface;
-    private int automaticDockHeight = -1;
     private boolean closed;
     private boolean agentToolsRequested;
     private final Map<Tab, Runnable> dockTransitions = new EnumMap<>(Tab.class);
-    private int rememberedHeight = -1;
-    private boolean rememberedAutomatic;
-    private static final java.util.List<Tab> TAB_ORDER = java.util.List.of(Tab.SEARCH, Tab.GIT, Tab.DEBUG, Tab.TASKS, Tab.TESTS, Tab.PROBLEMS, Tab.REPLACE, Tab.AGENT);
+    private static final java.util.List<Tab> TAB_ORDER = java.util.List.of(Tab.SEARCH, Tab.GIT, Tab.DEBUG, Tab.TASKS, Tab.TESTS, Tab.PROBLEMS, Tab.REPLACE, Tab.LANGUAGE, Tab.QUICKFIX, Tab.AGENT);
 
     ToolWindowHost(Texteditor editor) {
         super(new BorderLayout());
@@ -67,7 +61,6 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         };
         body.add(tabs, javax.swing.JLayeredPane.DEFAULT_LAYER);
         body.add(headerPanel, javax.swing.JLayeredPane.PALETTE_LAYER);
-        toolBody=body;
         add(body, BorderLayout.CENTER);
         addSurface(Tab.SEARCH, "Search", new WorkspaceSearchPanel(editor));
         addSurface(Tab.GIT, "Git", new GitChangesToolPanel(editor, this));
@@ -76,12 +69,16 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         addSurface(Tab.TESTS, "Tests", new TestsToolPanel(editor, this));
         addSurface(Tab.PROBLEMS, "Problems", new ProblemsToolPanel(editor, this));
         addSurface(Tab.REPLACE, "Replace", new ProjectReplaceToolPanel(editor, this));
+        addSurface(Tab.QUICKFIX, "Results", new QuickfixToolPanel(editor));
+        addSurface(Tab.LANGUAGE, "Language", new ToolSurface(){private final JPanel panel=new JPanel(new BorderLayout());{panel.add(new JLabel("Use :lsp status, :lsp servers or :lsp log to inspect language services."));}public JPanel component(){return panel;}public void refresh(){}});
         addSurface(Tab.AGENT, "Chat", new AgentWorkbenchPanel(editor));
-        chatDock.setName("agent.rightDock");
-        var chatTitle=new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING,6,0));var label=new JLabel("Agent Chat");label.setName("agent.dock.title");
-        var close=new JButton(WorkbenchIcons.CLOSE);close.setName("agent.dock.close");WorkbenchStyle.quiet(close);AccessibilitySupport.describe(close,"Close Agent Chat","Hide chat without deleting the conversation.");close.addActionListener(e->editor.hideToolWindow());
-        chatTitle.add(label);chatTitle.add(close);chatDock.add(chatTitle,BorderLayout.NORTH);chatDock.add(presentations.get(Tab.AGENT));
-        selectedSurface = tabs.getSelectedComponent();
+        chatDock.setName("workbench.rightDock");rightTabs.setName("workbench.rightTools");rightTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        rightTabs.addTab("Git",presentations.get(Tab.GIT));rightTabs.addTab("Chat",presentations.get(Tab.AGENT));
+        var close=new JButton(WorkbenchIcons.CLOSE);close.setName("workbench.right.close");WorkbenchStyle.quiet(close);AccessibilitySupport.describe(close,"Hide sidebar","Hide Git and Chat without closing their state.");close.addActionListener(e->{editor.workbenchDocks.showRight(false);editor.requestActivePaneFocus();});
+        var rightBody=new javax.swing.JLayeredPane(){public Dimension getPreferredSize(){return rightTabs.getPreferredSize();}public void doLayout(){rightTabs.setBounds(0,0,getWidth(),getHeight());close.setBounds(Math.max(0,getWidth()-headerHeight()),0,headerHeight(),headerHeight());}};
+        rightBody.add(rightTabs,javax.swing.JLayeredPane.DEFAULT_LAYER);rightBody.add(close,javax.swing.JLayeredPane.PALETTE_LAYER);chatDock.add(rightBody);
+        rightTabs.addChangeListener(e->{if(!closed)for(var tab:java.util.List.of(Tab.GIT,Tab.AGENT))if(rightTabs.getSelectedComponent()==presentations.get(tab))refresh(tab);});
+        KeyboardFocusSupport.installEscape(chatDock,editor::requestActivePaneFocus);
         java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", toolFocus);
         tabs.addChangeListener(event -> selectedTabChanged());
     }
@@ -89,7 +86,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     private JPanel header() {
         JPanel panel = new JPanel(new java.awt.GridLayout(1, 2, 0, 0));
         JButton close = new JButton(WorkbenchIcons.CLOSE);
-        close.addActionListener(event -> { editor.hideToolWindow(); editor.requestActivePaneFocus(); });
+        close.addActionListener(event -> { editor.workbenchDocks.showBottom(false); editor.requestActivePaneFocus(); });
         JButton detach = new JButton(WorkbenchIcons.DETACH);
         detach.addActionListener(event -> detachSelected());
         WorkbenchStyle.quiet(close); WorkbenchStyle.quiet(detach);
@@ -102,13 +99,15 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
 
     private void addSurface(Tab tab, String title, ToolSurface surface) {
         surfaces.put(tab, surface);
-        ToolViewport view = new ToolViewport(surface.component(), () -> UiZoom.scale(switch (tab) {
+        JPanel component=surface.component();
+        if(tab!=Tab.AGENT){var report=new ToolReportPanel(component,title,editor::showScratchBuffer);reports.put(tab,report);component=report;}
+        ToolViewport view = new ToolViewport(component, () -> UiZoom.scale(switch (tab) {
             case AGENT, DEBUG, REPLACE -> 480;
             case GIT, TESTS -> 380;
             default -> 320;
         }, editor.configManager.getUiZoom()));
         presentations.put(tab, view);
-        if(tab!=Tab.AGENT)tabs.addTab(title, view);
+        if(tab!=Tab.AGENT&&tab!=Tab.GIT)tabs.addTab(title, view);
     }
 
     void showTab(Tab tab) {
@@ -123,26 +122,17 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
             surface.refresh();
             return;
         }
-        boolean changedDock=setDockMode(tab==Tab.AGENT);
-        boolean firstSizing = !isVisible() && rememberedSize() < 0;
-        editor.showToolWindow();
-        if(tab!=Tab.AGENT)tabs.setSelectedComponent(presentations.get(tab));
-        if (firstSizing||changedDock) {if(!restoreDockSize())sizeDockAutomatically(tab);}
-        editor.editorUiController.applyUiTheme(chatDock);editor.editorUiController.applyUiFont(chatDock);surface.refreshAppearance();
-        surface.refresh();
+        boolean right=tab==Tab.AGENT||tab==Tab.GIT;
+        if(right){rightTabs.setSelectedComponent(presentations.get(tab));editor.workbenchDocks.showRight(true);}
+        else {tabs.setSelectedComponent(presentations.get(tab));editor.workbenchDocks.preferBottomHeight(preferredHeight(tab));editor.showToolWindow();}
+        if(reports.containsKey(tab))reports.get(tab).primary();
+        editor.editorUiController.applyUiTheme(chatDock);editor.editorUiController.applyUiFont(chatDock);surface.refreshAppearance();surface.refresh();
     }
-
-    private boolean setDockMode(boolean chat){
-        if(chatDocked==chat)return false;
-        rememberDockSize();chatDocked=chat;automaticDockHeight=-1;
-        removeAll();add(chat?chatDock:toolBody);editor.editorToolSplit.setOrientation(chat?javax.swing.JSplitPane.HORIZONTAL_SPLIT:javax.swing.JSplitPane.VERTICAL_SPLIT);
-        setMinimumSize(new Dimension(0,chat?80:160));revalidate();return true;
-    }
-    boolean isChatDock(){return chatDocked;}
-    private int dockExtent(){return chatDocked?editor.editorToolSplit.getWidth():editor.editorToolSplit.getHeight();}
-    private int rememberedSize(){return chatDocked?rememberedWidth:rememberedHeight;}
-    private void rememberedSize(int size,boolean automatic){if(chatDocked){rememberedWidth=size;rememberedChatAutomatic=automatic;}else{rememberedHeight=size;rememberedAutomatic=automatic;}}
-
+    GitChangesToolPanel gitPanel(){return (GitChangesToolPanel)surfaces.get(Tab.GIT);}
+    void toggleRight(Tab tab){if(isSelected(tab)&&(tab==Tab.GIT||tab==Tab.AGENT))editor.workbenchDocks.showRight(false);else showTab(tab);}
+    JPanel rightDock(){return chatDock;}
+    boolean rightVisible(){return editor.workbenchDocks!=null&&editor.workbenchDocks.rightVisible();}
+    void showReport(Tab tab,String title,String text){showTab(tab);var report=reports.get(tab);if(report!=null){report.show(title,text);report.appearance(editor.resolveUiFont(),editor.resolveEditorFont());}}
     void addSelectionToChat(EditorPane pane){
         if(pane==null||pane.isDisposed()||!editor.editorPanes.contains(pane)||pane.getBuffer()==null||pane.getBuffer().isLargeFile()||pane.getAlternateComponent()!=null||pane.isMarkdownPreview()||pane.getTerminalPane()!=null||editor.agentOwnsEditor())return;
         var area=pane.getTextArea();int start=area.getSelectionStart(),end=area.getSelectionEnd();
@@ -196,53 +186,14 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         showTab(Tab.AGENT);
     }
 
-    private int preferredDividerLocation(Tab tab) {
-        if(chatDocked){int desired=Math.min(UiZoom.scale(500,editor.configManager.getUiZoom()),(int)(dockExtent()*.45));return Math.max(UiZoom.scale(200,editor.configManager.getUiZoom()),dockExtent()-desired);}
-        int desiredHeight = switch (tab) {
-            case DEBUG, REPLACE, AGENT -> 520;
-            case GIT, TESTS -> 420;
-            default -> 360;
-        };
-        return Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()),
-            editor.editorToolSplit.getHeight() - UiZoom.scale(desiredHeight, editor.configManager.getUiZoom()));
-    }
-
-    private int dockHeight() {
-        return dockExtent() - editor.editorToolSplit.getDividerLocation()
-            - editor.editorToolSplit.getDividerSize();
-    }
-
-    private void sizeDockAutomatically(Tab tab) {
-        editor.editorToolSplit.setDividerLocation(preferredDividerLocation(tab));
-        automaticDockHeight = dockHeight();
-    }
-
-    private void selectedTabChanged() {
-        if(chatDocked)return;
-        java.awt.Component selected = tabs.getSelectedComponent();
-        boolean changed = selected != selectedSurface;
-        selectedSurface = selected;
-        // Grow a default-sized dock for denser tools, preserving a divider the user moved.
-        // Data refreshes do not enter this path, and selecting a smaller tool never shrinks it.
-        if (changed && isVisible() && editor.editorToolSplit != null && automaticDockHeight >= 0
-            && Math.abs(dockHeight() - automaticDockHeight) <= 2) {
-            for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
-                if (presentations.get(entry.getKey()) == selected
-                    && preferredDividerLocation(entry.getKey()) < editor.editorToolSplit.getDividerLocation()) {
-                    sizeDockAutomatically(entry.getKey());
-                    break;
-                }
-            }
-        }
-        refreshActive();
-    }
+    private int preferredHeight(Tab tab){return UiZoom.scale(switch(tab){case DEBUG,REPLACE -> 520;case TESTS -> 420;default -> 360;},editor.configManager.getUiZoom());}
+    private void selectedTabChanged() {if(editor.workbenchDocks!=null&&isVisible())for(var tab:surfaces.keySet())if(tabs.getSelectedComponent()==presentations.get(tab))editor.workbenchDocks.preferBottomHeight(preferredHeight(tab));refreshActive();}
 
     boolean isSelected(Tab tab) {
         ToolSurface surface = surfaces.get(tab);
         JDialog dialog = detached.get(tab);
         if (dialog != null && dialog.isDisplayable() && dialog.isVisible()) return true;
-        if(chatDocked)return tab==Tab.AGENT&&isVisible();
-        if(tab==Tab.AGENT)return false;
+        if(tab==Tab.AGENT||tab==Tab.GIT)return rightVisible()&&rightTabs.getSelectedComponent()==presentations.get(tab);
         return surface != null && tabs.getSelectedComponent() == presentations.get(tab) && isVisible();
     }
 
@@ -274,6 +225,8 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
                 return new java.awt.Insets(0, 0, 0, headerHeight() * 2);
             }
         });
+        rightTabs.setFont(editor.resolveUiFont());rightTabs.setUI(new WorkbenchStyle.TabsUI(){protected java.awt.Insets getTabAreaInsets(int placement){return new java.awt.Insets(0,0,0,headerHeight());}});
+        for(var report:reports.values())report.appearance(editor.resolveUiFont(),editor.resolveEditorFont());
         for (ToolSurface surface : surfaces.values()) surface.refreshAppearance();
         for (ToolViewport view : presentations.values()) view.revalidate();
     }
@@ -293,7 +246,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
 
     void refreshActive() {
         if (closed) return;
-        if(chatDocked){surfaces.get(Tab.AGENT).refresh();return;}
+        for(var tab:java.util.List.of(Tab.GIT,Tab.AGENT))if(isSelected(tab))surfaces.get(tab).refresh();
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
             if (tabs.getSelectedComponent() == presentations.get(entry.getKey())) {
                 entry.getValue().refresh();
@@ -302,40 +255,15 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         }
     }
 
-    record FocusState(boolean visible, int height, boolean automatic, Tab selected, Map<String, Object> dockState) { }
-
-    FocusState hideForFocusMode() {
-        boolean dockedVisible = isVisible();
-        Map<String, Object> dock = captureDockState();
-        FocusState state = new FocusState(dockedVisible, rememberedSize(), chatDocked?rememberedChatAutomatic:rememberedAutomatic, Tab.valueOf((String) dock.get("selected")), dock);
-        hiddenDetachedForFocusMode.clear();
-        for (Map.Entry<Tab, JDialog> entry : detached.entrySet()) {
-            JDialog dialog = entry.getValue();
-            if (dialog != null && dialog.isDisplayable() && dialog.isVisible()) {
-                hiddenDetachedForFocusMode.add(entry.getKey());
-                dialog.setVisible(false);
-            }
-        }
-        editor.hideToolWindow();
-        return state;
+    record FocusState(Map<String,Object> dockState) { }
+    FocusState hideForFocusMode(){
+        var state=new FocusState(captureDockState());hiddenDetachedForFocusMode.clear();
+        for(var entry:detached.entrySet())if(entry.getValue().isVisible()){hiddenDetachedForFocusMode.add(entry.getKey());entry.getValue().setVisible(false);}
+        editor.hideToolWindow();return state;
     }
-
-    void restoreAfterFocusMode(FocusState state) {
-        if (closed) return;
-        setDockMode(state.selected()==Tab.AGENT);
-        if (state.selected()!=Tab.AGENT&&!detached.containsKey(state.selected())) tabs.setSelectedComponent(presentations.get(state.selected()));
-        rememberedSize(state.height(),state.automatic());
-        if (state.visible()) {
-            editor.showToolWindow();
-            restoreDockSize();
-        } else editor.hideToolWindow();
-        for (Tab tab : EnumSet.copyOf(hiddenDetachedForFocusMode)) {
-            JDialog dialog = detached.get(tab);
-            if (dialog != null && dialog.isDisplayable()) {
-                dialog.setVisible(true);
-            }
-        }
-        hiddenDetachedForFocusMode.clear();
+    void restoreAfterFocusMode(FocusState state){
+        restoreDockSelections(state.dockState(),false);
+        for(Tab tab:EnumSet.copyOf(hiddenDetachedForFocusMode)){var dialog=detached.get(tab);if(dialog!=null&&dialog.isDisplayable())dialog.setVisible(true);}hiddenDetachedForFocusMode.clear();
     }
 
     private void detachSelected() {
@@ -350,7 +278,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     private void detach(Tab tab, ToolSurface surface) { detach(tab, surface, false); }
 
     private void detach(Tab tab, ToolSurface surface, boolean restoring) {
-        if (closed || detached.containsKey(tab)) return;
+        if (closed || detached.containsKey(tab) || tab==Tab.AGENT || tab==Tab.GIT) return;
         tabs.remove(presentations.get(tab));
         JDialog dialog = new JDialog(editor, title(tab), false);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
@@ -382,7 +310,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         int index = 0;
         for (Tab candidate : TAB_ORDER) {
             if (candidate == tab) break;
-            if (!detached.containsKey(candidate)) index++;
+            if (candidate!=Tab.AGENT&&candidate!=Tab.GIT&&!detached.containsKey(candidate)) index++;
         }
         tabs.insertTab(title(tab), null, presentation, null, Math.min(index, tabs.getTabCount()));
         tabs.setSelectedComponent(presentations.get(tab));
@@ -391,7 +319,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     }
 
     static String title(Tab tab) {
-        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; case AGENT -> "Chat"; };
+        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; case LANGUAGE -> "Language"; case QUICKFIX -> "Results"; case AGENT -> "Chat"; };
     }
 
     private static WorkbenchLayout.SurfaceType surfaceType(Tab tab) {
@@ -403,6 +331,8 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
             case PROBLEMS -> WorkbenchLayout.SurfaceType.PROBLEMS;
             case REPLACE -> WorkbenchLayout.SurfaceType.REPLACE;
             case SEARCH -> WorkbenchLayout.SurfaceType.SEARCH;
+            case LANGUAGE -> WorkbenchLayout.SurfaceType.LANGUAGE;
+            case QUICKFIX -> WorkbenchLayout.SurfaceType.QUICKFIX;
             case AGENT -> WorkbenchLayout.SurfaceType.AGENT;
         };
     }
@@ -422,57 +352,25 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         }
     }
 
-    void rememberDockSize() {
-        if (!isVisible()) return;
-        int size=Math.max(0,dockHeight());rememberedSize(size,automaticDockHeight>=0&&Math.abs(size-automaticDockHeight)<=2);
+    Map<String,Object> captureDockState(){
+        var state=new java.util.HashMap<String,Object>(editor.workbenchDocks.snapshot());
+        Tab bottom=Tab.SEARCH;for(var tab:surfaces.keySet())if(tabs.getSelectedComponent()==presentations.get(tab))bottom=tab;
+        int extent=editor.editorToolSplit.getHeight();state.put("ratio",extent<=0?.6:Math.max(.1,Math.min(.9,1.0-((Number)state.get("bottomHeight")).doubleValue()/extent)));
+        state.put("selected",bottom.name());state.put("visible",isVisible());state.put("rightSelected",rightTabs.getSelectedComponent()==presentations.get(Tab.GIT)?"GIT":"AGENT");return Map.copyOf(state);
     }
-
-    boolean restoreDockSize() {
-        if (rememberedSize() < 0) return false;
-        editor.editorToolSplit.setDividerLocation(Math.max(WorkbenchStyle.px(120),dockExtent()-rememberedSize()-editor.editorToolSplit.getDividerSize()));
-        automaticDockHeight = (chatDocked?rememberedChatAutomatic:rememberedAutomatic) ? dockHeight() : -1;
-        return true;
+    private void restoreDockSelections(Map<String,Object> dock,boolean startup){
+        if(dock==null)return;
+        var state=new java.util.HashMap<String,Object>(dock);
+        try{Tab selected=Tab.valueOf(String.valueOf(dock.get("selected")));if(selected==Tab.AGENT||selected==Tab.GIT){state.putIfAbsent("rightSelected",selected.name());state.putIfAbsent("rightVisible",Boolean.TRUE.equals(dock.get("visible")));state.putIfAbsent("bottomVisible",false);}else{state.putIfAbsent("bottomVisible",Boolean.TRUE.equals(dock.get("visible")));if(!detached.containsKey(selected))tabs.setSelectedComponent(presentations.get(selected));}}catch(IllegalArgumentException ignored){}
+        try{Tab right=Tab.valueOf(String.valueOf(state.get("rightSelected")));if(right==Tab.AGENT||right==Tab.GIT){rightTabs.setSelectedComponent(presentations.get(right));if(startup&&right==Tab.AGENT&&!agentToolsRequested)state.put("rightVisible",false);}}catch(IllegalArgumentException ignored){}
+        if(!dock.containsKey("bottomHeight")&&dock.get("ratio") instanceof Number ratio&&Double.isFinite(ratio.doubleValue())&&ratio.doubleValue()>=.1&&ratio.doubleValue()<=.9){boolean legacyRight="AGENT".equals(dock.get("selected"))||"GIT".equals(dock.get("selected"));int extent=legacyRight?editor.workbenchDocks.getWidth():editor.editorToolSplit.getHeight();state.put(legacyRight?"rightWidth":"bottomHeight",(int)Math.round(extent*(1-ratio.doubleValue())));}
+        editor.workbenchDocks.restore(state);
     }
-
-    Map<String, Object> captureDockState() {
-        if (isVisible()) rememberDockSize();
-        Tab selected = Tab.SEARCH;
-        for (var entry : surfaces.entrySet()) if (presentations.get(entry.getKey()) == tabs.getSelectedComponent()) selected = entry.getKey();
-        if(chatDocked)selected=Tab.AGENT;
-        int total = dockExtent();
-        double ratio = total <= 0 || rememberedSize() < 0 ? .6 : 1.0 - rememberedSize() / (double) total;
-        return Map.of("visible", isVisible(), "selected", selected.name(), "ratio", Math.max(.1, Math.min(.9, ratio)));
-    }
-
-    void restoreWorkbench(Map<String, Object> dock) {
-        if (closed) return;
-        String workspace = WorkbenchToolWindowPlacement.workspaceId(editor);
-        Map<Tab, WorkbenchPlacementState.Entry> saved = new EnumMap<>(Tab.class);
-        for (Tab tab : TAB_ORDER) {
-            var placement = editor.workbenchPlacementState.get(workspace, surfaceType(tab), "panel");
-            if (placement != null) saved.put(tab, placement);
-        }
-        reattachAll();
-        for (Tab tab : TAB_ORDER) {
-            var entry = saved.get(tab);
-            if(tab==Tab.AGENT)continue;
-            if (entry != null && entry.mode() == WorkbenchPlacementState.Mode.DETACHED && "primary".equals(entry.ownerWindowId())) detach(tab, surfaces.get(tab), true);
-        }
-        if (dock == null) return;
-        boolean suppressAgentRestore=false;
-        try {
-            Tab selected = Tab.valueOf(String.valueOf(dock.get("selected")));
-            if(selected==Tab.AGENT&&!agentToolsRequested){selected=Tab.SEARCH;suppressAgentRestore=true;}
-            setDockMode(selected==Tab.AGENT);
-            if (selected!=Tab.AGENT&&!detached.containsKey(selected)) tabs.setSelectedComponent(presentations.get(selected));
-        } catch (IllegalArgumentException ignored) { }
-        if (dock.get("ratio") instanceof Number number && Double.isFinite(number.doubleValue()) && number.doubleValue() >= .1 && number.doubleValue() <= .9) {
-            editor.validate();rememberedSize((int)Math.round(dockExtent()*(1-number.doubleValue())),false);
-        }
-        if (Boolean.TRUE.equals(dock.get("visible"))&&!suppressAgentRestore) { editor.showToolWindow(); restoreDockSize(); }
-        else {
-            int savedHeight = rememberedSize();editor.hideToolWindow();rememberedSize(savedHeight,false);
-        }
+    void restoreWorkbench(Map<String,Object> dock){
+        if(closed)return;String workspace=WorkbenchToolWindowPlacement.workspaceId(editor);var saved=new EnumMap<Tab,WorkbenchPlacementState.Entry>(Tab.class);
+        for(Tab tab:TAB_ORDER){var entry=editor.workbenchPlacementState.get(workspace,surfaceType(tab),"panel");if(entry!=null)saved.put(tab,entry);}reattachAll();
+        for(Tab tab:TAB_ORDER){var entry=saved.get(tab);if(entry!=null&&entry.mode()==WorkbenchPlacementState.Mode.DETACHED&&"primary".equals(entry.ownerWindowId()))detach(tab,surfaces.get(tab),true);}
+        restoreDockSelections(dock,true);
     }
 
     private static void revealFocusedControl(javax.swing.JComponent component) {

@@ -36,6 +36,16 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private boolean observedDiffDirty;
     private final JTextField commit = new JTextField();
     private final List<GitChangesWorkbenchModel.Change> visibleChanges = new ArrayList<>();
+    private final JPanel pages=new JPanel(new java.awt.CardLayout());
+    private final DefaultTableModel historyRows=new DefaultTableModel(new Object[]{"Commit","Message","Author"},0){public boolean isCellEditable(int r,int c){return false;}};
+    private final JTable historyTable=new JTable(historyRows);
+    private List<GitHistoryModel.Commit> history=List.of();
+    private GitHistoryModel.Snapshot historySnapshot;
+    private boolean historyVisible;
+    private int historyLimit=100;
+    private long historyGeneration;
+    private int historyJob=-1;
+    private long snapshotWorkspace=-1,historyWorkspace=-1;
     private GitChangesWorkbenchModel.Snapshot snapshot;
     private GitChangesWorkbenchModel.Diff selectedDiff;
     private long statusGeneration;
@@ -50,8 +60,9 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         this.host = host;
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(header(), BorderLayout.NORTH);
-        panel.add(content(), BorderLayout.CENTER);
-        panel.add(actions(), BorderLayout.SOUTH);
+        var changePage=new JPanel(new BorderLayout(6,6));changePage.add(content());changePage.add(actions(),BorderLayout.SOUTH);pages.add(changePage,"changes");
+        var historyPage=new JPanel(new BorderLayout(4,4));historyTable.setName("git.history");historyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);historyTable.setDefaultRenderer(Object.class,new javax.swing.table.DefaultTableCellRenderer(){public java.awt.Component getTableCellRendererComponent(JTable t,Object value,boolean selected,boolean focus,int row,int column){var label=(JLabel)super.getTableCellRendererComponent(t,value,selected,focus,row,column);label.putClientProperty("html.disable",true);return label;}});historyPage.add(new JScrollPane(historyTable));var openCommit=button("Open commit comparison",this::openCommit);var historyActions=new JPanel(new WrappingFlowLayout(new FlowLayout(FlowLayout.LEADING,4,2)));historyActions.add(openCommit);historyActions.add(button("Graph…",this::openGraph));historyPage.add(historyActions,BorderLayout.SOUTH);pages.add(historyPage,"history");panel.add(pages,BorderLayout.CENTER);
+        AccessibilitySupport.describe(historyTable,"Git history","Local commits. Select a commit and choose Open commit comparison.");
         changeTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         changeTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) loadDiff(); });
         diff.setName("git.changeDiff");changeTable.setName("git.changeFiles");
@@ -74,7 +85,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     @Override public void focus() { changeTable.requestFocusInWindow(); }
 
     @Override public void close() {
-        closed = true; pulse.close();autoRefreshTimer.stop(); statusGeneration++; diffGeneration++;
+        closed = true; pulse.close();autoRefreshTimer.stop(); statusGeneration++; diffGeneration++;historyGeneration++;if(historyJob>=0)editor.asyncJobService.cancel(historyJob);
     }
 
     private JPanel header() {
@@ -82,7 +93,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         JPanel labels = new JPanel(new java.awt.GridLayout(2, 1));
         labels.add(repository); labels.add(state);
         panel.add(labels, BorderLayout.CENTER);
-        panel.add(button("Refresh", this::refresh), BorderLayout.EAST);
+        var actions=new JPanel(new WrappingFlowLayout(new FlowLayout(FlowLayout.LEADING,4,2)));actions.add(button("Changes",()->{historyVisible=false;((java.awt.CardLayout)pages.getLayout()).show(pages,"changes");refresh();}));actions.add(button("History",this::showHistory));actions.add(button("Refresh",this::refresh));actions.add(button("Remote actions…",()->editor.treeGitController.showGitRemoteActionsDialog()));panel.add(actions,BorderLayout.SOUTH);
         return panel;
     }
 
@@ -91,15 +102,16 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         files.setBorder(BorderFactory.createTitledBorder("Changes"));
         JScrollPane patch = new JScrollPane(diff);
         patch.setBorder(BorderFactory.createTitledBorder("Diff"));
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, files, patch);
-        split.setResizeWeight(0.36);
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, files, patch);
+        split.setResizeWeight(0.55);
         return split;
     }
 
     private JPanel actions() {
         JPanel panel = new JPanel(new BorderLayout(6, 0));
-        JPanel fileActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        JPanel fileActions = new JPanel(new WrappingFlowLayout(new FlowLayout(FlowLayout.LEFT, 4, 2)));
         fileActions.add(button("Open", this::open));
+        fileActions.add(button("Open Diff", this::openComparison));
         fileActions.add(button("Stage", this::stage));
         fileActions.add(button("Unstage", this::unstage));
         fileActions.add(button("Revert", this::revert));
@@ -118,6 +130,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public void refresh() {
+        if(historyVisible){loadHistory();return;}
         requestRefresh(false);
     }
 
@@ -135,6 +148,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
             autoRefreshTimer.setDelay(interval);
             autoRefreshTimer.setInitialDelay(interval);
         }
+        if(historyVisible)return;
         if (!editor.configManager.getGitAutoRefreshEnabled() || !panel.isShowing() || !host.isSelected(ToolWindowHost.Tab.GIT)) return;
         requestRefresh(true);
     }
@@ -142,11 +156,13 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private void requestRefresh(boolean automatic) {
         if (closed || statusLoading) return;
         statusLoading = true;
-        long request = ++statusGeneration;
+        long request = ++statusGeneration,workspace=editor.workspaceRoots.generation();
         if (!automatic) WorkbenchStyle.message(state, "Refreshing Git status…", null);
         editor.asyncJobService.submit("Git changes refresh", token -> editor.treeGitController.loadGitChangesWorkbench(), (job, result, error) -> {
             if (closed || request != statusGeneration) return;
             statusLoading = false;
+            if(workspace!=editor.workspaceRoots.generation()){state.setText("Project changed; refresh Git.");return;}
+            snapshotWorkspace=workspace;
             if (!panel.isDisplayable()) return;
             if (error != null || result == null) {
                 snapshot = null; diffGeneration++; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0);
@@ -192,22 +208,44 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         GitChangesWorkbenchModel.Change change = selected();
         long request = ++diffGeneration;
         GitChangesWorkbenchModel.Snapshot captured = snapshot;
-        if (captured == null || change == null) return;
+        long workspace=snapshotWorkspace;
+        selectedDiff=null;
+        if (captured == null || change == null || snapshotWorkspace!=editor.workspaceRoots.generation()) return;
         WorkbenchStyle.message(state, "Loading diff…", null);
         editor.asyncJobService.submit("Git diff: " + change.path(), token -> editor.treeGitController.loadGitChangesWorkbenchDiff(captured, change),
             (job, result, error) -> {
-                if (closed || request != diffGeneration || snapshot != captured || !panel.isDisplayable()) return;
+                if (closed || request != diffGeneration || snapshot != captured || workspace!=editor.workspaceRoots.generation() || !panel.isDisplayable()) return;
                 if (error != null || result == null) { WorkbenchStyle.message(state, "Diff failed: " + (error == null ? job.getErrorMessage() : error.getMessage()), "error"); return; }
                 selectedDiff = result; diff.showPatch(result.content(),editor.resolveEditorFont()); WorkbenchStyle.message(state, result.detail(), result.available() ? null : "error");
             });
     }
+
+    void showHistory(int count){historyLimit=Math.max(1,Math.min(200,count));showHistory();}
+    void showHistory(){historyVisible=true;((java.awt.CardLayout)pages.getLayout()).show(pages,"history");loadHistory();}
+    private void loadHistory(){
+        if(closed)return;long request=++historyGeneration,workspace=editor.workspaceRoots.generation();var root=editor.treeRoot;if(historyJob>=0)editor.asyncJobService.cancel(historyJob);state.setText("Loading local history…");
+        historyJob=editor.asyncJobService.submit("Git sidebar history",token->editor.treeGitController.loadGitHistory(token,historyLimit),(job,result,error)->{
+            if(closed||request!=historyGeneration)return;historyJob=-1;if(workspace!=editor.workspaceRoots.generation()||!Objects.equals(root,editor.treeRoot)){state.setText("Project changed; refresh history.");return;}historyWorkspace=workspace;historyRows.setRowCount(0);historySnapshot=result;history=result==null?List.of():result.commits();
+            for(var entry:history)historyRows.addRow(new Object[]{entry.hash().substring(0,Math.min(12,entry.hash().length())),entry.subject(),entry.author()});state.setText(error!=null?"History unavailable: "+error.getMessage():result==null?"History unavailable":result.detail());
+        });
+    }
+    static boolean usableHistory(GitHistoryModel.Snapshot snapshot,long expectedWorkspace,long currentWorkspace){return snapshot!=null&&snapshot.available()&&!snapshot.root().isBlank()&&expectedWorkspace==currentWorkspace;}
+    private void openGraph(){if(usableHistory(historySnapshot,historyWorkspace,editor.workspaceRoots.generation()))editor.treeGitController.showGitGraph(new File(historySnapshot.root()),Integer.toString(historyLimit));else state.setText("Refresh available history for this project before opening its graph.");}
+    private void openCommit(){
+        int row=historyTable.getSelectedRow();if(row<0||row>=history.size()||!usableHistory(historySnapshot,historyWorkspace,editor.workspaceRoots.generation()))return;var entry=history.get(row);var root=historySnapshot.root();var project=editor.treeRoot;var pane=editor.getActivePane();var source=editor.getCurrentBuffer();long revision=source==null?-1:source.documentRevision(),input=editor.inputController.lastKeyPressNanos();long request=++historyGeneration,workspace=editor.workspaceRoots.generation();
+        if(historyJob>=0)editor.asyncJobService.cancel(historyJob);
+        historyJob=editor.asyncJobService.submit("Git commit comparison",token->editor.treeGitController.loadGitCommitComparison(new File(root),entry.hash(),token),(job,text,error)->{
+            if(closed||request!=historyGeneration||workspace!=editor.workspaceRoots.generation()||!Objects.equals(project,editor.treeRoot))return;historyJob=-1;if(error!=null){state.setText("Commit comparison failed: "+error.getMessage());return;}if(editor.getActivePane()!=pane||editor.getCurrentBuffer()!=source||(source!=null&&source.documentRevision()!=revision)||editor.inputController.lastKeyPressNanos()!=input){state.setText("Editor context changed; select the commit again to open its comparison.");return;}editor.showComparison("Commit "+entry.hash().substring(0,Math.min(12,entry.hash().length())),text);
+        });
+    }
+    private void openComparison(){var change=selected();if(change==null||selectedDiff==null||!selectedDiff.available()||snapshotWorkspace!=editor.workspaceRoots.generation()){state.setText("Select a file and wait for its diff.");return;}editor.showComparison("Diff · "+change.path(),selectedDiff.content());}
 
     private GitChangesWorkbenchModel.Change selected() {
         int row = changeTable.getSelectedRow();
         return row < 0 || row >= visibleChanges.size() ? null : visibleChanges.get(row);
     }
 
-    private File root() { return snapshot == null || snapshot.root().isBlank() ? null : new File(snapshot.root()); }
+    private File root() { return snapshot == null || snapshotWorkspace!=editor.workspaceRoots.generation() || snapshot.root().isBlank() ? null : new File(snapshot.root()); }
 
     private void open() {
         GitChangesWorkbenchModel.Change change = selected(); File root = root();

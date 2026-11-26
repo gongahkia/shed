@@ -101,6 +101,7 @@ final class PaneBufferController {
         if (pane == null || pane.isDisposed() || buffer == null) {
             return;
         }
+        if(pane==editor.getActivePane())editor.editorUiController.dismissComparison();
         pane.rememberBufferView();
         if (pane.isMarkdownPreview()) {
             editor.detachMarkdownPreview(pane);

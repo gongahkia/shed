@@ -308,7 +308,7 @@ final class JobQuickfixController {
             }
         }
         appendVsCodeTaskReports(sb, vsCodeTasks);
-        editor.showScratchBuffer("[tasks]", sb.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[tasks]", sb.toString());
         return "Showing tasks";
     }
 
@@ -357,7 +357,7 @@ final class JobQuickfixController {
     private String showVsCodeTasks(File projectRoot, VsCodeTaskReports reports) {
         StringBuilder output = new StringBuilder("VS Code task compatibility\n\nWorkspace: ").append(projectRoot.getAbsolutePath()).append('\n');
         appendVsCodeTaskReports(output, reports);
-        editor.showScratchBuffer("[VS Code tasks.json]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[VS Code tasks.json]", output.toString());
         return reports != null && (reports.folder().present() || reports.workspace().present())
             ? "Showing VS Code task compatibility" : "No .vscode/tasks.json or imported workspace tasks were found for this workspace.";
     }
@@ -397,7 +397,7 @@ final class JobQuickfixController {
         StringBuilder output = new StringBuilder("Task configuration invalid\n\n");
         output.append("file: ").append(editor.taskService.taskFile(projectRoot).getAbsolutePath()).append("\n\n");
         for (String diagnostic : diagnostics) output.append("- ").append(diagnostic).append("\n");
-        editor.showScratchBuffer("[tasks]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[tasks]", output.toString());
         return "Task configuration invalid";
     }
 
@@ -1133,7 +1133,7 @@ final class JobQuickfixController {
         output.append(parallel
             ? "\nIndependent local dependency stages run concurrently; this dry run starts nothing.\n"
             : "\nTasks run in this exact order; this dry run starts nothing.\n");
-        editor.showScratchBuffer("[task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
         return "Task dependency dry run shown (not started)";
     }
 
@@ -1146,7 +1146,7 @@ final class JobQuickfixController {
         output.append("problem_matcher: ").append(plan.task().problemMatcher().configValue()).append("\n");
         output.append("presentation: ").append(plan.task().presentation().configValue()).append("\n");
         output.append("env keys: ").append(plan.environment().isEmpty() ? "(none)" : String.join(", ", plan.environment().keySet())).append("\n");
-        editor.showScratchBuffer("[task dry-run " + plan.task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[task dry-run " + plan.task().name() + "]", output.toString());
         return "Task dry run shown (not started)";
     }
 
@@ -1177,7 +1177,7 @@ final class JobQuickfixController {
             return "Remote task validation failed: " + error.getMessage();
         }
         output.append("\nTasks run in this exact order; this dry run starts nothing.\n");
-        editor.showScratchBuffer("[remote task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[remote task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
         return "Remote task dependency dry run shown (not started)";
     }
 
@@ -1192,7 +1192,7 @@ final class JobQuickfixController {
         output.append("presentation: ").append(plan.task().presentation().configValue()).append("\n");
         output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
         output.append("This dry run starts nothing.\n");
-        editor.showScratchBuffer("[remote task dry-run " + plan.task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[remote task dry-run " + plan.task().name() + "]", output.toString());
         return "Remote task dry run shown (not started)";
     }
 
@@ -1215,7 +1215,7 @@ final class JobQuickfixController {
                 .append("   cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
         }
         output.append("\nThe Dev Container workspace path is resolved once when this sequence runs; this dry run starts nothing.\n");
-        editor.showScratchBuffer("[container task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[container task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
         return "Dev Container task dependency dry run shown (not started)";
     }
 
@@ -1227,7 +1227,7 @@ final class JobQuickfixController {
         output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
         output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
         output.append("The remote workspace path is resolved by an explicit devcontainer exec call when this task runs.\n");
-        editor.showScratchBuffer("[container task dry-run " + plan.task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[container task dry-run " + plan.task().name() + "]", output.toString());
         return "Dev Container task dry run shown (not started)";
     }
 
@@ -1253,7 +1253,7 @@ final class JobQuickfixController {
                 .append("   cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
         }
         output.append("\nTasks run in this exact order in the explicitly connected container; this dry run starts nothing.\n");
-        editor.showScratchBuffer("[container task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[container task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
         return "Connected Dev Container task dependency dry run shown (not started)";
     }
 
@@ -1267,7 +1267,7 @@ final class JobQuickfixController {
         output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
         output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
         output.append("The container was explicitly connected earlier in this application session; this dry run starts nothing.\n");
-        editor.showScratchBuffer("[container task dry-run " + plan.task().name() + "]", output.toString());
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[container task dry-run " + plan.task().name() + "]", output.toString());
         return "Dev Container task dry run shown (not started)";
     }
 
@@ -1394,7 +1394,7 @@ final class JobQuickfixController {
             if (result.exitCode != 0) {
                 if (!panelOutput && shouldPresentTaskOutput(plan.task().presentation(), false) && !output.isEmpty()) {
                     if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
-                        editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+                        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[task " + taskName + " #" + jobId + "]", output + "\n");
                     }
                 }
                 String failure = result.stderr == null || result.stderr.isBlank() ? "exit " + result.exitCode : result.stderr.strip();
@@ -1406,7 +1406,7 @@ final class JobQuickfixController {
 
             if (!panelOutput && shouldPresentTaskOutput(plan.task().presentation(), true) && !output.isEmpty()) {
                 if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
-                    editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+                    editor.showToolReport(ToolWindowHost.Tab.TASKS, "[task " + taskName + " #" + jobId + "]", output + "\n");
                 }
             }
             editor.showMessage(parsedEntries.isEmpty()
@@ -1504,27 +1504,7 @@ final class JobQuickfixController {
         if (!editor.quickfixService.hasEntries()) {
             return "Quickfix is empty";
         }
-        String content = editor.quickfixService.render();
-        if (content.isBlank()) {
-            return "Quickfix is empty";
-        }
-
-        if (editor.quickfixBuffer != null && editor.buffers.contains(editor.quickfixBuffer)) {
-            editor.quickfixBuffer.setContent(content, false);
-            editor.loadBufferIntoEditor(editor.quickfixBuffer);
-            editor.writingArea.setCaretPosition(Math.min(Math.max(0, editor.quickfixService.currentIndex()), Math.max(0, editor.writingArea.getDocument().getLength() - 1)));
-            return "Quickfix updated";
-        }
-
-        editor.persistCurrentBufferState();
-        FileBuffer returnBuffer = editor.getCurrentBuffer();
-        int returnCaretPosition = editor.writingArea.getCaretPosition();
-        editor.quickfixBuffer = FileBuffer.createScratch("[quickfix]", content);
-        editor.buffers.add(editor.quickfixBuffer);
-        if (returnBuffer != null) {
-            editor.specialBufferReturns.push(new SpecialBufferReturnState(editor.quickfixBuffer, returnBuffer, returnCaretPosition));
-        }
-        editor.loadBufferIntoEditor(editor.quickfixBuffer);
+        editor.showToolWindow(ToolWindowHost.Tab.QUICKFIX);
         return "Quickfix opened";
     }
 
@@ -1567,6 +1547,11 @@ final class JobQuickfixController {
 
 
     public String closeQuickfixList() {
+        if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.QUICKFIX)) {
+            editor.workbenchDocks.showBottom(false);
+            editor.requestActivePaneFocus();
+            return "Quickfix closed";
+        }
         if (editor.quickfixBuffer == null || !editor.buffers.contains(editor.quickfixBuffer)) {
             return "Quickfix not open";
         }
@@ -1883,7 +1868,7 @@ final class JobQuickfixController {
             if (output.isEmpty()) {
                 editor.showMessage("Shell job " + jobId + " failed (exit " + result.exitCode + ")");
             } else {
-                editor.showScratchBuffer("[shell job " + jobId + "]", output + "\n");
+                editor.showToolReport(ToolWindowHost.Tab.TASKS, "[shell job " + jobId + "]", output + "\n");
                 editor.showMessage(parsedEntries.isEmpty()
                     ? "Shell job " + jobId + " failed (exit " + result.exitCode + ")"
                     : "Shell job " + jobId + " failed (exit " + result.exitCode + ", quickfix updated)");
@@ -1899,7 +1884,7 @@ final class JobQuickfixController {
             editor.showMessage(output);
             return;
         }
-        editor.showScratchBuffer("[shell job " + jobId + "]", output + "\n");
+        editor.showToolReport(ToolWindowHost.Tab.TASKS, "[shell job " + jobId + "]", output + "\n");
         editor.showMessage(parsedEntries.isEmpty()
             ? "Shell job " + jobId + " complete"
             : "Shell job " + jobId + " complete (quickfix updated)");
@@ -1935,7 +1920,7 @@ final class JobQuickfixController {
             if (output.isEmpty()) {
                 editor.showMessage("Filter job " + jobId + " failed (exit " + result.exitCode + ")");
             } else {
-                editor.showScratchBuffer("[filter job " + jobId + "]", output + "\n");
+                editor.showToolReport(ToolWindowHost.Tab.TASKS, "[filter job " + jobId + "]", output + "\n");
                 editor.showMessage("Filter job " + jobId + " failed (exit " + result.exitCode + ")");
             }
             return;

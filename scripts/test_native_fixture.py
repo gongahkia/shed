@@ -298,6 +298,11 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'AgentCliChatPanelTest',
             'AgentChatTranscriptTest',
             'FileExplorerSidebarTest',
+            'WorkbenchDocksTest',
+            'GitSidebarContextTest',
+            'ToolReportPanelTest',
+            'ReadOnlyComparisonPanelTest',
+
             'InlineCompletionSessionTest',
             'InlineCompletionKeymapTest',
             'InlineCompletionDisplayTest',

@@ -1,6 +1,6 @@
 # Ongoing CLI chat inside Shed
 
-Shed's normal agent surface is a single right-hand Chat panel for a conversation with an already-installed local coding CLI. The CLI owns its native conversation and tools; Shed supplies the chat UI and the existing authenticated visualization attachment. There is no new model service, daemon, API key store or document model.
+Shed's normal agent surface is the Chat page in the right-hand Git/Chat sidebar for a conversation with an already-installed local coding CLI. The CLI owns its native conversation and tools; Shed supplies the chat UI and the existing authenticated visualization attachment. There is no new model service, daemon, API key store or document model.
 
 ## Use it
 
@@ -13,6 +13,8 @@ Shed's normal agent surface is a single right-hand Chat panel for a conversation
 The editor stays visible and source input pauses only while a turn is running. It returns between replies; bridge commands are suspended during that interval. The approved lease lasts up to eight minutes. Expiration/revocation ends control, not the visible conversation: a later message needs a new approval and resumes the known native conversation ID. Changing projects requires New chat. A dirty buffer prevents the next turn until it is saved or otherwise resolved.
 
 Run the controlled demonstration with `make demo-chat` or `make demo-delegation`. Both show two conversation turns, actual source reading/editing and cancellation with a fixed Java CLI double. This is a live application test, not a real cloud-model run. The general animation tour remains `make demo`.
+
+The right sidebar and bottom tools are independent: opening Search/Problems/Tasks below does not move Chat. View → Agent Chat… toggles its sidebar page; hiding tools retains the conversation. During an approved active turn, only the Chat input surface and Take Back strip are exempt from the existing input shield; take back control before interacting with other tools. See [tool docking](INDEPENDENT_TOOL_DOCKS.md).
 
 ## Conversation presentation
 

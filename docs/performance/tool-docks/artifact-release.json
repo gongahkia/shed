@@ -1,0 +1,10 @@
+{
+  "jar_sha256": "ac3a549ffda73476ec0ce27a9c95ba0f488f43a92212d64e46163ac101681a21",
+  "compiled_main_classes": 1598,
+  "mismatched_classes": [],
+  "production_commits": [
+    "5e742e925",
+    "f0511e97f"
+  ],
+  "native_evidence": "live-release-evidence.json.gz"
+}

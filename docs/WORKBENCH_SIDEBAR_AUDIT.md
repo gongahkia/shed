@@ -34,3 +34,9 @@ Recommended order: (1) independent right and bottom regions, reusing existing co
 ## Verification
 
 See [commands, counts, live checks and limitations](performance/explorer-sidebar/INDEX.md). Unqualified native-shell fixtures and real language servers remain excluded. Atomic local commits are authorized; no push. README remains byte-for-byte unchanged.
+
+## Implemented follow-up
+
+The independent right Git/Chat dock and bottom tool region are now implemented. Git's normal status/history routes use the sidebar; full patches use a central read-only comparison surface. Language/debug/task/test reports and quickfix results no longer need source tabs; explicit displayed-text exports remain available. See [current guide and qualification](INDEPENDENT_TOOL_DOCKS.md).
+
+The user chose to retain the current tabbed terminal behavior. Terminal buffers, splits, process/session ownership and keyboard behavior are unchanged; no terminal relocation is part of this follow-up. Explicit Git remote/worktree/stash/conflict/graph views remain available with their existing confirmation paths.

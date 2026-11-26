@@ -65,8 +65,9 @@ final class ManagedAgentTask {
                     if(child.isAlive())child.destroyForcibly();
                     try {
                         if(!child.waitFor(2,TimeUnit.SECONDS))throw new IOException("Agent process did not retire");
+                        long childrenDeadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(2);
                         for(var owned:descendants.values()) {
-                            try { owned.handle().onExit().get(2,TimeUnit.SECONDS); }
+                            try { owned.handle().onExit().get(Math.max(1,childrenDeadline-System.nanoTime()),TimeUnit.NANOSECONDS); }
                             catch(TimeoutException pending){throw new IOException("Agent child did not retire",pending);}
                         }
                     } finally {

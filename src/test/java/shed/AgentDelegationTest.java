@@ -48,6 +48,15 @@ class AgentDelegationTest {
             });
         }
     }
+    @Test void disposingAPaneDuringOwnershipCannotReenableItsRetiredSourceView() throws Exception {
+        try(var f=new EditorControlTest.Fixture(temporary)) {
+            EditorControlTest.edt(()->{
+                var root=new JRootPane();root.getContentPane().add(f.pane.getScrollPane());var area=f.pane.getTextArea();int listeners=area.getPropertyChangeListeners("editable").length;
+                try(var owner=new AgentEditorOwnership(root,()->List.of(f.pane),"Agent",()->{})){f.pane.disposeSourceView();owner.refresh();}
+                assertFalse(area.isEditable());assertTrue(f.pane.isDisposed());assertEquals(listeners,area.getPropertyChangeListeners("editable").length);return null;
+            });
+        }
+    }
     static final class DelegatedFixture extends EditorControlTest.Fixture {
         final AgentDelegation lease=new AgentDelegation();
         volatile boolean revokeOnCapture;

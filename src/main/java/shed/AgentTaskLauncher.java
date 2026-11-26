@@ -12,6 +12,7 @@ final class AgentTaskLauncher {
         if(root==null){editor.showMessage("Open a project before delegating a task.");return;}
         if(delegation.lease.running()){editor.showMessage("A delegation request is already running. Take back control first.");return;}
         var provider=new JComboBox<>(new String[]{"Codex CLI","Claude Code CLI","Other CLI (task on stdin)"});
+        provider.setRenderer((list,value,index,selected,focus)->{var label=(JLabel)new DefaultListCellRenderer().getListCellRendererComponent(list,value,index,selected,focus);label.putClientProperty("html.disable",true);label.setIcon(ProviderIcons.forValue(value,label.getBackground()));return label;});
         var command=new JTextField("[\"codex\",\"exec\",\"--sandbox\",\"workspace-write\",\"-\"]",48);command.setName("agent.launchCommand");
         provider.addActionListener(e->{command.setText(provider.getSelectedIndex()==0?"[\"codex\",\"exec\",\"--sandbox\",\"workspace-write\",\"-\"]":provider.getSelectedIndex()==1?"[\"claude\",\"-p\"]":"[\"/path/to/agent-cli\"]");});
         var name=new JTextField("Codex",16);name.setName("agent.launchName");provider.addActionListener(e->name.setText(provider.getSelectedIndex()==0?"Codex":provider.getSelectedIndex()==1?"Claude":"Agent"));

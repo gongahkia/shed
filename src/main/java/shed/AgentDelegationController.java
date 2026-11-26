@@ -69,7 +69,7 @@ final class AgentDelegationController implements AutoCloseable {
             var watch=editor.toolWindowHost.watchAgentChanges("state",lease.agent());
             if(watch.get("error") instanceof String error&&!error.isEmpty())lease.revoke("failed");
             else if(editor.visualAttachmentFailed())lease.revoke("failed");
-            else if(editor.visualAttachment()!=null&&Boolean.TRUE.equals(watch.get("ready"))){lease.activate(lease.id());try{onActive.run();}catch(RuntimeException failure){lease.revoke("failed");editor.showMessage("Agent task could not start; control returned to you.");}}
+            else if(editor.visualAttachment()!=null&&Boolean.TRUE.equals(watch.get("ready"))){lease.activate(lease.id());editor.showMessage(lease.agent()+" has control · Take Back Control to return to editing.");try{onActive.run();}catch(RuntimeException failure){lease.revoke("failed");editor.showMessage("Agent task could not start; control returned to you.");}}
         }
         if(ownership!=null)ownership.refresh();
         if(!lease.running())handBack();

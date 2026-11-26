@@ -52,4 +52,42 @@ class AgentTerminalCommandTest {
             var result=command.result().join();assertEquals(-1,result.exitCode);assertTrue(result.stderr.contains("timed out"));assertTrue(result.stdout.length()<8300);assertTrue(result.stdout.contains("truncated"));assertEquals(1,terminal.releases);
         });
     }
+    private static boolean ticking(AgentTerminalCommand command)throws Exception{var field=AgentTerminalCommand.class.getDeclaredField("timer");field.setAccessible(true);return ((javax.swing.Timer)field.get(command)).isRunning();}
+    @Test void humanHandoffAtTheLastCharacterCannotPressEnterAndLateEventsCannotReviveIt()throws Exception{
+        var ref=new java.util.concurrent.atomic.AtomicReference<AgentTerminalCommand>();var terminal=new Terminal();
+        SwingUtilities.invokeAndWait(()->{
+            String line="'tool'";var command=new AgentTerminalCommand(terminal,line,60);ref.set(command);command.start();long now=System.nanoTime();for(int i=1;i<=line.length();i++)command.advance(now+i*50_000_000L);
+            assertEquals(line,String.join("",terminal.input));assertFalse(terminal.input.contains("\r"));command.cancel("Human took terminal control");
+            command.event(new TerminalShellIntegrationTracker.Event(java.time.Instant.now(),"command","stale"));command.event(new TerminalShellIntegrationTracker.Event(java.time.Instant.now(),"finished","0"));command.advance(now+2_000_000_000L);
+            assertFalse(terminal.input.contains("\r"));assertEquals(1,terminal.releases);assertEquals("Human took terminal control",command.result().join().stderr);
+        });
+        SwingUtilities.invokeAndWait(()->{try{assertFalse(ticking(ref.get()));}catch(Exception e){throw new AssertionError(e);}});
+    }
+    @Test void closureWhileWaitingTypingOrRunningStopsExactlyOnce()throws Exception{
+        SwingUtilities.invokeAndWait(()->{
+            for(int phase=0;phase<3;phase++){
+                var terminal=new Terminal();terminal.ready=phase!=0;var command=new AgentTerminalCommand(terminal,"'tool'",60);command.start();long now=System.nanoTime();
+                if(phase==1)command.advance(now+100_000_000L);else if(phase==2)type(command);
+                terminal.connected=false;command.advance(now+2_000_000_000L);command.close();command.advance(now+3_000_000_000L);
+                assertEquals(1,terminal.releases);assertEquals("Terminal closed",command.result().join().stderr);if(phase<2)assertFalse(terminal.input.contains("\r"));
+                try{assertFalse(ticking(command));}catch(Exception e){throw new AssertionError(e);}
+            }
+        });
+    }
+    @Test void cancellationWinsOverAnAlreadyQueuedCompletionAndLaterCommandsStayIndependent()throws Exception{
+        var first=new java.util.concurrent.atomic.AtomicReference<AgentTerminalCommand>();var oldTerminal=new Terminal();
+        SwingUtilities.invokeAndWait(()->{
+            var command=new AgentTerminalCommand(oldTerminal,"'old'",60);first.set(command);command.start();type(command);command.output("old output");
+            command.event(new TerminalShellIntegrationTracker.Event(java.time.Instant.now(),"command","old"));command.event(new TerminalShellIntegrationTracker.Event(java.time.Instant.now(),"finished","0"));command.cancel("Human took terminal control");
+        });
+        SwingUtilities.invokeAndWait(()->{var nextTerminal=new Terminal();var next=new AgentTerminalCommand(nextTerminal,"'next'",60);next.start();assertEquals("Human took terminal control",first.get().result().join().stderr);assertFalse(next.result().isDone());type(next);assertEquals("'next'\r",String.join("",nextTerminal.input));next.close();assertEquals(1,nextTerminal.releases);assertEquals(1,oldTerminal.releases);});
+    }
+    @Test void repeatedCloseAndStartAfterRetirementDoNotRestartTimersOrTypeAgain()throws Exception{
+        SwingUtilities.invokeAndWait(()->{
+            for(int cycle=0;cycle<100;cycle++){
+                var terminal=new Terminal();var command=new AgentTerminalCommand(terminal,"'tool'",60);command.start();command.close();int sent=terminal.input.size();command.start();command.close();command.advance(System.nanoTime()+30_000_000_000L);
+                assertEquals(sent,terminal.input.size());assertEquals(1,terminal.releases);try{assertFalse(ticking(command),"Retired commands must not restart their timer");}catch(Exception e){throw new AssertionError(e);}
+            }
+        });
+    }
 }

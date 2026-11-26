@@ -164,7 +164,8 @@ final class AgentEditPresentation implements AutoCloseable {
         intent=null;intentViewport=null;intentScroll=null;area.putClientProperty("shed.agentIntent",null);area.putClientProperty("shed.agentIntentStatus",null);
         if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)playback.close();
         area.putClientProperty("shed.agentDirection",null);
-        if (highlighter != null) for (Object tag : tags) highlighter.removeHighlight(tag);
+        // a UI replacement has already deinstalled the old highlighter before this callback
+        if (highlighter != null && highlighter == area.getHighlighter()) for (Object tag : tags) highlighter.removeHighlight(tag);
         tags.clear();touring=false;reading=false; ranges = List.of(); highlighter = null; ticks = 0; agentName = agentProvider = "Agent";
         area.putClientProperty("shed.agentActivity", null);
     }

@@ -138,7 +138,7 @@ class AnimatedTerminalPanel extends TerminalPanel {
     }
 
     Font agentFont(){return getFontToDisplay(new char[]{'M'},0,1,com.jediterm.terminal.TextStyle.EMPTY);}
-    Rectangle agentCursorBounds(){return disposed||!cursorVisible||composing||getSelection()!=null||getTerminalTextBuffer().isUsingAlternateBuffer()?new Rectangle():cursorBounds(CursorShape.STEADY_BLOCK);}
+    Rectangle agentCursorBounds(){return disposed||!cursorVisible||composing||myClientScrollOrigin!=0||getSelection()!=null||getTerminalTextBuffer().isUsingAlternateBuffer()?new Rectangle():cursorBounds(CursorShape.STEADY_BLOCK);}
     private int agentBadgeSpace(Rectangle caret){
         if(caret.isEmpty())return 0;
         int x=caret.x+caret.width+6,column=Math.max(0,(caret.x-getInsetX())/myCharSize.width+1),row=cursor.y-1;

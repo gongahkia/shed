@@ -14,6 +14,9 @@ final class AgentSourceHandoff implements AutoCloseable {
     private final JTextArea area;
     private final Document document;
     private final Rectangle bounds;
+    private final Font font;
+    private final Color foreground,background;
+    private final boolean wrapped;
     private final Timer expiry;
     private BufferedImage image;
     private JScrollPane scroll;
@@ -22,7 +25,7 @@ final class AgentSourceHandoff implements AutoCloseable {
     private final MouseAdapter mouse=new MouseAdapter(){public void mousePressed(MouseEvent e){close();}public void mouseWheelMoved(MouseWheelEvent e){close();}};
     private final FocusAdapter focus=new FocusAdapter(){public void focusLost(FocusEvent e){close();}};
     private final DocumentListener edits=new DocumentListener(){public void insertUpdate(DocumentEvent e){close();}public void removeUpdate(DocumentEvent e){close();}public void changedUpdate(DocumentEvent e){close();}};
-    private final PropertyChangeListener properties=e->{if("document".equals(e.getPropertyName())||"font".equals(e.getPropertyName())||"lineWrap".equals(e.getPropertyName()))close();};
+    private final PropertyChangeListener properties=e->{String name=e.getPropertyName();if("document".equals(name)||"font".equals(name)||"lineWrap".equals(name)||"foreground".equals(name)||"background".equals(name)||"UI".equals(name))close();};
     private final HierarchyListener hierarchy=e->visibilityChanged();
     private final ChangeListener viewport=e->viewportChanged();
     private void visibilityChanged(){if(!area.isShowing())close();}
@@ -30,6 +33,7 @@ final class AgentSourceHandoff implements AutoCloseable {
 
     private AgentSourceHandoff(JTextArea area,Rectangle bounds,BufferedImage image){
         this.area=area;this.document=area.getDocument();this.bounds=bounds;this.image=image;
+        font=area.getFont();foreground=area.getForeground();background=area.getBackground();wrapped=area.getLineWrap();
         expiry=new Timer(1000,e->close());expiry.setRepeats(false);
     }
     static AgentSourceHandoff capture(JTextArea area){
@@ -40,7 +44,8 @@ final class AgentSourceHandoff implements AutoCloseable {
     }
     void install(){
         if(image==null)return;
-        if(area.getDocument()!=document||!area.isShowing()||!area.getVisibleRect().equals(bounds)){close();return;}
+        if(area.getDocument()!=document||!area.isShowing()||!area.getVisibleRect().equals(bounds)||!java.util.Objects.equals(font,area.getFont())
+                ||!java.util.Objects.equals(foreground,area.getForeground())||!java.util.Objects.equals(background,area.getBackground())||wrapped!=area.getLineWrap()){close();return;}
         clear(area);installed=true;area.putClientProperty(KEY,this);
         area.addKeyListener(keys);area.addMouseListener(mouse);area.addFocusListener(focus);area.addPropertyChangeListener(properties);area.addHierarchyListener(hierarchy);document.addDocumentListener(edits);
         scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,area);

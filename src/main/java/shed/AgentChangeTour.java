@@ -10,6 +10,7 @@ import javax.swing.event.DocumentListener;
 
 /** A finite presentation of observed blocks; never moves the human caret or edits text. */
 final class AgentChangeTour implements AutoCloseable {
+    private static final String OWNER="shed.agentTourOwner";
     private final JTextArea area;
     private final JViewport viewport;
     private final JScrollPane scroll;
@@ -57,7 +58,7 @@ final class AgentChangeTour implements AutoCloseable {
         started=now;fromY=viewport.getViewPosition().y;presentation.showApplied(ranges);presentation.setAgentName(name);version=presentation.version();
         groupEnd=index+1;
         if(playbackEdits!=null){playback=new AgentChangePlayback(area,source,playbackEdits,presentation::agentColor);groupEnd=parallelEnd();playback.frames(index,groupEnd,0);presentation.setAgentName(name+("deleting".equals(area.getClientProperty("shed.agentAnimation"))?" deleting":" writing"),name);}
-        presentation.moveMarker(index,ranges.get(index).start());area.putClientProperty("shed.agentTour",index+1);
+        presentation.moveMarker(index,ranges.get(index).start());area.putClientProperty(OWNER,this);area.putClientProperty("shed.agentTour",index+1);
     }
     private int parallelEnd(){
         if(!playback.inline(index)||area.getLineWrap()||Boolean.TRUE.equals(document.getProperty("i18n")))return index+1;
@@ -101,7 +102,8 @@ final class AgentChangeTour implements AutoCloseable {
         if(playback!=null){playback.close();playback=null;}
         area.removeKeyListener(key);area.removeMouseListener(mouse);area.removeFocusListener(focus);document.removeDocumentListener(edits);
         if(scroll!=null){scroll.removeMouseWheelListener(mouse);scroll.getVerticalScrollBar().removeMouseListener(mouse);scroll.getHorizontalScrollBar().removeMouseListener(mouse);}
-        if(presentation.version()==version){if(clear)presentation.clear();else presentation.finishTour();}area.putClientProperty("shed.agentTour",null);finished.run();
+        if(presentation.version()==version){if(clear)presentation.clear();else presentation.finishTour();}
+        if(area.getClientProperty(OWNER)==this){area.putClientProperty(OWNER,null);area.putClientProperty("shed.agentTour",null);}finished.run();
     }
     boolean running(){return timer.isRunning();}
     @Override public void close(){end(true);}

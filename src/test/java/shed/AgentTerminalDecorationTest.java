@@ -66,6 +66,52 @@ class AgentTerminalDecorationTest {
     private static int tinted(Color background,Color color){
         var image=new BufferedImage(1,1,BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();try{g.setColor(background);g.fillRect(0,0,1,1);g.setComposite(AlphaComposite.SrcOver.derive(.75f));g.setColor(color);g.fillRect(0,0,1,1);}finally{g.dispose();}return image.getRGB(0,0);
     }
+    static final class EdgePanel extends AnimatedTerminalPanel {
+        com.jediterm.terminal.model.TerminalSelection selection;
+        EdgePanel(com.jediterm.terminal.ui.settings.SettingsProvider settings,com.jediterm.terminal.model.TerminalTextBuffer buffer,com.jediterm.terminal.model.StyleState style){super(settings,buffer,style);}
+        @Override public boolean isShowing(){return true;}
+        @Override public boolean isFocusOwner(){return false;}
+        @Override public com.jediterm.terminal.model.TerminalSelection getSelection(){return selection;}
+        void history(int origin){myClientScrollOrigin=origin;}
+        void ime(String text){var iterator=text==null?null:new java.text.AttributedString(text).getIterator();processInputMethodEvent(new java.awt.event.InputMethodEvent(this,java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,iterator,0,null,null));}
+    }
+    static EdgePanel edgePanel(com.jediterm.terminal.model.TerminalTextBuffer buffer,com.jediterm.terminal.model.StyleState style){var settings=new PtyTerminalPane.ShedTerminalSettingsProvider(null,new Font("Monospaced",0,16));style.setDefaultStyle(settings.getDefaultStyle());var panel=new EdgePanel(settings,buffer,style);panel.init(new JScrollBar());panel.setSize(panel.getPreferredSize());panel.putClientProperty("shed.caretAnimation",false);panel.setCursorShape(com.jediterm.terminal.CursorShape.STEADY_BLOCK);panel.setCursor(5,1);return panel;}
+    @Test void badgesAndTintYieldToSelectionScrollbackImeAndAlternateScreen()throws Exception{
+        EditorControlTest.edt(()->{
+            var style=new com.jediterm.terminal.model.StyleState();var buffer=new com.jediterm.terminal.model.TerminalTextBuffer(80,24,style);var panel=edgePanel(buffer,style);var owner=new JPanel();
+            try(var decoration=new AgentTerminalDecoration(owner,panel,"Codex")){
+                decoration.phase("typing");assertFalse(panel.agentCursorBounds().isEmpty());
+                panel.selection=new com.jediterm.terminal.model.TerminalSelection(new com.jediterm.core.compatibility.Point(0,0));assertTrue(panel.agentCursorBounds().isEmpty());paintPanel(panel);panel.selection=null;
+                panel.history(-1);assertTrue(panel.agentCursorBounds().isEmpty(),"Any scrollback must hide the agent marker, even when the screen cursor would still fit");paintPanel(panel);panel.history(0);
+                buffer.useAlternateBuffer(true);assertTrue(panel.agentCursorBounds().isEmpty());paintPanel(panel);buffer.useAlternateBuffer(false);
+                panel.ime("拼");assertTrue(panel.agentCursorBounds().isEmpty());paintPanel(panel);panel.ime(null);assertFalse(panel.agentCursorBounds().isEmpty());
+                panel.setCursorVisible(false);assertTrue(panel.agentCursorBounds().isEmpty());panel.setCursorVisible(true);assertFalse(panel.agentCursorBounds().isEmpty());
+            }finally{panel.dispose();}
+            return null;
+        });
+    }
+    @Test void obsoleteDecorationCannotReleaseANewerOwnerOrRestoreAClosedBadge()throws Exception{
+        EditorControlTest.edt(()->{
+            var owner=new JPanel();var input=new JPanel();owner.setSize(300,100);input.setSize(300,100);
+            var old=new AgentTerminalDecoration(owner,input,"Codex");var next=new AgentTerminalDecoration(owner,input,"Claude Code");
+            old.close();assertEquals(Boolean.TRUE,input.getClientProperty("shed.agentControl"));assertTrue(AgentTerminalDecoration.active(input));next.close();assertFalse(AgentTerminalDecoration.active(input));assertNull(input.getClientProperty("shed.agentTerminalBadge"));assertNull(owner.getClientProperty("shed.agentTerminalGlow"));assertNull(input.getClientProperty("shed.agentControl"));return null;
+        });
+    }
+    @Test void rightEdgeAndRepeatedScaledPaintingStayBoundedAndRestoreHumanAppearance()throws Exception{
+        EditorControlTest.edt(()->{
+            var style=new com.jediterm.terminal.model.StyleState();var buffer=new com.jediterm.terminal.model.TerminalTextBuffer(80,24,style);var panel=edgePanel(buffer,style);var owner=new JPanel();String source=buffer.getScreenLines();
+            try{
+                for(int cycle=0;cycle<100;cycle++){
+                    panel.setCursor(cycle%2==0?79:5,1);var before=paintPanel(panel);
+                    try(var decoration=new AgentTerminalDecoration(owner,panel,cycle%2==0?"Codex":"Local agent")){
+                        decoration.phase(cycle%2==0?"typing":"running");var image=new BufferedImage(panel.getWidth()*2,panel.getHeight()*2,BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();try{g.scale(2,2);panel.paint(g);}finally{g.dispose();}
+                        assertEquals(source,buffer.getScreenLines());assertEquals(panel.getPreferredSize(),panel.getSize());
+                    }
+                    assertArrayEquals(before.getRGB(0,0,before.getWidth(),before.getHeight(),null,0,before.getWidth()),paintPanel(panel).getRGB(0,0,before.getWidth(),before.getHeight(),null,0,before.getWidth()));assertNull(panel.getClientProperty("shed.agentTerminalBadge"));assertNull(owner.getClientProperty("shed.agentTerminalGlow"));
+                }
+            }finally{panel.dispose();}assertTrue(panel.agentCursorBounds().isEmpty());return null;
+        });
+    }
     private static BufferedImage paintPanel(AnimatedTerminalPanel panel){
         var image=new BufferedImage(panel.getWidth(),panel.getHeight(),BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();try{panel.paintComponent(g);}finally{g.dispose();}return image;
     }

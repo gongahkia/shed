@@ -51,7 +51,7 @@ final class AgentTerminalCommand implements AutoCloseable {
         this.terminal=terminal;this.line=line;this.timeoutSeconds=timeoutSeconds;
         timer=new Timer(16,event->advance(System.nanoTime()));timer.setCoalesce(true);
     }
-    CompletableFuture<CommandResult> start(){terminal.activity("waiting for prompt");timer.start();return result;}
+    CompletableFuture<CommandResult> start(){if(!finished){terminal.activity("waiting for prompt");timer.start();}return result;}
     CompletableFuture<CommandResult> result(){return result;}
     void advance(long now){
         if(finished)return;terminal.pulse();

@@ -9,7 +9,7 @@ final class AgentTerminalDecoration implements AutoCloseable {
     private static final String KEY="shed.agentTerminalGlow",BADGE="shed.agentTerminalBadge";
     private final JComponent terminal,input;
     private final String agent;
-    private final Object previous,previousBadge;
+    private final Object previous,previousBadge,previousControl;
     private final BusyPainter spinner=new BusyPainter(20);
     private final long started=System.nanoTime();
     private long lastPaint;
@@ -19,7 +19,7 @@ final class AgentTerminalDecoration implements AutoCloseable {
 
     AgentTerminalDecoration(JComponent terminal,JComponent input,String agent){
         this.terminal=terminal;this.input=input;this.agent=agent;
-        previous=terminal.getClientProperty(KEY);previousBadge=input.getClientProperty(BADGE);
+        previous=terminal.getClientProperty(KEY);previousBadge=input.getClientProperty(BADGE);previousControl=input.getClientProperty("shed.agentControl");
         spinner.setPoints(16);spinner.setTrailLength(8);spinner.setAntialiasing(true);spinner.setPointShape(new java.awt.geom.RoundRectangle2D.Double(0,0,5,2,2,2));
         terminal.putClientProperty(KEY,this);input.putClientProperty(BADGE,this);input.putClientProperty("shed.agentControl",true);
     }
@@ -85,8 +85,12 @@ final class AgentTerminalDecoration implements AutoCloseable {
     }
     public void close(){
         if(closed)return;closed=true;
-        input.putClientProperty("shed.agentControl",null);if(input.getClientProperty(BADGE)==this)input.putClientProperty(BADGE,previousBadge);
-        if(terminal.getClientProperty(KEY)==this)terminal.putClientProperty(KEY,previous);
+        if(input.getClientProperty(BADGE)==this){
+            Object badge=previousBadge,control=previousControl;
+            while(badge instanceof AgentTerminalDecoration prior&&prior.closed){control=prior.previousControl;badge=prior.previousBadge;}
+            input.putClientProperty(BADGE,badge);input.putClientProperty("shed.agentControl",control);
+        }
+        if(terminal.getClientProperty(KEY)==this){Object glow=previous;while(glow instanceof AgentTerminalDecoration prior&&prior.closed)glow=prior.previous;terminal.putClientProperty(KEY,glow);}
         terminal.repaint();input.repaint();
     }
 }

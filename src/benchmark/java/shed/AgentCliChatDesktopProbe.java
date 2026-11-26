@@ -19,7 +19,7 @@ public final class AgentCliChatDesktopProbe {
     static Component find(Component c,String name){if(name.equals(c.getName()))return c;if(c instanceof Container p)for(Component child:p.getComponents()){var found=find(child,name);if(found!=null)return found;}return null;}
     static JDialog approval(){for(Window w:Window.getWindows())if(w instanceof JDialog d&&d.isShowing()&&"agent.approval".equals(d.getName()))return d;return null;}
     static JButton button(Component c,String title){if(c instanceof JButton b&&title.equals(b.getText()))return b;if(c instanceof Container p)for(Component child:p.getComponents()){var found=button(child,title);if(found!=null)return found;}return null;}
-    static JTextArea transcript(){return (JTextArea)find(editor.getRootPane(),"agent.chat.transcript");}
+    static javax.swing.text.JTextComponent transcript(){return (javax.swing.text.JTextComponent)find(editor.getRootPane(),"agent.chat.transcript");}
     static JTextArea composer(){return (JTextArea)find(editor.getRootPane(),"agent.chat.composer");}
     static JButton send(){return (JButton)find(editor.getRootPane(),"agent.chat.send");}
     static List<String> javaCommand(int turn){return List.of(Path.of(System.getProperty("java.home"),"bin/java").toString(),"-Djava.awt.headless=true","-Duser.home="+System.getProperty("user.home"),"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir"),"-cp",System.getProperty("java.class.path"),AgentCliChatDesktopProbe.class.getName(),"--fake-agent",Integer.toString(turn));}

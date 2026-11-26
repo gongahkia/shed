@@ -296,6 +296,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'AgentTaskLaunchTest',
             'CliChatProtocolTest',
             'AgentCliChatPanelTest',
+            'AgentChatTranscriptTest',
             'ShedControlCliTest',
             'AgentActivityStateTest',
             'EditorProjectChangesTest',

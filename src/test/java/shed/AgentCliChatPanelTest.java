@@ -27,7 +27,7 @@ class AgentCliChatPanelTest {
     static Component find(Component c,String name){if(name.equals(c.getName()))return c;if(c instanceof Container p)for(Component child:p.getComponents()){var v=find(child,name);if(v!=null)return v;}return null;}
     static <T>T ui(Callable<T> call)throws Exception{return EditorControlTest.edt(call);}
     static void await(java.util.function.BooleanSupplier ready)throws Exception{long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);while(!ui(ready::getAsBoolean)){if(System.nanoTime()>until)throw new AssertionError("Chat condition timed out");Thread.sleep(20);}}
-    static JTextArea text(AgentCliChatPanel panel,String name){return (JTextArea)find(panel.component(),"agent.chat."+name);}
+    static javax.swing.text.JTextComponent text(AgentCliChatPanel panel,String name){return (javax.swing.text.JTextComponent)find(panel.component(),"agent.chat."+name);}
     static JButton button(AgentCliChatPanel panel,String name){return (JButton)find(panel.component(),"agent.chat."+name);}
     static void send(AgentCliChatPanel panel,String message)throws Exception{ui(()->{text(panel,"composer").setText(message);button(panel,"send").doClick();return null;});}
     static void javaExecutable(AgentCliChatPanel panel)throws Exception{ui(()->{((JTextField)find(panel.component(),"agent.chat.executable")).setText(AgentTaskInstructions.cli().getFirst());return null;});}

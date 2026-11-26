@@ -7,6 +7,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DocumentWorkbenchTest {
+    @Test void closeHitBelongsToItsOwnTabAndNeverTheUnusedStrip(){
+        var cell=new java.awt.Rectangle(100,0,160,40);
+        assertTrue(OpenEditorsBar.closeHit(cell,new java.awt.Point(240,20),40));
+        assertFalse(OpenEditorsBar.closeHit(cell,new java.awt.Point(150,20),40));
+        assertFalse(OpenEditorsBar.closeHit(cell,new java.awt.Point(280,20),40));
+        assertFalse(OpenEditorsBar.closeHit(cell,new java.awt.Point(240,41),40));
+        assertFalse(OpenEditorsBar.closeHit(null,new java.awt.Point(240,20),40));
+    }
     @TempDir Path directory;
     private static final class Host implements DocumentWorkbench.Host {
         final LegacyDocumentStore store;

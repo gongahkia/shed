@@ -30,7 +30,11 @@ final class ProviderIcons {
     }
     private static Icon load(String key){
         try(var stream=ProviderIcons.class.getResourceAsStream("/assets/providers/"+key+".png")){
-            if(stream==null)return WorkbenchIcons.COMMANDS;BufferedImage image=ImageIO.read(stream);
+            if(stream==null)return WorkbenchIcons.COMMANDS;BufferedImage decoded=ImageIO.read(stream);BufferedImage image;
+            if(key.endsWith("/claude")){
+                image=new BufferedImage(decoded.getWidth(),decoded.getHeight(),BufferedImage.TYPE_INT_ARGB);
+                var tint=image.createGraphics();try{tint.drawImage(decoded,0,0,null);tint.setComposite(AlphaComposite.SrcIn);tint.setColor(new Color(0xD97757));tint.fillRect(0,0,image.getWidth(),image.getHeight());}finally{tint.dispose();decoded.flush();}
+            }else image=decoded;
             return new Icon(){public int getIconWidth(){return WorkbenchStyle.px(18);}public int getIconHeight(){return WorkbenchStyle.px(18);}
                 public void paintIcon(Component c,Graphics graphics,int x,int y){var g=(Graphics2D)graphics.create();try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);g.drawImage(image,x,y,getIconWidth(),getIconHeight(),null);}finally{g.dispose();}}};
         }catch(java.io.IOException failure){return WorkbenchIcons.COMMANDS;}

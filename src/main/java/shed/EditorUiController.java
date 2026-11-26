@@ -593,6 +593,11 @@ final class EditorUiController {
             editor.clearExtraCursors();
             textArea.selectAll();
         });
+        menu.addSeparator();
+        JMenuItem chatSelection=editorContextItem(menu,"Add selection to chat",()->{
+            var pane=editor.editorPanes.stream().filter(candidate->candidate.getTextArea()==textArea).findFirst().orElse(null);
+            if(editor.toolWindowHost!=null)editor.toolWindowHost.addSelectionToChat(pane);
+        });chatSelection.setName("editor.addSelectionToChat");
         menu.addPopupMenuListener(new PopupMenuListener() {
             @Override public void popupMenuWillBecomeVisible(PopupMenuEvent event) {
                 EditorPane pane = editor.editorPanes.stream().filter(candidate -> candidate.getTextArea() == textArea)
@@ -607,6 +612,7 @@ final class EditorUiController {
                 copy.setEnabled(selected);
                 paste.setEnabled(editable && clipboardContainsText());
                 selectAll.setEnabled(textArea.getDocument().getLength() > 0);
+                chatSelection.setEnabled(pane!=null&&!pane.isDisposed()&&pane.getBuffer()!=null&&!pane.getBuffer().isLargeFile()&&textArea.getSelectionEnd()>textArea.getSelectionStart()&&textArea.getSelectionEnd()-textArea.getSelectionStart()<=8192&&!editor.agentOwnsEditor());
                 applyUiTheme(menu);
             }
             @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { }
@@ -894,8 +900,8 @@ final class EditorUiController {
         editor.toolWindowHost.setVisible(true);
         editor.editorToolSplit.setDividerSize(UiZoom.scale(6, editor.configManager.getUiZoom()));
         if (!wasVisible && !editor.toolWindowHost.restoreDockSize()) {
-            int height = Math.max(editor.getHeight(), editor.editorToolSplit.getHeight());
-            editor.editorToolSplit.setDividerLocation(Math.max(180, (int) (height * 0.62)));
+            int extent=editor.toolWindowHost.isChatDock()?editor.editorToolSplit.getWidth():Math.max(editor.getHeight(),editor.editorToolSplit.getHeight());
+            editor.editorToolSplit.setDividerLocation(Math.max(180,(int)(extent*.62)));
         }
         editor.toolWindowHost.refreshActive();
         editor.editorToolSplit.revalidate();

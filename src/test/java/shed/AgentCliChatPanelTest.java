@@ -31,6 +31,16 @@ class AgentCliChatPanelTest {
     static JButton button(AgentCliChatPanel panel,String name){return (JButton)find(panel.component(),"agent.chat."+name);}
     static void send(AgentCliChatPanel panel,String message)throws Exception{ui(()->{text(panel,"composer").setText(message);button(panel,"send").doClick();return null;});}
     static void javaExecutable(AgentCliChatPanel panel)throws Exception{ui(()->{((JTextField)find(panel.component(),"agent.chat.executable")).setText(AgentTaskInstructions.cli().getFirst());return null;});}
+    @Test void selectedCodeIsRemovableBoundedSnapshotContextForOneTurnOnly()throws Exception{
+        var jobs=new AsyncJobService(20);var host=new Host(temporary);var prompts=new CopyOnWriteArrayList<String>();
+        var panel=ui(()->new AgentCliChatPanel(jobs,host,(command,a,prompt,live,chunk)->{prompts.add(prompt);chunk.accept("{\"type\":\"thread.started\",\"thread_id\":\"native\"}\n{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"Done\"}}\n");return new ManagedAgentTask.Result(0,"");},()->new Font(Font.DIALOG,Font.PLAIN,13)));
+        var context=new AgentCliChatPanel.SelectionContext(temporary,"Demo.java",3,2,9,"a\n👩‍💻");
+        try{javaExecutable(panel);ui(()->{assertTrue(panel.addSelection(context));assertTrue(prompts.isEmpty());((JButton)find(panel.component(),"agent.chat.removeContext")).doClick();assertNull(find(panel.component(),"agent.chat.removeContext"));assertTrue(panel.addSelection(context));assertFalse(panel.addSelection(new AgentCliChatPanel.SelectionContext(temporary.resolve("other"),"Other.java",0,0,1,"x")));return null;});
+            send(panel,"Explain this");await(()->button(panel,"send").isEnabled());assertTrue(prompts.getFirst().contains("\"documentRevision\":3"));assertTrue(prompts.getFirst().contains("\"text\":\"a\\n👩‍💻\""));assertTrue(prompts.getFirst().contains("\"endOffset\":9"));
+            ui(()->{assertNull(find(panel.component(),"agent.chat.removeContext"));return null;});send(panel,"Continue");await(()->host.done==2);assertFalse(prompts.getLast().contains("Human-attached source"));
+            assertThrows(IllegalArgumentException.class,()->new AgentCliChatPanel.SelectionContext(temporary,"Demo.java",0,0,8193,"x".repeat(8193)));
+        }finally{ui(()->{panel.close();return null;});jobs.shutdownNow();}
+    }
     @Test void twoMessagesResumeNativeSessionAndInjectVisualizationEveryTime()throws Exception{
         var jobs=new AsyncJobService(20);var host=new Host(temporary);var commands=new CopyOnWriteArrayList<List<String>>();var prompts=new CopyOnWriteArrayList<String>();
         var panel=ui(()->new AgentCliChatPanel(jobs,host,(command,a,prompt,live,chunk)->{
@@ -74,13 +84,13 @@ class AgentCliChatPanelTest {
     @Test void failedPreparationReleasesOwnershipWithoutDiscardingUnsentMessage()throws Exception{
         var jobs=new AsyncJobService(20);var host=new Host(temporary){@Override public void prepare(String name,String message,JComponent surface,java.util.function.Consumer<AgentCliChatPanel.Attachment> ready,Runnable end){live=true;ended=end;throw new IllegalStateException("Permission unavailable");}};
         var runs=new AtomicInteger();var panel=ui(()->new AgentCliChatPanel(jobs,host,(command,a,prompt,live,chunk)->{runs.incrementAndGet();return new ManagedAgentTask.Result(0,"");},()->new Font(Font.DIALOG,Font.PLAIN,13)));
-        try{javaExecutable(panel);send(panel,"Keep this request");ui(()->{assertFalse(host.live);assertTrue(button(panel,"send").isEnabled());assertEquals("Keep this request",text(panel,"composer").getText());assertEquals("Permission unavailable",((JLabel)find(panel.component(),"agent.chat.status")).getText());return null;});assertEquals(0,runs.get());}
+        try{javaExecutable(panel);send(panel,"Keep this request");ui(()->{assertFalse(host.live);assertTrue(button(panel,"send").isEnabled());assertEquals("Keep this request",text(panel,"composer").getText());assertEquals("Permission unavailable",((JTextArea)find(panel.component(),"agent.chat.status")).getText());return null;});assertEquals(0,runs.get());}
         finally{ui(()->{panel.close();return null;});jobs.shutdownNow();}
     }
     @Test void malformedReplyReportsProtocolFailureAndStillReturnsSourceOwnership()throws Exception{
         var jobs=new AsyncJobService(20);var host=new Host(temporary);
         var panel=ui(()->new AgentCliChatPanel(jobs,host,(command,a,prompt,live,chunk)->{chunk.accept("{broken}\n");throw new CancellationException();},()->new Font(Font.DIALOG,Font.PLAIN,13)));
-        try{javaExecutable(panel);send(panel,"Task");await(()->host.done==1);ui(()->{assertTrue(((JLabel)find(panel.component(),"agent.chat.status")).getText().contains("malformed JSON"));assertFalse(button(panel,"stop").isEnabled());return null;});}
+        try{javaExecutable(panel);send(panel,"Task");await(()->host.done==1);ui(()->{assertTrue(((JTextArea)find(panel.component(),"agent.chat.status")).getText().contains("malformed JSON"));assertFalse(button(panel,"stop").isEnabled());return null;});}
         finally{ui(()->{panel.close();return null;});jobs.shutdownNow();}
     }
 }

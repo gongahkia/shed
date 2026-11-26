@@ -43,9 +43,9 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "edit", "ask", "run" -> {
                 if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentAction(
                     value.equals("edit") ? AgentAction.EDIT : value.equals("ask") ? AgentAction.ASK : AgentAction.RUN);
-                yield "Describe your request in the Assistant panel.";
+                yield "Describe your request in Advanced agent tools.";
             }
-            case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
+            case "" -> { editor.toolWindowHost.showAgentChat();yield "Chat with your local coding agent."; }
             case "watch" -> { editor.toolWindowHost.watchAgentChanges("start","Agent");yield "Watching external edits in Live changes."; }
             case "watch stop" -> {editor.toolWindowHost.watchAgentChanges("stop","Agent");yield "Watch stopped.";}
             case "changes" -> {editor.toolWindowHost.showAgentChanges();yield "Live change controls.";}

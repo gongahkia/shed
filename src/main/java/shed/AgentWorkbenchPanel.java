@@ -17,6 +17,9 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     private LiveChangesPanel liveChanges;
     private AgentCliChatPanel chat;
     private java.awt.Component advanced;
+    private JPanel chatViews;
+    private java.awt.Component displayed;
+    private java.util.function.Consumer<java.awt.Component> style=component->{};
     private final Supplier<AgentSessionPanel> factory;
     private final Supplier<Font> uiFont;
     private final Runnable dismissCompletion;
@@ -35,7 +38,9 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         review.onNavigate(location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent change")));
         review.onApplied(editor::agentEditsApplied);
         liveChanges=new LiveChangesPanel(editor);tabs.addTab("Live changes",liveChanges.component());
-        advanced=tabs.getComponentAt(0);chat=new AgentCliChatPanel(editor);tabs.setComponentAt(0,chat.component());tabs.setTitleAt(0,"Chat");tabs.addTab("Advanced",advanced);tabs.setSelectedIndex(0);
+        advanced=tabs.getComponentAt(0);chat=new AgentCliChatPanel(editor);
+        style=component->{editor.editorUiController.applyUiTheme(component);editor.editorUiController.applyUiFont(component);};
+        chatViews=new JPanel(new BorderLayout());panel.remove(tabs);tabs.removeAll();panel.add(chatViews);showChat();
     }
 
     AgentWorkbenchPanel(Supplier<AgentSessionPanel> factory, Function<AgentSessionPanel, AgentReviewPanel.Scope> reviewScope,
@@ -61,7 +66,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     EditorPane followedSource(FileBuffer buffer){return liveChanges==null?null:liveChanges.followedSource(buffer);}
     void pauseFollowing(){if(liveChanges!=null)liveChanges.pauseForHuman();}
     void retirePresentation(){if(liveChanges!=null)liveChanges.retirePresentation();}
-    boolean selectObserved(java.nio.file.Path path){if(liveChanges==null||!liveChanges.selectObserved(path))return false;tabs.setSelectedIndex(2);return true;}
+    boolean selectObserved(java.nio.file.Path path){if(liveChanges==null||!liveChanges.selectObserved(path))return false;display(liveChanges.component(),"Changes");return true;}
     void decorateExplorer(FileTreePanel tree){if(liveChanges!=null)liveChanges.decorateExplorer(tree);}
     private AgentSessionPanel current() {
         int index = conversations.getSelectedIndex(); return index < 0 || index >= sessions.size() ? null : sessions.get(index);
@@ -69,7 +74,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     private void newConversation() {
         if (closed || sessions.size() >= 8) return;
         AgentSessionPanel session = factory.get(); sessions.add(session);
-        session.onReview(id -> { workspaceReview = false; reviewOwner = session; review.showProposal(id); tabs.setSelectedIndex(1); });
+        session.onReview(id -> { workspaceReview = false; reviewOwner = session; review.showProposal(id);if(chat==null)tabs.setSelectedIndex(1);display(review.component(),"Review changes"); });
         String title = "Conversation " + ++nextConversation;
         conversations.addTab(title, session.component());
         session.onActivity(working -> {
@@ -77,7 +82,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
             String caption = title + (working ? " · Working" : "");
             if (!caption.equals(conversations.getTitleAt(index))) conversations.setTitleAt(index, caption);
         });
-        conversations.setSelectedComponent(session.component()); if(advanced!=null)tabs.setSelectedComponent(advanced);else tabs.setSelectedIndex(0);
+        conversations.setSelectedComponent(session.component()); if(advanced!=null)display(advanced,"Advanced agent tools");else tabs.setSelectedIndex(0);
         add.setEnabled(sessions.size() < 8); refresh();
     }
     private void closeConversation() {
@@ -93,7 +98,9 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
     }
     @Override public JPanel component() { return panel; }
     @Override public void focus() {
-        if(chat!=null&&tabs.getSelectedComponent()==chat.component())chat.focus();
+        if(chat!=null&&displayed==chat.component())chat.focus();
+        else if(displayed==review.component())review.focus();
+        else if(liveChanges!=null&&displayed==liveChanges.component())liveChanges.focus();
         else if (tabs.getSelectedIndex() == 1) review.focus();
         else if(tabs.getSelectedIndex()==2 && liveChanges!=null)liveChanges.focus();
         else { var session = current(); if (session != null) session.focus(); }
@@ -102,14 +109,24 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         if(liveChanges==null)throw WorkspaceApiException.invalidRequest("Live changes unavailable");
         return liveChanges.command(action,name);
     }
-    void showLiveChanges(){if(liveChanges!=null){tabs.setSelectedIndex(2);liveChanges.refresh();}}
-    void showReview() { if(!workspaceReview)reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
-    void showReview(String proposal) { workspaceReview = true; reviewOwner = null; tabs.setSelectedIndex(1); review.showProposal(proposal); }
-    void showChat(){tabs.setSelectedIndex(0);if(chat!=null)chat.focus();}
-    void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); if(advanced!=null)tabs.setSelectedComponent(advanced);else tabs.setSelectedIndex(0); }
+    private void display(java.awt.Component surface,String title){
+        if(chatViews==null)return;
+        displayed=surface;chatViews.removeAll();
+        if(surface!=chat.component()){
+            var back=new JButton("Back to Chat",WorkbenchIcons.PREVIOUS);back.setName("agent.backToChat");back.addActionListener(e->showChat());
+            var header=new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING,6,4));header.add(back);header.add(new JLabel(title));chatViews.add(header,BorderLayout.NORTH);
+        }
+        chatViews.add(surface);style.accept(chatViews);chatViews.revalidate();chatViews.repaint();
+    }
+    void showLiveChanges(){if(liveChanges!=null){display(liveChanges.component(),"Changes");liveChanges.refresh();}}
+    void showReview() { if(!workspaceReview)reviewOwner = current();if(chat==null)tabs.setSelectedIndex(1);display(review.component(),"Review changes"); review.refresh(); }
+    void showReview(String proposal) { workspaceReview = true; reviewOwner = null;if(chat==null)tabs.setSelectedIndex(1);display(review.component(),"Review changes"); review.showProposal(proposal); }
+    void showChat(){if(chat!=null){display(chat.component(),"Chat");chat.focus();}else tabs.setSelectedIndex(0);}
+    boolean addSelection(AgentCliChatPanel.SelectionContext context){return chat!=null&&chat.addSelection(context);}
+    void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); if(advanced!=null)display(advanced,"Advanced agent tools");else tabs.setSelectedIndex(0); }
     @Override public void refresh() {
         if (closed) return;
-        if(chat!=null&&tabs.getSelectedComponent()==chat.component())chat.refresh();
+        if(chat!=null){if(displayed==chat.component())chat.refresh();else if(liveChanges!=null&&displayed==liveChanges.component())liveChanges.refresh();else if(displayed==review.component())review.refresh();else{var session=current();if(session!=null)session.refresh();}return;}
         else if (tabs.getSelectedIndex() == 0||tabs.getSelectedComponent()==advanced) { var current = current(); if (current != null) current.refresh(); }
         else if(tabs.getSelectedIndex()==2 && liveChanges!=null)liveChanges.refresh();
         else review.refresh();

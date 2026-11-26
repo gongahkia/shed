@@ -72,7 +72,6 @@ final class ShedMenuBar {
         item(view, "Tasks", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TASKS));
         item(view, "Tests", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TESTS));
         item(view, "Agent Chat…", -1, 0, () -> command("agent delegate"));
-        item(view, "AI Assistant", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.AGENT));
 
         JMenu navigate = menu("Navigate");
         item(navigate, "Go Back", nativeMac ? KeyEvent.VK_MINUS : KeyEvent.VK_LEFT,

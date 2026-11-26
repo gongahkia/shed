@@ -13,8 +13,17 @@ final class OpenEditorsBar extends JPanel {
     private final Texteditor editor;
     private final DocumentWorkspace documents;
     private final DefaultListModel<Entry> model = new DefaultListModel<>();
-    private final JList<Entry> list = new JList<>(model);
-    private final JButton close = new JButton(WorkbenchIcons.CLOSE);
+    private final JList<Entry> list = new JList<>(model) {
+        @Override protected void processMouseEvent(java.awt.event.MouseEvent event){
+            if(javax.swing.SwingUtilities.isLeftMouseButton(event)){
+                int index=locationToIndex(event.getPoint());var bounds=index<0?null:getCellBounds(index,index);
+                if(closeHit(bounds,event.getPoint(),controlHeight())){
+                    if(event.getID()==java.awt.event.MouseEvent.MOUSE_PRESSED)closeEntry(model.get(index));event.consume();return;
+                }
+            }
+            super.processMouseEvent(event);
+        }
+    };
     private final JScrollPane scroll;
     private List<Entry> entries = List.of();
     private boolean refreshing;
@@ -28,6 +37,10 @@ final class OpenEditorsBar extends JPanel {
         list.setVisibleRowCount(1);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer(new DefaultListCellRenderer() {
+            @Override protected void paintComponent(java.awt.Graphics graphics){
+                super.paintComponent(graphics);var icon=WorkbenchIcons.CLOSE;
+                icon.paintIcon(this,graphics,getWidth()-controlHeight()+(controlHeight()-icon.getIconWidth())/2,(getHeight()-icon.getIconHeight())/2);
+            }
             @Override public java.awt.Component getListCellRendererComponent(JList<?> source, Object value, int index, boolean selected, boolean focused) {
                 super.getListCellRendererComponent(source, value, index, selected, focused);
                 putClientProperty("html.disable", true);
@@ -44,7 +57,7 @@ final class OpenEditorsBar extends JPanel {
                     focused ? BorderFactory.createLineBorder(config.getFocusColor(), zoomLine)
                         : BorderFactory.createMatteBorder(0, 0, zoomLine, 0, selected ? config.getFocusColor() : getBackground()),
                     BorderFactory.createEmptyBorder(0, UiZoom.scale(config.getUiDensity().tabHorizontal, config.getUiZoom()),
-                        0, UiZoom.scale(config.getUiDensity().tabHorizontal, config.getUiZoom()))));
+                        0, controlHeight())));
                 return this;
             }
         });
@@ -54,7 +67,7 @@ final class OpenEditorsBar extends JPanel {
             @Override public void componentShown(java.awt.event.ComponentEvent event) { revalidate(); }
             @Override public void componentHidden(java.awt.event.ComponentEvent event) { revalidate(); }
         });
-        add(scroll); add(close, BorderLayout.EAST);
+        list.setName("workbench.openEditors");add(scroll);
         list.addListSelectionListener(event -> {
             if (refreshing || event.getValueIsAdjusting()) return;
             Entry entry = list.getSelectedValue();
@@ -67,11 +80,7 @@ final class OpenEditorsBar extends JPanel {
         bind(KeyEvent.VK_ENTER, "edit", () -> focusSurface());
         bind(KeyEvent.VK_DELETE, "close", this::closeSelected);
         KeyboardFocusSupport.installEscape(this, () -> focusSurface());
-        close.addActionListener(event -> closeSelected());
-        WorkbenchStyle.quiet(close);
-        close.setToolTipText("Close selected editor");
         AccessibilitySupport.describe(list, "Open editors", "Left and Right switch documents in the active pane. Enter returns to editing. Delete closes with confirmation for unsaved changes.");
-        AccessibilitySupport.describe(close, "Close selected editor", "Close the selected document. Unsaved changes require confirmation; closing the last document keeps Shed open.");
         refreshAppearance();
     }
 
@@ -83,14 +92,12 @@ final class OpenEditorsBar extends JPanel {
     }
 
     void refreshAppearance() {
-        SearchControlMetrics.styleButton(close, editor.configManager);
         if (editor.stagedStartupPending) {
             // Selection/layout can ask the renderer for metrics before prepareStagedWindow.
             // Keep that first document switch independent of system-font discovery.
             list.setFont(editor.stagedStartupFont.deriveFont((float) list.getFont().getSize()));
-            close.setFont(editor.stagedStartupFont.deriveFont((float) close.getFont().getSize()));
         } else {
-            list.setFont(editor.resolveUiFont()); close.setFont(editor.resolveUiFont());
+            list.setFont(editor.resolveUiFont());
         }
         refreshDensity();
         setBackground(editor.configManager.getStatusBarBackground());
@@ -127,7 +134,6 @@ final class OpenEditorsBar extends JPanel {
             var active = documents.activeDocument();
             for (int index = 0; index < entries.size(); index++) if (active != null && entries.get(index).id().equals(active.id())) selected = index;
             if (list.getSelectedIndex() != selected) { list.setSelectedIndex(selected); if (selected >= 0) list.ensureIndexIsVisible(selected); }
-            close.setEnabled(selected >= 0);
         } finally { refreshing = false; }
     }
 
@@ -141,12 +147,17 @@ final class OpenEditorsBar extends JPanel {
         int height = controlHeight();
         list.setFixedCellHeight(height);
         list.setFixedCellWidth(UiZoom.scale(editor.configManager.getUiDensity().editorTabWidth, editor.configManager.getUiZoom()));
-        close.setPreferredSize(new Dimension(height, height));
         revalidate(); repaint();
     }
 
     void closeSelected() {
         Entry selected = list.getSelectedValue();
+        closeEntry(selected);
+    }
+
+    static boolean closeHit(java.awt.Rectangle cell,java.awt.Point point,int width){return cell!=null&&cell.contains(point)&&point.x>=cell.x+cell.width-Math.min(cell.width,width);}
+
+    private void closeEntry(Entry selected){
         if (selected == null) return;
         var current = documents.documents().stream().filter(document -> document.id().equals(selected.id()))
             .findFirst().orElse(null);
@@ -158,7 +169,9 @@ final class OpenEditorsBar extends JPanel {
 
     // Keeps the close decision explicit, including in noninteractive lifecycle tests.
     boolean closeDocument(DocumentWorkspace.Id id, boolean discard) {
+        var active=documents.activeDocument();
         boolean closed = documents.close(id, discard);
+        if(closed&&active!=null&&!active.id().equals(id))documents.activate(active.id());
         if (closed) { refresh(); focusSurface(); }
         return closed;
     }

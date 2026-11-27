@@ -79,7 +79,7 @@ final class ShedMenuBar {
         item(view, "Toggle Minimap", -1, 0, () -> command("minimap toggle"));
         view.addSeparator();
         item(view, "Problems", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS));
-        dockToggle(view,"Git Changes",ToolWindowHost.Tab.GIT);
+        dockToggle(view,"Source Control",ToolWindowHost.Tab.GIT);
         item(view, "Tasks", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TASKS));
         item(view, "Tests", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TESTS));
         dockToggle(view,"Agent Chat…",ToolWindowHost.Tab.AGENT);

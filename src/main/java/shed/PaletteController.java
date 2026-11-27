@@ -149,6 +149,7 @@ final class PaletteController {
         action("Git Status", "git status", "Show the active repository's Git status."),
         action("Git Branches", "git branches", "Show the active repository's branches."),
         action("Git Conflict Resolution", "git conflict", "Open the graphical conflict-resolution view."),
+        action("Source Control", "scm gui", "Graphical Git, Mercurial and Subversion working copies."),
         action("Git History and Remotes", "git history", "Open graphical local history and explicit remote controls."),
         action("Git Worktrees and Stashes", "git worktrees", "Open graphical worktree and stash controls."),
         action("Git Graph", "git log", "Open graphical local Git history when enabled."),

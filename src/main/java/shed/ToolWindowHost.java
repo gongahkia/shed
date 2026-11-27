@@ -63,7 +63,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         body.add(headerPanel, javax.swing.JLayeredPane.PALETTE_LAYER);
         add(body, BorderLayout.CENTER);
         addSurface(Tab.SEARCH, "Search", new WorkspaceSearchPanel(editor));
-        addSurface(Tab.GIT, "Git", new GitChangesToolPanel(editor, this));
+        addSurface(Tab.GIT, "Source Control", new SourceControlPanel(editor, this));
         addSurface(Tab.DEBUG, "Debug", new DebugToolPanel(editor, this));
         addSurface(Tab.TASKS, "Tasks", new TasksToolPanel(editor, this));
         addSurface(Tab.TESTS, "Tests", new TestsToolPanel(editor, this));
@@ -73,8 +73,8 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         addSurface(Tab.LANGUAGE, "Language", new ToolSurface(){private final JPanel panel=new JPanel(new BorderLayout());{panel.add(new JLabel("Use :lsp status, :lsp servers or :lsp log to inspect language services."));}public JPanel component(){return panel;}public void refresh(){}});
         addSurface(Tab.AGENT, "Chat", new AgentWorkbenchPanel(editor));
         chatDock.setName("workbench.rightDock");rightTabs.setName("workbench.rightTools");rightTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
-        rightTabs.addTab("Git",presentations.get(Tab.GIT));rightTabs.addTab("Chat",presentations.get(Tab.AGENT));
-        var close=new JButton(WorkbenchIcons.CLOSE);close.setName("workbench.right.close");WorkbenchStyle.quiet(close);AccessibilitySupport.describe(close,"Hide sidebar","Hide Git and Chat without closing their state.");close.addActionListener(e->{editor.workbenchDocks.showRight(false);editor.requestActivePaneFocus();});
+        rightTabs.addTab("Source Control",presentations.get(Tab.GIT));rightTabs.addTab("Chat",presentations.get(Tab.AGENT));
+        var close=new JButton(WorkbenchIcons.CLOSE);close.setName("workbench.right.close");WorkbenchStyle.quiet(close);AccessibilitySupport.describe(close,"Hide sidebar","Hide Source Control and Chat without closing their state.");close.addActionListener(e->{editor.workbenchDocks.showRight(false);editor.requestActivePaneFocus();});
         var rightBody=new javax.swing.JLayeredPane(){public Dimension getPreferredSize(){return rightTabs.getPreferredSize();}public void doLayout(){rightTabs.setBounds(0,0,getWidth(),getHeight());close.setBounds(Math.max(0,getWidth()-headerHeight()),0,headerHeight(),headerHeight());}};
         rightBody.add(rightTabs,javax.swing.JLayeredPane.DEFAULT_LAYER);rightBody.add(close,javax.swing.JLayeredPane.PALETTE_LAYER);chatDock.add(rightBody);
         rightTabs.addChangeListener(e->{if(!closed)for(var tab:java.util.List.of(Tab.GIT,Tab.AGENT))if(rightTabs.getSelectedComponent()==presentations.get(tab))refresh(tab);});
@@ -128,7 +128,8 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         if(reports.containsKey(tab))reports.get(tab).primary();
         editor.editorUiController.applyUiTheme(chatDock);editor.editorUiController.applyUiFont(chatDock);surface.refreshAppearance();surface.refresh();
     }
-    GitChangesToolPanel gitPanel(){return (GitChangesToolPanel)surfaces.get(Tab.GIT);}
+    GitChangesToolPanel gitPanel(){return sourceControlPanel().git();}
+    SourceControlPanel sourceControlPanel(){return (SourceControlPanel)surfaces.get(Tab.GIT);}
     void toggleRight(Tab tab){if(isSelected(tab)&&(tab==Tab.GIT||tab==Tab.AGENT))editor.workbenchDocks.showRight(false);else showTab(tab);}
     JPanel rightDock(){return chatDock;}
     boolean rightVisible(){return editor.workbenchDocks!=null&&editor.workbenchDocks.rightVisible();}
@@ -149,7 +150,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         var marks=FileChangeMarks.from(root,changes);var pulses=FileChangeMarks.recent(root,recent);
         if(editor.fileExplorer!=null)editor.fileExplorer.observeChanges(marks,pulses);
         for(var pane:editor.editorPanes)if(pane.getAlternateComponent() instanceof FileTreePanel tree)tree.observeChanges(marks,pulses);
-        if(surfaces.get(Tab.GIT) instanceof GitChangesToolPanel git)git.observeExternalChanges(root,recent);
+        if(surfaces.get(Tab.GIT) instanceof SourceControlPanel scm)scm.observeExternalChanges(root,recent);
     }
     void observedSourceReady(){if(surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents)agents.observedSourceReady();}
     EditorPane followedAgentSource(FileBuffer buffer){return surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents?agents.followedSource(buffer):null;}
@@ -319,7 +320,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     }
 
     static String title(Tab tab) {
-        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; case LANGUAGE -> "Language"; case QUICKFIX -> "Results"; case AGENT -> "Chat"; };
+        return switch (tab) { case GIT -> "Source Control"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; case LANGUAGE -> "Language"; case QUICKFIX -> "Results"; case AGENT -> "Chat"; };
     }
 
     private static WorkbenchLayout.SurfaceType surfaceType(Tab tab) {

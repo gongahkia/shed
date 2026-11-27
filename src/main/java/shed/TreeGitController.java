@@ -546,7 +546,7 @@ final class TreeGitController {
 
     public String handleGitCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
-        if(trimmed.isEmpty()||"status".equalsIgnoreCase(trimmed)){editor.showToolWindow(ToolWindowHost.Tab.GIT);return "Git sidebar opened";}
+        if(trimmed.isEmpty()||"status".equalsIgnoreCase(trimmed)){editor.showToolWindow(ToolWindowHost.Tab.GIT);if(editor.toolWindowHost!=null)editor.toolWindowHost.gitPanel();return "Git sidebar opened";}
         if ("conflict".equalsIgnoreCase(trimmed) || "conflicts".equalsIgnoreCase(trimmed)) {
             return showGitConflictResolutionDocument();
         }

@@ -32,7 +32,7 @@ final class AgentEditPresentation implements AutoCloseable {
     private AgentBufferIntent intent;
     private AgentUiPresentation presence;
     private long presenceToken;
-    private boolean presenceAttempted,clearing;
+    private boolean presenceAttempted,clearing,blockWriting;
     private JViewport intentViewport;
     private JScrollPane intentScroll;
     private int intentFromY,intentTargetY;
@@ -136,14 +136,7 @@ final class AgentEditPresentation implements AutoCloseable {
     private Color rangeColor(int index) {
         boolean deleting="deleting".equals(area.getClientProperty("shed.agentAnimation"));
         String role=intent!=null?intent.role(index):reading?"warning":deleting?"error":"success";
-        Color base = UIManager.getColor("shed."+role);
-        if (base == null) base = new Color(role.equals("navigation")?0x8B52C7:role.equals("info")?0x087F9C:role.equals("warning")?0xA87808:role.equals("error")?0xCC4855:0x27815C);
-        Color human = area.getCaretColor();
-        if (human != null && distance(base, human) < 100) base = new Color(0x8B52C7);
-        return AccessibilitySupport.readableText(base, area.getBackground());
-    }
-    private static int distance(Color a, Color b) {
-        return Math.abs(a.getRed() - b.getRed()) + Math.abs(a.getGreen() - b.getGreen()) + Math.abs(a.getBlue() - b.getBlue());
+        return AgentTextPulse.color(area,role);
     }
     private void repaintRanges() {
         if (!area.isShowing() || !available()) return;
@@ -164,14 +157,15 @@ final class AgentEditPresentation implements AutoCloseable {
     }
     private void followPresence() {
         if(ranges.isEmpty())return;
-        try {var caret=area.modelToView2D(markerOffset);if(caret==null)return;
-            var anchor=new Point((int)caret.getX(),(int)caret.getCenterY());
+        try {if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)blockWriting=playback.badgeOnly();boolean block=blockWriting&&!reading;
+            var caret=area.modelToView2D(block?ranges.get(activeRange).start():markerOffset);if(caret==null)return;
+            var visible=area.getVisibleRect();var anchor=new Point(Math.max(visible.x+4,Math.min(visible.x+visible.width-4,(int)caret.getX())),block?Math.max(visible.y+12,Math.min(visible.y+visible.height-45,(int)caret.getCenterY())):(int)caret.getCenterY());
             if(!presenceAttempted){presenceAttempted=true;presence=AgentUiPresentation.find(area);if(presence!=null)presenceToken=presence.beginFollow(area,anchor,agentProvider,animated());}
-            if(presence!=null)presence.follow(presenceToken,anchor,!reading,reading?"reading":"deleting".equals(area.getClientProperty("shed.agentAnimation"))?"deleting":"writing");
+            if(presence!=null)presence.follow(presenceToken,anchor,!reading,reading?"reading":"deleting".equals(area.getClientProperty("shed.agentAnimation"))?"deleting":"writing",block);
         }catch(BadLocationException unavailable) { }
     }
     void clear() {
-        checkEdt();clearing=true; if(presence!=null)presence.endFollow(presenceToken);presence=null;presenceAttempted=false; AgentSourceHandoff.clear(area);version++;timer.stop(); repaintRanges();
+        checkEdt();clearing=true;blockWriting=false; if(presence!=null)presence.endFollow(presenceToken);presence=null;presenceAttempted=false; AgentSourceHandoff.clear(area);version++;timer.stop(); repaintRanges();
         if(intent!=null){area.removeKeyListener(intentKeys);area.removeMouseListener(intentMouse);area.removeFocusListener(intentFocus);
             if(intentScroll!=null){intentScroll.removeMouseWheelListener(intentMouse);intentScroll.getVerticalScrollBar().removeMouseListener(intentMouse);intentScroll.getHorizontalScrollBar().removeMouseListener(intentMouse);}}
         intent=null;intentViewport=null;intentScroll=null;area.putClientProperty("shed.agentIntent",null);area.putClientProperty("shed.agentIntentStatus",null);
@@ -230,11 +224,12 @@ final class AgentEditPresentation implements AutoCloseable {
     private void paintMarker(Graphics2D graphics) {
         if(presence!=null)return;
         try{
-            Rectangle2D caret=area.modelToView2D(markerOffset);if(caret==null)return;
+            int offset=blockWriting?ranges.get(activeRange).start():markerOffset;
+            Rectangle2D caret=area.modelToView2D(offset);if(caret==null)return;
             Color color=rangeColor(activeRange);graphics.setColor(color);
             if(reading)graphics.fillRect((int)caret.getX(),(int)caret.getMaxY()-2,7,2);
-            else graphics.fillRect((int)caret.getX(),(int)caret.getY(),3,(int)caret.getHeight());
-            int sourceLine=area.getLineOfOffset(markerOffset),lineEnd=Math.min(document.getLength(),area.getLineEndOffset(sourceLine));
+            else if(!blockWriting)graphics.fillRect((int)caret.getX(),(int)caret.getY(),3,(int)caret.getHeight());
+            int sourceLine=area.getLineOfOffset(offset),lineEnd=Math.min(document.getLength(),area.getLineEndOffset(sourceLine));
             if(lineEnd-area.getLineStartOffset(sourceLine)>256)return;
             if(lineEnd>0&&"\n".equals(document.getText(lineEnd-1,1)))lineEnd--;
             var ending=area.modelToView2D(lineEnd);var visible=area.getVisibleRect();
@@ -257,29 +252,15 @@ final class AgentEditPresentation implements AutoCloseable {
                 Graphics2D copy = (Graphics2D) graphics.create();
                 try {
                     Color color = rangeColor(ranges.indexOf(range));
-                    int alpha = !animated() ? 48 : reading ? 30+(int)(12*Math.sin(ticks*.18)) : (pending||touring&&range.equals(ranges.get(activeRange))) ? 36 + (int)(22 * Math.sin(ticks * .45)) : Math.max(8, 60 - ticks);
-                    copy.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
-                    copy.fill(line);
+                    int alpha=AgentTextPulse.alpha(animated(),reading,pending||touring&&range.equals(ranges.get(activeRange)),ticks);
+                    AgentTextPulse.fill(copy,line,color,alpha);
                     if(intent!=null){copy.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),150));copy.drawRect(line.x,line.y,Math.max(1,line.width-1),Math.max(1,line.height-1));}
                     if(animated()){
-                        var sweep=(Graphics2D)copy.create();
-                        try{
-                            sweep.clip(line);sweep.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),38));
-                            double phase=(ticks%40)/40.0;
-                            if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)phase=playback.directionalProgress();
-                            if(reading||"top-to-bottom".equals(area.getClientProperty("shed.agentDirection"))||"bottom-to-top".equals(area.getClientProperty("shed.agentDirection"))){
-                                var first=area.modelToView2D(range.start());var last=area.modelToView2D(range.end());
-                                if(first!=null&&last!=null){
-                                    int height=Math.max(2,area.getFontMetrics(area.getFont()).getHeight()/2);
-                                    boolean upward="bottom-to-top".equals(area.getClientProperty("shed.agentDirection"));
-                                    int y=(int)(first.getY()+(upward?(1-phase)*Math.max(0,last.getMaxY()-first.getY()-height):phase*(last.getMaxY()-first.getY())));
-                                    sweep.fillRect(line.x,y,line.width,height);
-                                }
-                            }else{
-                                int x=line.x+(int)(phase*line.width);if("right-to-left".equals(area.getClientProperty("shed.agentDirection")))x=line.x+line.width-(int)(phase*line.width);
-                                sweep.fillRect(x,line.y,Math.max(3,line.width/12),line.height);
-                            }
-                        }finally{sweep.dispose();}
+                        double phase=(ticks%40)/40.0;
+                        if(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback playback)phase=playback.directionalProgress();
+                        String direction=reading?"top-to-bottom":java.util.Objects.toString(area.getClientProperty("shed.agentDirection"),"left-to-right");
+                        boolean vertical=direction.equals("top-to-bottom")||direction.equals("bottom-to-top");
+                        AgentTextPulse.sweep(copy,line,color,direction,phase,vertical?area.modelToView2D(range.start()):null,vertical?area.modelToView2D(range.end()):null,area.getFontMetrics(area.getFont()).getHeight());
                     }
                     if(range.equals(ranges.get(activeRange))&&start<=markerOffset&&markerOffset<=end
                         &&!(area.getClientProperty(AgentChangePlayback.KEY) instanceof AgentChangePlayback))paintMarker(copy);

@@ -8,6 +8,14 @@ import javax.swing.undo.UndoManager;
 import org.junit.jupiter.api.Test;
 
 class AgentChangeTourTest {
+    @Test void chunkInsertionHasNoThinTrackingCaretAndRetainsTheExactSource()throws Exception {
+        EditorControlTest.edt(()->{
+            String source="block line\n".repeat(20);var area=playbackArea(source);var undo=new UndoManager();area.getDocument().addUndoableEditListener(undo);
+            try(var playback=new AgentChangePlayback(area,source,List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"")),()->java.awt.Color.GREEN)){
+                int offset=playback.frame(0,.5);assertTrue(playback.badgeOnly());assertEquals("chunks",area.getClientProperty("shed.agentAnimation"));assertEquals(0,area.getClientProperty("shed.agentCursorCount"));var caret=area.modelToView2D(offset);var rendered=image(area);assertEquals(java.awt.Color.WHITE.getRGB(),rendered.getRGB((int)caret.getX(),(int)caret.getMaxY()-2),"A chunk must not paint a tracking I-beam or thin caret");assertEquals(source,area.getText());assertFalse(undo.canUndo());
+            }return null;
+        });
+    }
     @Test void inlineDeletionKeepsAPulsingHighlightBehindEveryRemainingWord()throws Exception {
         EditorControlTest.edt(()->{
             for(var background:List.of(java.awt.Color.WHITE,new java.awt.Color(0x202020))){

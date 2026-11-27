@@ -19,8 +19,8 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     private String agent = "Agent";
     private Icon logo;
     private Point2D.Double point = new Point2D.Double(), origin = new Point2D.Double();
-    private float progress, morph;
-    private boolean typing, motion, settled;
+    private float progress, morph, cursorAlpha=1;
+    private boolean typing, motion, settled, badgeOnly;
     private Point explicitPoint,lastScreen;
     private String activity = "";
     private double activityPhase;
@@ -35,7 +35,11 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     }
     boolean follows(long token) { return following&&generation==token&&layer!=null; }
     void follow(long token,Point anchor,boolean typing,String activity) {
+        follow(token,anchor,typing,activity,false);
+    }
+    void follow(long token,Point anchor,boolean typing,String activity,boolean badgeOnly) {
         if(!follows(token))return;this.explicitPoint=new Point(anchor);this.activity=activity;
+        this.badgeOnly=badgeOnly;
         frame(Math.min(1,(System.nanoTime()-followStarted)/300_000_000f),typing);
     }
     void endFollow(long token) { if(follows(token))settle(); }
@@ -59,7 +63,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
             else point = new Point2D.Double(initial.x - 35, initial.y + 25);
         }
         this.target = new WeakReference<>(control); this.agent = agent; this.motion = motion;
-        explicitPoint = null; activity = "";
+        explicitPoint = null; activity = ""; badgeOnly=false;
         logo = ProviderIcons.forValue(agent, COLOR);
         origin = new Point2D.Double(point.x, point.y); progress = 0; typing = false; settled = false;
         frame(0, false);
@@ -74,11 +78,13 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     void activity(String value,double phase) {
         requireEdt(); activity=value; activityPhase=Math.clamp(phase,0,1); repaint(drawingBounds());
     }
+    void badgeOnly(boolean value){requireEdt();badgeOnly=value;}
 
     void frame(float progress, boolean typing) {
         requireEdt();
         Rectangle old = drawingBounds();
         this.progress = Math.clamp(progress, 0, 1); this.typing = typing;
+        cursorAlpha=motion?Math.clamp(cursorAlpha+(badgeOnly?-.16f:.16f),0,1):badgeOnly?0:1;
         if(typing&&!following)explicitPoint=null;
         morph = motion ? Math.clamp(morph + (typing ? .16f : -.16f), 0, 1) : typing ? 1 : 0;
         Component control = target.get();
@@ -118,16 +124,23 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.translate(point.x, point.y);
-            if (!settled && progress >= .55f && !typing) {
-                float phase = (progress - .55f) / .45f;
-                int radius = motion ? 5 + (int)(18 * phase) : 10;
-                g.setColor(new Color(COLOR.getRed(), COLOR.getGreen(), COLOR.getBlue(), (int)(130 * (1 - phase))));
-                g.setStroke(new BasicStroke(2)); g.drawOval(-radius, -radius, radius * 2, radius * 2);
+            if(cursorAlpha>0){
+                var cursor=(Graphics2D)g.create();
+                try{
+                    cursor.setComposite(AlphaComposite.SrcOver.derive(cursorAlpha));
+                    if (!settled && progress >= .55f && !typing && !badgeOnly) {
+                        float phase = (progress - .55f) / .45f;
+                        int radius = motion ? 5 + (int)(18 * phase) : 10;
+                        cursor.setColor(new Color(COLOR.getRed(), COLOR.getGreen(), COLOR.getBlue(), (int)(130 * (1 - phase))));
+                        cursor.setStroke(new BasicStroke(2)); cursor.drawOval(-radius, -radius, radius * 2, radius * 2);
+                    }
+                    Path2D shape = shape(morph);
+                    cursor.setColor(new Color(0,0,0,85));cursor.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));cursor.draw(shape);
+                    cursor.setColor(Color.WHITE);cursor.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));cursor.draw(shape);
+                    cursor.setColor(COLOR);cursor.fill(shape);
+                }finally{cursor.dispose();}
             }
-            Path2D shape = shape(morph);
-            g.setColor(new Color(0,0,0,85));g.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));g.draw(shape);
-            g.setColor(Color.WHITE);g.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));g.draw(shape);
-            g.setColor(COLOR);g.fill(shape);
+            g.setColor(COLOR);
             if(activity.equals("scrolling")) {
                 g.setColor(Color.WHITE);g.setStroke(new BasicStroke(2));g.drawRoundRect(-12,9,8,15,5,5);
                 int position=12+(int)(6*activityPhase);g.drawLine(-8,position,-8,position+2);
@@ -160,10 +173,12 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     boolean installed() { return layer != null; }
     Point2D pointerPosition() { return new Point2D.Double(point.x,point.y); }
     float morph() { return morph; }
+    float cursorAlpha(){return cursorAlpha;}
+    boolean badgeOnly(){return badgeOnly;}
     @Override public void close() {
         requireEdt();
         if (layer != null) { JLayeredPane old = layer; Rectangle bounds = drawingBounds(); old.remove(this); old.repaint(bounds); }
-        generation++;following=false;lastScreen=null;layer = null; target.clear(); logo = null; typing = false; progress = 0; morph = 0;
+        generation++;following=false;lastScreen=null;layer = null; target.clear(); logo = null; typing = false; progress = 0; morph = 0;badgeOnly=false;cursorAlpha=1;
     }
     private static void requireEdt() {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("UI presentation belongs on the EDT");

@@ -53,7 +53,7 @@ final class AgentChangePlayback implements AutoCloseable {
         for(var edit:edits){var range=edit.range();if(range.start()<0||range.end()<range.start()||range.end()>source.length()||(removed+=edit.removed().length())>65536)throw new IllegalArgumentException("Invalid playback edit");}
         this.area=area;this.source=source;this.edits=List.copyOf(edits);this.markerColor=markerColor;
     }
-    private boolean small(Edit edit){return edit.range().end()-edit.range().start()<=160&&source.substring(edit.range().start(),edit.range().end()).chars().filter(c->c=='\n').count()<=2;}
+    private boolean small(Edit edit){return edit.range().end()-edit.range().start()<=160&&AgentTextPulse.small(source.substring(edit.range().start(),edit.range().end()));}
     private boolean removal(Edit edit){return !edit.removed().isEmpty();}
     boolean inline(int index){return inline(edits.get(index));}
     private boolean inline(Edit edit){return small(edit)&&edit.removed().indexOf('\n')<0&&source.substring(edit.range().start(),edit.range().end()).indexOf('\n')<0;}
@@ -66,7 +66,7 @@ final class AgentChangePlayback implements AutoCloseable {
         if(first<0||last<=first||last>edits.size())throw new IllegalArgumentException("Invalid playback group");
         this.first=first;this.last=last;this.progress=progress;select(first,progress);
         area.putClientProperty(KEY,this);
-        area.putClientProperty("shed.agentCursorCount",last-first);
+        area.putClientProperty("shed.agentCursorCount",badgeOnly()?0:last-first);
         area.putClientProperty("shed.agentAnimation",deleting?"deleting":small(active)?"typing":"chunks");
         area.putClientProperty("shed.agentDirection",deleting?"right-to-left":"left-to-right");
         area.repaint(area.getVisibleRect());return revealed;
@@ -83,6 +83,7 @@ final class AgentChangePlayback implements AutoCloseable {
         int offset=small(active)?start+(int)((end-start)*writing):chunkOffset(start,end,writing);
         revealed=Math.max(start,GraphemeBoundary.floor(source,offset));
     }
+    boolean badgeOnly(){return active!=null&&!deleting&&!small(active);}
     double directionalProgress(){return deleting?erasing:writing;}
     private int chunkOffset(int start,int end,double progress){
         int target=start+(int)((end-start)*progress);
@@ -106,7 +107,7 @@ final class AgentChangePlayback implements AutoCloseable {
                 if(deleting){if(!paintInlineDeletion(copy,!pending))paintDeletion(copy);}
                 else{
                     if(writing<1&&!slideInlineTail(copy))maskUnrevealed(copy);
-                    var caret=pending?null:area.modelToView2D(revealed);
+                    var caret=pending||!small(active)?null:area.modelToView2D(revealed);
                     if(caret!=null){copy.setColor(markerColor.get());copy.fillRect((int)caret.getX(),(int)caret.getY(),3,(int)caret.getHeight());}
                 }
             }

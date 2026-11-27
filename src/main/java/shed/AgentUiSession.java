@@ -88,20 +88,21 @@ final class AgentUiSession implements AutoCloseable {
         recordEvent(id,request,"requested",Map.of());
         AgentUiScroll scrolling=request.kind().equals("scroll")?scroll(c,request):null;
         if(c instanceof JTextComponent text)boundedText(text);
-        String[] desired={null};int[] written={0};int dragOrigin=c instanceof JSplitPane split?(int)(1000.0*split.getDividerLocation()/Math.max(1,(split.getOrientation()==JSplitPane.HORIZONTAL_SPLIT?split.getWidth():split.getHeight()))):c instanceof JScrollBar bar?(int)(1000.0*(bar.getValue()-bar.getMinimum())/Math.max(1,bar.getMaximum()-bar.getVisibleAmount()-bar.getMinimum())):-1;boolean[] applied={false};long[] finishAt={-1};Object[] highlight={null};Highlighter[] highlighter={null};
-        cleanup=()->{if(highlight[0]!=null&&c instanceof JTextComponent text&&text.getHighlighter()==highlighter[0])highlighter[0].removeHighlight(highlight[0]);};
+        String[] desired={null};int[] written={0};int dragOrigin=c instanceof JSplitPane split?(int)(1000.0*split.getDividerLocation()/Math.max(1,(split.getOrientation()==JSplitPane.HORIZONTAL_SPLIT?split.getWidth():split.getHeight()))):c instanceof JScrollBar bar?(int)(1000.0*(bar.getValue()-bar.getMinimum())/Math.max(1,bar.getMaximum()-bar.getVisibleAmount()-bar.getMinimum())):-1;boolean[] applied={false};long[] finishAt={-1};
+        AgentTextPulse[] pulse={null};boolean[] readingStarted={false};
+        cleanup=()->{if(pulse[0]!=null)pulse[0].close();};
         pending=completed;
         timer=new javax.swing.Timer(16,event->{
             try{
                 if(completed.isCancelled()||!authorized.getAsBoolean())throw fail(WorkspaceApiException.Code.CANCELLED);
                 check(target,request.kind());if(!applied[0]&&!expectedContext.equals(host.contextKey()))throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);if(!Objects.equals(expectedItem,item(c,index)))throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
                 long elapsed=(System.nanoTime()-started)/1_000_000;if(elapsed>3500)throw fail(WorkspaceApiException.Code.TIMEOUT);
-                if(finishAt[0]>=0){if(host.presenting(target))return;presence.frame(1,false);if(elapsed-finishAt[0]>=(host.motion()?140:0))finish(id,request,target,Map.of(),completed,highlight,highlighter,null);return;}
-                presence.frame(approach==0?1:Math.min(1f,(float)elapsed/approach),elapsed>=approach&&request.kind().equals("text")&&!Boolean.TRUE.equals(c.getClientProperty("shed.agent.source"))&&Set.of("set","insert").contains(request.args().get("mode")));
+                if(finishAt[0]>=0){if(host.presenting(target))return;if(pulse[0]!=null)pulse[0].frame(written[0],written[0]+desired[0].length(),1,elapsed);presence.frame(1,false);if(elapsed-finishAt[0]>=(host.motion()?140:0))finish(id,request,target,Map.of(),completed,null);return;}
+                presence.frame(approach==0?1:Math.min(1f,(float)elapsed/approach),elapsed>=approach&&request.kind().equals("text")&&!Boolean.TRUE.equals(c.getClientProperty("shed.agent.source"))&&Set.of("set","insert").contains(request.args().get("mode"))&&AgentTextPulse.small((String)request.args().get("text")));
                 if(elapsed<approach)return;
                 double phase=duration==0?1:Math.clamp((double)(elapsed-approach)/duration,0,1);
-                if(scrolling!=null){presence.activity("scrolling",phase);scrolling.frame(phase);if(phase<1)return;finish(id,request,target,Map.of("viewport",scrolling.state()),completed,highlight,highlighter,null);return;}
-                if(request.kind().equals("hover")){String tip=c.getToolTipText();if(tip!=null&&!tip.isBlank()&&c.isShowing()&&!GraphicsEnvironment.isHeadless()){var view=c.createToolTip();view.setTipText(AgentUiTarget.bounded(tip,512));Point location=new Point(interactionAnchor);SwingUtilities.convertPointToScreen(location,c);tooltip=PopupFactory.getSharedInstance().getPopup(c,view,location.x+14,location.y+22);tooltip.show();tooltipTimer=new javax.swing.Timer(1800,e->clearTooltip());tooltipTimer.setRepeats(false);tooltipTimer.start();}finish(id,request,target,Map.of("tooltip",AgentUiTarget.bounded(tip,512)),completed,highlight,highlighter,null);return;}
+                if(scrolling!=null){presence.activity("scrolling",phase);scrolling.frame(phase);if(phase<1)return;finish(id,request,target,Map.of("viewport",scrolling.state()),completed,null);return;}
+                if(request.kind().equals("hover")){String tip=c.getToolTipText();if(tip!=null&&!tip.isBlank()&&c.isShowing()&&!GraphicsEnvironment.isHeadless()){var view=c.createToolTip();view.setTipText(AgentUiTarget.bounded(tip,512));Point location=new Point(interactionAnchor);SwingUtilities.convertPointToScreen(location,c);tooltip=PopupFactory.getSharedInstance().getPopup(c,view,location.x+14,location.y+22);tooltip.show();tooltipTimer=new javax.swing.Timer(1800,e->clearTooltip());tooltipTimer.setRepeats(false);tooltipTimer.start();}finish(id,request,target,Map.of("tooltip",AgentUiTarget.bounded(tip,512)),completed,null);return;}
                 if(request.kind().equals("text")&&Set.of("set","insert").contains(request.args().get("mode"))){
                     var field=text(c);String value=AgentUiRequest.string(request.args(),"text",AgentUiRequest.MAX_TEXT);
                     if(desired[0]==null){
@@ -113,9 +114,9 @@ final class AgentUiSession implements AutoCloseable {
                         else{host.edit(target,a,b,"");field.setCaretPosition(a);written[0]=a;}
                     }
                     if(!applied[0]){
-                        int count=host.motion()&&value.chars().allMatch(ch->ch<128)?Math.min(value.length(),(int)((elapsed-approach)/Math.max(1,Math.min(14,650/Math.max(1,value.length()))))+1):value.length();
+                        int count=AgentTextPulse.typedUnits(value,elapsed-approach,host.motion());
                         int already=field.getCaretPosition()-written[0];if(count>already)host.edit(target,field.getCaretPosition(),field.getCaretPosition(),value.substring(already,count));
-                        field.setCaretPosition(written[0]+count);presence.frame(1,true);if(count<value.length())return;applied[0]=true;
+                        field.setCaretPosition(written[0]+count);if(pulse[0]==null)pulse[0]=new AgentTextPulse(field,"writing",host.motion());pulse[0].frame(written[0],written[0]+count,count/(double)Math.max(1,value.length()),elapsed);presence.badgeOnly(!AgentTextPulse.small(value));presence.activity("writing",phase);presence.frame(1,AgentTextPulse.small(value));if(count<value.length())return;applied[0]=true;
                     }
                     revision++;finishAt[0]=elapsed;return;
                 }
@@ -125,11 +126,11 @@ final class AgentUiSession implements AutoCloseable {
                     if(b-a>AgentUiRequest.MAX_TEXT)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
                     if(request.kind().equals("text")&&request.args().get("mode").equals("select")){field.select(a,b);presence.frame(1,true);}
                     else{
-                        if(highlight[0]==null){highlighter[0]=field.getHighlighter();highlight[0]=highlighter[0].addHighlight(a,b,new DefaultHighlighter.DefaultHighlightPainter(new Color(42,139,176,65)));host.activity(target,"reading",a,b,request.agent());}
-                        presence.activity("reading",phase);if(phase<1)return;
-                        String content=field.getDocument().getText(a,b-a);finish(id,request,target,Map.of("content",content,"start",a,"end",b),completed,highlight,highlighter,null);return;
+                        if(!readingStarted[0]){readingStarted[0]=true;host.activity(target,"reading",a,b,request.agent());if(!Boolean.TRUE.equals(c.getClientProperty("shed.agent.source")))pulse[0]=new AgentTextPulse(field,"reading",host.motion());}
+                        if(pulse[0]!=null)pulse[0].frame(a,b,phase,elapsed);presence.activity("reading",phase);if(phase<1)return;
+                        String content=field.getDocument().getText(a,b-a);finish(id,request,target,Map.of("content",content,"start",a,"end",b),completed,null);return;
                     }
-                }else if(request.kind().equals("text")){var field=text(c);int a=(int)AgentUiRequest.integer(request.args(),"start"),b=(int)AgentUiRequest.integer(request.args(),"end");bounds(field,a,b);host.edit(target,a,b,"");}
+                }else if(request.kind().equals("text")){var field=text(c);int a=(int)AgentUiRequest.integer(request.args(),"start"),b=(int)AgentUiRequest.integer(request.args(),"end");bounds(field,a,b);if(!Boolean.TRUE.equals(c.getClientProperty("shed.agent.source"))){if(pulse[0]==null)pulse[0]=new AgentTextPulse(field,"deleting",host.motion());pulse[0].frame(a,b,phase,elapsed);presence.activity("deleting",phase);if(phase<1)return;}host.edit(target,a,b,"");}
                 else if(request.kind().equals("copy"))copy(target,false);
                 else if(request.kind().equals("paste"))paste(target);
                 else if(request.kind().equals("select")){if(c instanceof JComboBox<?> combo&&host.motion()&&phase<1){combo.setPopupVisible(true);return;}select(c,index);if(c instanceof JComboBox<?> combo)combo.setPopupVisible(false);}
@@ -152,11 +153,11 @@ final class AgentUiSession implements AutoCloseable {
                     });
                     completed.complete(reply(id,request,"requested",Map.of()));return;
                 }
-                revision++;if(host.presenting(target)){applied[0]=true;finishAt[0]=elapsed;return;}if(c instanceof JTextComponent)presence.frame(1,true);finish(id,request,target,Map.of(),completed,highlight,highlighter,null);
-            }catch(Exception failed){finish(id,request,target,Map.of(),completed,highlight,highlighter,failed instanceof WorkspaceApiException known?known:fail(WorkspaceApiException.Code.INVALID_CONTEXT));}
+                revision++;if(host.presenting(target)){applied[0]=true;finishAt[0]=elapsed;return;}if(c instanceof JTextComponent)presence.frame(1,true);finish(id,request,target,Map.of(),completed,null);
+            }catch(Exception failed){finish(id,request,target,Map.of(),completed,failed instanceof WorkspaceApiException known?known:fail(WorkspaceApiException.Code.INVALID_CONTEXT));}
         });timer.start();return completed;
     }
-    private void finish(long id,AgentUiRequest request,AgentUiTarget target,Map<String,Object> details,CompletableFuture<Map<String,Object>> completed,Object[] tag,Highlighter[] painter,RuntimeException failure){
+    private void finish(long id,AgentUiRequest request,AgentUiTarget target,Map<String,Object> details,CompletableFuture<Map<String,Object>> completed,RuntimeException failure){
         if(timer!=null)timer.stop();timer=null;pending=null;presence.settle();
         cleanup.run();cleanup=()->{};
         if(failure!=null){recordEvent(id,request,"failed",Map.of("code",failure instanceof WorkspaceApiException known?known.code().name():"INVALID_CONTEXT"));completed.completeExceptionally(failure);return;}

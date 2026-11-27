@@ -10,6 +10,48 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
 class AgentWorkbenchInteractionTest {
+    @Test void badgeOnlyPaintKeepsTheProviderLabelButRemovesThePointerAndRestoresItSmoothly()throws Exception{
+        edt(()->{var f=new Fixture();try(f){var p=f.presence;p.showAt(f.query,new Point(20,12),"Codex",false);p.badgeOnly(true);p.frame(1,false);var position=p.pointerPosition();
+            var image=new java.awt.image.BufferedImage(640,400,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();p.paint(g);g.dispose();int x=(int)position.getX(),y=(int)position.getY(),badge=0;
+            for(int row=y-8;row<y+10;row++)for(int col=x-5;col<x+18;col++)assertEquals(0,image.getRGB(col,row)>>>24,"Tracking cursor must not be painted in badge-only mode");
+            for(int row=y+16;row<Math.min(400,y+40);row++)for(int col=x+26;col<Math.min(640,x+180);col++)if((image.getRGB(col,row)>>>24)>0)badge++;assertTrue(badge>0,"Provider badge must remain visible");
+            p.show(f.button,"Claude Code",true);assertEquals(position,p.pointerPosition(),"Changing surfaces must start from the retained location");assertFalse(p.badgeOnly());assertTrue(p.cursorAlpha()<1);for(int tick=0;tick<10;tick++)p.frame(tick/9f,false);assertEquals(1,p.cursorAlpha());
+        }return null;});
+    }
+    @Test void largeSourceReplayPinsTheBadgeInsteadOfFollowingTheRevealCursor()throws Exception{
+        edt(()->{var f=new Fixture();try(f){String source="block line\n".repeat(20);f.area.setText(source);f.area.setCaretPosition(0);f.presence.attach(f.root);var undo=new javax.swing.undo.UndoManager();f.area.getDocument().addUndoableEditListener(undo);
+            try(var presentation=new AgentEditPresentation(f.area);var playback=new AgentChangePlayback(f.area,source,List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,source.length()),"")),presentation::agentColor)){
+                presentation.showApplied(0,source.length());presentation.setAgentName("Codex");int revealed=playback.frame(0,.25);presentation.moveMarker(0,revealed);for(int tick=0;tick<30;tick++)f.presence.frame(1,true);var before=f.presence.pointerPosition();
+                revealed=playback.frame(0,.7);presentation.moveMarker(0,revealed);for(int tick=0;tick<10;tick++)f.presence.frame(1,true);
+                assertTrue(f.presence.badgeOnly());assertEquals(0,f.presence.cursorAlpha());assertTrue(before.distance(f.presence.pointerPosition())<1,"Badge moved through the inserted block");assertEquals(0,f.area.getClientProperty("shed.agentCursorCount"));assertEquals(source,f.area.getText());assertEquals(0,f.area.getCaretPosition());assertFalse(undo.canUndo());playback.close();presentation.finishTour();assertTrue(f.presence.badgeOnly(),"Finishing a block must not flash a tracking cursor at EOF");
+            }
+        }return null;});
+    }
+    @Test void sharedTextPulseUsesDirectionalSweepsAndClipsTheBand()throws Exception{
+        edt(()->{for(String direction:List.of("left-to-right","right-to-left","top-to-bottom")){
+            var image=new java.awt.image.BufferedImage(120,80,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();var line=new Rectangle(10,10,100,60);AgentTextPulse.sweep(g,line,Color.GREEN,direction,.25,new Rectangle(10,10,1,20),new Rectangle(10,50,1,20),20);g.dispose();
+            assertEquals(0,image.getRGB(5,5));if(direction.equals("left-to-right")){assertTrue((image.getRGB(36,20)>>>24)>0);assertEquals(0,image.getRGB(86,20));}else if(direction.equals("right-to-left")){assertTrue((image.getRGB(86,20)>>>24)>0);assertEquals(0,image.getRGB(36,20));}else{assertTrue((image.getRGB(20,26)>>>24)>0);assertEquals(0,image.getRGB(20,60));}
+        }return null;});
+    }
+    @Test void fieldPulsePreservesTextHistoryAndSelectionAndRejectsReplacedDocuments()throws Exception{
+        edt(()->{var f=new Fixture();try(f){f.query.setText("cafe\u0301 👩‍💻");f.query.select(0,5);String text=f.query.getText();var undo=new javax.swing.undo.UndoManager();f.query.getDocument().addUndoableEditListener(undo);
+            try(var pulse=new AgentTextPulse(f.query,"reading",true)){pulse.frame(0,5,.1,50);assertEquals(1,f.query.getHighlighter().getHighlights().length);pulse.frame(0,5,.8,400);assertEquals(text,f.query.getText());assertEquals(0,f.query.getSelectionStart());assertEquals(5,f.query.getSelectionEnd());assertFalse(undo.canUndo());
+                f.query.setDocument(new javax.swing.text.PlainDocument());assertThrows(WorkspaceApiException.class,()->pulse.frame(0,0,1,500));
+            }assertEquals(0,f.query.getHighlighter().getHighlights().length);
+        }return null;});
+    }
+    @Test void longFieldsUseOneShapedInsertionAndRetireTheirHighlight()throws Exception{
+        var f=edt(Fixture::new);f.motion=true;var inserted=new ArrayList<String>();String value="x".repeat(161);try{
+            edt(()->{f.query.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){inserted.add(f.query.getText());}public void removeUpdate(javax.swing.event.DocumentEvent e){}public void changedUpdate(javax.swing.event.DocumentEvent e){}});return null;});
+            run(f,"text","query",Map.of("mode","set","text",value,"start",0L,"end",0L));assertEquals(List.of(value),inserted);edt(()->{assertEquals(0,f.query.getHighlighter().getHighlights().length);assertTrue(f.presence.badgeOnly());return null;});
+        }finally{edt(()->{f.close();return null;});}
+    }
+    @Test void pulseCleanupPreservesOtherHighlightsAndReducedMotionIsStatic()throws Exception{
+        edt(()->{var f=new Fixture();try(f){f.query.setText("selected query");var original=f.query.getHighlighter().addHighlight(0,2,new javax.swing.text.DefaultHighlighter.DefaultHighlightPainter(Color.BLUE));
+            try(var pulse=new AgentTextPulse(f.query,"writing",false)){pulse.frame(3,8,.1,50);var first=new java.awt.image.BufferedImage(200,30,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=first.createGraphics();f.query.paint(g);g.dispose();pulse.frame(3,8,.8,400);var second=new java.awt.image.BufferedImage(200,30,java.awt.image.BufferedImage.TYPE_INT_ARGB);g=second.createGraphics();f.query.paint(g);g.dispose();assertArrayEquals(first.getRGB(0,0,200,30,null,0,200),second.getRGB(0,0,200,30,null,0,200));}
+            assertEquals(1,f.query.getHighlighter().getHighlights().length);f.query.getHighlighter().removeHighlight(original);
+        }return null;});
+    }
     @Test void animatedFieldTypingCompletesTheBeamMorphInsteadOfOscillating()throws Exception{
         var f=edt(Fixture::new);f.motion=true;var seen=new ArrayList<Float>();try{edt(()->{f.query.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){seen.add(f.presence.morph());}public void removeUpdate(javax.swing.event.DocumentEvent e){}public void changedUpdate(javax.swing.event.DocumentEvent e){}});return null;});run(f,"text","query",Map.of("mode","set","text","x".repeat(100),"start",0L,"end",0L));assertTrue(seen.stream().anyMatch(value->value>=.95f),seen::toString);assertEquals("x".repeat(100),edt(f.query::getText));}finally{edt(()->{f.close();return null;});}
     }

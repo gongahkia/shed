@@ -37,6 +37,7 @@ final class AgentUiActions implements AutoCloseable {
     private AWTEventListener input;
     private CompletableFuture<Map<String,Object>> pending;
     private boolean closed;
+    private AgentTextPulse pulse;
 
     AgentUiActions(Surface surface) { this(surface,new AgentUiPresentation()); }
     AgentUiActions(Surface surface,AgentUiPresentation presentation) { this.surface=surface;this.presentation=presentation; }
@@ -71,7 +72,6 @@ final class AgentUiActions implements AutoCloseable {
         presentation.show(target, command.agent(), surface.motion());
         long started = System.nanoTime();
         long[] revision = { ((Number)surface.state().get("revision")).longValue() };
-        boolean incremental = command.text().chars().allMatch(c -> c < 128);
         int[] written = {-1}; boolean[] applied = {false};
         long[] finishing = {-1};
         var window = SwingUtilities.getWindowAncestor(target);
@@ -100,15 +100,16 @@ final class AgentUiActions implements AutoCloseable {
                 if (elapsed < clickMillis) { presentation.frame((float)elapsed / clickMillis,false); return; }
                 if (command.action().equals("find.query")) {
                     JTextComponent field = (JTextComponent)target;
-                    if (written[0] < 0) { field.requestFocusInWindow(); field.setText(""); written[0] = 0; }
+                    if (written[0] < 0) { field.requestFocusInWindow(); field.setText(""); written[0] = 0; pulse=new AgentTextPulse(field,"writing",surface.motion()); }
                     // complex queries install as one shaped chunk instead of repeatedly laying out partial scripts
-                    int end = surface.motion() && incremental ? Math.min(command.text().length(), (int)((elapsed - clickMillis) / Math.max(1, Math.min(14, 650 / Math.max(1, command.text().length())))) + 1) : command.text().length();
+                    int end=AgentTextPulse.typedUnits(command.text(),elapsed-clickMillis,surface.motion());
                     while (end < command.text().length() && !GraphemeBoundary.isBoundary(command.text(), end)) end++;
                     if (end > written[0]) {
                         field.getDocument().insertString(field.getDocument().getLength(), command.text().substring(written[0], end), null);
                         field.setCaretPosition(field.getDocument().getLength()); written[0] = end;
                     }
-                    presentation.frame(1f, true);
+                    pulse.frame(0,end,end/(double)Math.max(1,command.text().length()),elapsed);
+                    presentation.badgeOnly(!AgentTextPulse.small(command.text()));presentation.activity("writing",Math.min(1,(elapsed-clickMillis)/650.0));presentation.frame(1f,AgentTextPulse.small(command.text()));
                     applied[0] = end == command.text().length();
                 } else if (!applied[0]) {
                     presentation.frame(1f,false);
@@ -132,6 +133,7 @@ final class AgentUiActions implements AutoCloseable {
     private void finish(Map<String,Object> state, RuntimeException error) {
         if (timer != null) timer.stop(); timer = null;
         if (input != null) Toolkit.getDefaultToolkit().removeAWTEventListener(input); input = null;
+        if(pulse!=null){pulse.close();pulse=null;}
         presentation.settle();
         var done = pending; pending = null;
         if (done != null) { if (error == null) done.complete(state); else done.completeExceptionally(error); }

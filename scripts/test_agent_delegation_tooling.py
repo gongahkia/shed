@@ -66,3 +66,14 @@ class AgentDelegationAdmissionTest(unittest.TestCase):
         output = self.root / 'not-created'
         self.reject(output, ('--inline',))
         self.assertFalse(output.exists())
+
+    def test_ui_fixture_cannot_mix_chat_or_interactive_completion(self):
+        for extra in [('--ui', '--chat'), ('--ui', '--inline')]:
+            output = self.root / 'not-created-ui'
+            self.reject(output, extra)
+            self.assertFalse(output.exists())
+
+    def test_ui_fixture_retains_existing_output_protection(self):
+        output = self.root / 'existing-ui'
+        output.mkdir()
+        self.reject(output, ('--ui',))

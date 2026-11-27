@@ -1,0 +1,381 @@
+{
+  "entry_head": "7d303dab6986640c5ba317d524839fa198e717c0",
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "readme_sha256_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_sha256_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "jar_sha256": "3582568e1d9754b12719f897d00be794e76ee08bc092b7c42c2333954eb9f981",
+  "maven": {
+    "total": 642,
+    "passed": 636,
+    "skipped": 6,
+    "failures": 0,
+    "errors": 0,
+    "classes": 108,
+    "skip_cases": [
+      {
+        "class": "shed.GutterPerformanceTest",
+        "test": "pairedGeometryLatencyAndDisposal",
+        "reason": "System property [shed.test.gutter.measure] does not exist"
+      },
+      {
+        "class": "shed.GlyphRenderingMeasurementTest",
+        "test": "boundedFirstWarmGeometryAndLifecycleMeasurements",
+        "reason": "System property [shed.test.glyph.measure] does not exist"
+      },
+      {
+        "class": "shed.WorkspaceMetadataMeasurementTest",
+        "test": "latencyEdtTypingAllocationsAndTwentyFourDisposalCycles",
+        "reason": "System property [shed.test.status.measure] does not exist"
+      },
+      {
+        "class": "shed.WorkspaceStatusMeasurementTest",
+        "test": "boundedLatencyTypingAndRetention",
+        "reason": "System property [shed.test.status.measure] does not exist"
+      },
+      {
+        "class": "shed.DataLossRegressionTest",
+        "test": "atomicSavePreservesDosHiddenAttributeWhenSupported",
+        "reason": "org.opentest4j.TestAbortedException: Assumption failed: DOS file attributes unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.DataLossRegressionTest.atomicSavePreservesDosHiddenAttributeWhenSupported(DataLossRegressionTest.java:196)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.WorkspaceNavigationMeasurementTest",
+        "test": "navigationLatencyEdtTypingAllocationAndDisposal",
+        "reason": "System property [shed.test.status.measure] does not exist"
+      }
+    ],
+    "selected_classes": [
+      "NativeFixtureGateTest",
+      "TerminalControllerTest",
+      "BoundedUndoManagerTest",
+      "GraphemeBoundaryTest",
+      "GraphemeEditRangeTest",
+      "VersionedTextSnapshotTest",
+      "UiDensityTest",
+      "ThemePreviewTest",
+      "LspDefinitionResponsivenessTest",
+      "LspTransportConcurrencyTest",
+      "LspDefinitionRequestsTest",
+      "LspDefinitionPerformanceTest",
+      "AsyncJobServiceTest",
+      "AsyncJobPayloadLifecycleTest",
+      "LspCompletionApplicationTest",
+      "LspWorkspaceFormatTest",
+      "NavigationHistoryTest",
+      "DocumentRequestsTest",
+      "DocumentWorkbenchTest",
+      "EditorSurfaceTest",
+      "DocumentLifecycleTest",
+      "DocumentFormatPreservationTest",
+      "FileBufferTest",
+      "PlainKeymapTest",
+      "EmacsKeymapTest",
+      "KeymapOverlayTest",
+      "SourcePlainViewTest",
+      "RecoveryJournalTest",
+      "MarkdownEditTest",
+      "MarkdownLinkNavigationTest",
+      "CenteredWritingLayoutTest",
+      "SyntaxHighlightServiceTest",
+      "MarkdownHighlightTest",
+      "LspQueuedCancellationTest",
+      "GutterRenderingTest",
+      "LineNumberPanelTest",
+      "IncrementalDiffGutterTest",
+      "GutterPerformanceTest",
+      "GlyphRenderingQualificationTest",
+      "GlyphRenderingMeasurementTest",
+      "BundledEditorFontTest",
+      "IndicConjunctBoundaryTest",
+      "UnicodeEditingRegressionTest",
+      "WorkspaceStatusContractTest",
+      "WorkspaceStatusTransportTest",
+      "WorkspaceRpcTest",
+      "PrivateWorkspaceFilesTest",
+      "WorkspaceCliProcessGuardTest",
+      "WorkspaceStatusProcessTest",
+      "WorkspaceCliTest",
+      "WorkspaceBridgeTest",
+      "WorkspaceStatusMeasurementTest",
+      "WorkspaceMetadataTransportTest",
+      "EditorMetadataTest",
+      "WorkspaceMetadataMeasurementTest",
+      "ArchitectureBoundaryTest",
+      "EditorNavigationTest",
+      "WorkspaceNavigationTransportTest",
+      "WorkspaceNavigationMeasurementTest",
+      "ProjectBoundFileAcquisitionTest",
+      "ProjectDocumentInstallTest",
+      "ProjectFileOpenTest",
+      "EditorControlTest",
+      "AgentEditPresentationTest",
+      "AgentReviewPanelTest",
+      "WorkspaceProposalServiceTest",
+      "ShedControlCliTest",
+      "AgentActivityStateTest",
+      "EditorProjectChangesTest",
+      "EditorObservationTest",
+      "ExternalChangeSnapshotTest",
+      "ProviderIconsTest",
+      "VisualWatchControlTest",
+      "TestWatchServiceTest",
+      "DataLossRegressionTest",
+      "AgentChangeTourTest",
+      "SmoothScrollPaneUITest",
+      "AgentBufferIntentTest",
+      "AgentTerminalCommandTest",
+      "AgentTerminalTransportTest",
+      "AgentTerminalDecorationTest",
+      "AgentViewportHandoffTest",
+      "EditorWorkspaceDocumentsTest",
+      "AgentAnimationEdgeTest",
+      "OpenVsxThemeTest",
+      "TerminalColorTest",
+      "EditorFreshnessTest",
+      "AgentDelegationTest",
+      "AgentTaskLaunchTest",
+      "CliChatProtocolTest",
+      "AgentCliChatPanelTest",
+      "AgentChatTranscriptTest",
+      "InlineCompletionSessionTest",
+      "InlineCompletionKeymapTest",
+      "InlineCompletionDisplayTest",
+      "FileExplorerSidebarTest",
+      "WorkbenchDocksTest",
+      "ToolReportPanelTest",
+      "ReadOnlyComparisonPanelTest",
+      "GitSidebarContextTest",
+      "LocalHistoryStoreTest",
+      "ShortcutEditingTest",
+      "OutlineSidebarTest",
+      "ScmWorkbenchModelTest",
+      "ScmWorkbenchServiceTest",
+      "ScmChangesPanelTest",
+      "AgentUiActionsTest",
+      "AgentUiControlTest"
+    ]
+  },
+  "tooling": {
+    "passed": 134
+  },
+  "native_shell": "NOT_USED",
+  "desktop_platforms_tested": [
+    "macOS arm64"
+  ],
+  "exclusions": [
+    "ProjectFileOpenPrerequisiteTest retired legacy vulnerability characterization",
+    "unqualified native-shell fixtures",
+    "Windows/Linux native desktop",
+    "actual model/agent process",
+    "standalone active-UI CPU/RSS/NMT qualification"
+  ],
+  "performance": {
+    "state": "PASS",
+    "pairs": 3,
+    "comparisons": [
+      {
+        "operation": "buffer_switch",
+        "baseline": 2.371333,
+        "candidate": 2.461833,
+        "limit": 4.371333,
+        "pass": true
+      },
+      {
+        "operation": "caret",
+        "baseline": 2.582708,
+        "candidate": 3.366042,
+        "limit": 4.582708,
+        "pass": true
+      },
+      {
+        "operation": "deletion",
+        "baseline": 1.288542,
+        "candidate": 1.252875,
+        "limit": 3.288542,
+        "pass": true
+      },
+      {
+        "operation": "newline",
+        "baseline": 1.855334,
+        "candidate": 1.8415,
+        "limit": 3.855334,
+        "pass": true
+      },
+      {
+        "operation": "redo",
+        "baseline": 0.776958,
+        "candidate": 0.790042,
+        "limit": 2.776958,
+        "pass": true
+      },
+      {
+        "operation": "scroll",
+        "baseline": 1.690791,
+        "candidate": 1.864125,
+        "limit": 3.690791,
+        "pass": true
+      },
+      {
+        "operation": "selection",
+        "baseline": 1.509666,
+        "candidate": 1.897041,
+        "limit": 3.509666,
+        "pass": true
+      },
+      {
+        "operation": "split_cycle",
+        "baseline": 4.041292,
+        "candidate": 3.6615,
+        "limit": 9.041292,
+        "pass": true
+      },
+      {
+        "operation": "typing.5000_rows.MERCURIAL",
+        "baseline": 1.137375,
+        "candidate": 1.58775,
+        "limit": 2.137375,
+        "pass": true
+      },
+      {
+        "operation": "typing.5000_rows.SUBVERSION",
+        "baseline": 0.820083,
+        "candidate": 0.846584,
+        "limit": 1.820083,
+        "pass": true
+      },
+      {
+        "operation": "typing.failed.MERCURIAL",
+        "baseline": 1.736167,
+        "candidate": 1.334833,
+        "limit": 2.736167,
+        "pass": true
+      },
+      {
+        "operation": "typing.failed.SUBVERSION",
+        "baseline": 1.234375,
+        "candidate": 1.260917,
+        "limit": 2.234375,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.100KiB.txt",
+        "baseline": 2.214416,
+        "candidate": 2.159584,
+        "limit": 3.321624,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.1MiB.txt",
+        "baseline": 1.539792,
+        "candidate": 1.365416,
+        "limit": 2.5397920000000003,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.Small.txt",
+        "baseline": 2.833667,
+        "candidate": 2.633375,
+        "limit": 4.2505005,
+        "pass": true
+      },
+      {
+        "operation": "typing.installing.MERCURIAL",
+        "baseline": 1.40275,
+        "candidate": 1.551875,
+        "limit": 2.40275,
+        "pass": true
+      },
+      {
+        "operation": "typing.installing.SUBVERSION",
+        "baseline": 2.018292,
+        "candidate": 1.938834,
+        "limit": 3.027438,
+        "pass": true
+      },
+      {
+        "operation": "typing.pending.MERCURIAL",
+        "baseline": 0.931958,
+        "candidate": 1.030333,
+        "limit": 1.9319579999999998,
+        "pass": true
+      },
+      {
+        "operation": "typing.pending.SUBVERSION",
+        "baseline": 1.221834,
+        "candidate": 0.806667,
+        "limit": 2.2218340000000003,
+        "pass": true
+      },
+      {
+        "operation": "typing.source_control_open",
+        "baseline": 1.324708,
+        "candidate": 1.513917,
+        "limit": 2.324708,
+        "pass": true
+      },
+      {
+        "operation": "undo",
+        "baseline": 0.651375,
+        "candidate": 1.039292,
+        "limit": 2.651375,
+        "pass": true
+      },
+      {
+        "operation": "open.Small.txt",
+        "baseline": 6.486125,
+        "candidate": 6.265542,
+        "limit": 26.486125,
+        "pass": true
+      },
+      {
+        "operation": "open.100KiB.txt",
+        "baseline": 27.438708,
+        "candidate": 27.419791,
+        "limit": 47.438708,
+        "pass": true
+      },
+      {
+        "operation": "open.1MiB.txt",
+        "baseline": 79.948583,
+        "candidate": 72.842584,
+        "limit": 99.948583,
+        "pass": true
+      },
+      {
+        "operation": "startup",
+        "baseline": 1890,
+        "candidate": 2004,
+        "limit": 2268.0,
+        "pass": true
+      },
+      {
+        "operation": "used_heap_bytes",
+        "baseline": 32644976,
+        "candidate": 32954904,
+        "limit": 41033584,
+        "pass": true
+      },
+      {
+        "operation": "threads",
+        "baseline": 22,
+        "candidate": 22,
+        "limit": 24,
+        "pass": true
+      },
+      {
+        "operation": "open_descriptors",
+        "baseline": 11,
+        "candidate": 11,
+        "limit": 15,
+        "pass": true
+      }
+    ],
+    "budgets": "proposed practical regression gates; 16 ms typing target is pre-existing",
+    "limits": "fresh processes, warm OS caches; medians of per-process metrics; no statistical equivalence claim or real Hg/SVN qualification"
+  },
+  "jdk": {
+    "IMPLEMENTOR": "Eclipse Adoptium",
+    "JAVA_VERSION": "21.0.13.1",
+    "OS_ARCH": "aarch64"
+  }
+}

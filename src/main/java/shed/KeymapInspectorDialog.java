@@ -27,13 +27,16 @@ final class KeymapInspectorDialog extends JDialog {
     private final DefaultTableModel tableModel;
     private final JTable table;
     private List<KeymapOverlay.Binding> visibleBindings;
+    private boolean suppressRecordedTyped;
+    private final JLabel feedback = new JLabel("Select a shortcut to edit it, or record a new shortcut.");
+    private final javax.swing.JToggleButton record = new javax.swing.JToggleButton("Record shortcut");
 
     static void showFor(Texteditor editor) {
         new KeymapInspectorDialog(editor).setVisible(true);
     }
 
     private KeymapInspectorDialog(Texteditor editor) {
-        super(editor, "Keymap Inspector", false);
+        super(editor, "Keyboard Shortcuts", false);
         this.editor = editor;
         this.searchField = new JTextField();
         AccessibilitySupport.describe(searchField, "Keymap search", "Search effective keybindings by scope, key, mapping, source, or status.");
@@ -68,6 +71,12 @@ final class KeymapInspectorDialog extends JDialog {
             @Override public void changedUpdate(DocumentEvent event) { refreshTable(); }
         });
         table.setRowHeight(Math.max(table.getRowHeight(), UiZoom.scale(40, editor.configManager.getUiZoom())));
+        lhsField.setName("shortcuts.key"); rhsField.setName("shortcuts.mapping"); record.setName("shortcuts.record");
+        record.addActionListener(e -> { if(record.isSelected()){feedback.setText("Press a modified shortcut or function key in the Key field. Escape cancels.");lhsField.requestFocusInWindow();} });
+        lhsField.addKeyListener(new java.awt.event.KeyAdapter(){@Override public void keyPressed(java.awt.event.KeyEvent e){if(!record.isSelected())return;e.consume();if(e.getKeyCode()==java.awt.event.KeyEvent.VK_ESCAPE){record.setSelected(false);feedback.setText("Recording cancelled.");return;}String captured=ShortcutEditing.capture(e);if(captured!=null){suppressRecordedTyped=true;lhsField.setText(captured);record.setSelected(false);showConflicts();}}@Override public void keyTyped(java.awt.event.KeyEvent e){if(record.isSelected()||suppressRecordedTyped)e.consume();}@Override public void keyReleased(java.awt.event.KeyEvent e){suppressRecordedTyped=false;}});
+        table.addMouseListener(new java.awt.event.MouseAdapter(){@Override public void mouseClicked(java.awt.event.MouseEvent e){if(e.getClickCount()==2)editSelected();}});
+        lhsField.getDocument().addDocumentListener(new DocumentListener(){public void insertUpdate(DocumentEvent e){showConflicts();}public void removeUpdate(DocumentEvent e){showConflicts();}public void changedUpdate(DocumentEvent e){showConflicts();}});
+        scopeField.addActionListener(e->showConflicts());
         refreshTable();
     }
 
@@ -95,7 +104,8 @@ final class KeymapInspectorDialog extends JDialog {
         actions.addActionListener(event -> rhsField.setText("action:" + actions.getSelectedItem()));
         JPanel hint = new JPanel(new BorderLayout(8, 0));
         hint.add(new JLabel("One shortcut, e.g. <mod-s-k>. Mod means Cmd on macOS, Ctrl elsewhere."), BorderLayout.CENTER);
-        hint.add(actions, BorderLayout.EAST);
+        var choices=new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.TRAILING,6,0));choices.add(record);choices.add(actions);
+        hint.add(choices, BorderLayout.EAST);
         lower.add(hint, BorderLayout.SOUTH);
         panel.add(lower, BorderLayout.SOUTH);
         return panel;
@@ -115,7 +125,7 @@ final class KeymapInspectorDialog extends JDialog {
         panel.add(reset);
         panel.add(refresh);
         panel.add(close);
-        return panel;
+        var footer=new JPanel(new BorderLayout());footer.add(feedback,BorderLayout.NORTH);footer.add(panel);return footer;
     }
 
     private void refreshTable() {
@@ -149,13 +159,24 @@ final class KeymapInspectorDialog extends JDialog {
         rhsField.setText(binding.mapping());
     }
 
+    private void showConflicts() {
+        var conflicts=ShortcutEditing.conflicts(editor.getEffectiveKeybindings(),String.valueOf(scopeField.getSelectedItem()),lhsField.getText());
+        feedback.setText(conflicts.isEmpty()?"No matching shortcut in this scope or global fallback.":"Existing mapping: "+conflicts.stream().map(b->b.scope()+" · "+b.mapping()).distinct().collect(java.util.stream.Collectors.joining("; ")));
+    }
+
     private void saveOverlay() {
+        String scope=String.valueOf(scopeField.getSelectedItem()),key="keybind."+scope+"."+lhsField.getText();
+        String invalid=KeymapOverlay.validate(key,rhsField.getText());
+        if(invalid!=null){feedback.setText(invalid);return;}
+        var conflicts=ShortcutEditing.conflicts(editor.getEffectiveKeybindings(),scope,lhsField.getText());
+        if(!conflicts.isEmpty()&&JOptionPane.showConfirmDialog(this,"This shortcut already has a mapping in this scope or global fallback. Save this override?","Override shortcut",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION)return;
         String result = editor.setKeybindingPersistent(String.valueOf(scopeField.getSelectedItem()), lhsField.getText(), rhsField.getText());
         if (result.startsWith("Error")) {
             JOptionPane.showMessageDialog(this, result, "Keymap Inspector", JOptionPane.ERROR_MESSAGE);
             return;
         }
         refreshTable();
+        feedback.setText(result);
     }
 
     private void resetSelected() {

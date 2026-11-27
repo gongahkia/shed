@@ -245,7 +245,7 @@ public final class AgentWorkflowDesktopProbe {
         await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Agent").get("ready")),20);
         Files.writeString(file,expected);await(()->area.getClientProperty("shed.agentTour")!=null,12);
         long revision=edt(buffer::documentRevision);boolean undo=edt(()->buffer.getUndoManager().canUndo());
-        // external reload currently restores the caret, collapsing the old selection; the tour must preserve that installed state
+        // the tour must preserve the caret/selection state installed by external reload
         int dot=edt(area::getCaretPosition),mark=edt(()->area.getCaret().getMark());
         check(dot==6,"External append moved the human caret");
         await(()->area.getClientProperty("shed.agentTour")==null,5);
@@ -259,7 +259,15 @@ public final class AgentWorkflowDesktopProbe {
         capture("21-appended-eof-visible");
         // check subsequent event-loop turns too, so a late caret restoration cannot pass unnoticed
         long until=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(500);
-        await(()->{check(viewport.getViewPosition().y==y,"Late callback moved viewport away from appended EOF");return System.nanoTime()>=until;},2);
+        var trace=new ArrayList<Map<String,Object>>();
+        try{
+            await(()->{
+                var state=new LinkedHashMap<String,Object>();state.put("ns_until_deadline",until-System.nanoTime());state.put("expected_y",y);state.put("actual_y",viewport.getViewPosition().y);state.put("viewport",viewport.getViewRect().toString());state.put("source_size",area.getSize().toString());state.put("caret",area.getCaretPosition());state.put("mark",area.getCaret().getMark());state.put("revision",buffer.documentRevision());
+                if(viewport.getViewPosition().y!=y){try{var eof=area.modelToView2D(expected.length());state.put("eof",String.valueOf(eof));state.put("eof_visible",eof!=null&&viewport.getViewRect().contains(eof.getX(),eof.getY()));}catch(javax.swing.text.BadLocationException invalid){throw new AssertionError(invalid);}}
+                if(trace.size()<32)trace.add(state);
+                check(viewport.getViewPosition().y==y,"Late callback moved viewport away from appended EOF");return System.nanoTime()>=until;
+            },2);
+        }finally{events.add(Map.of("phase","eof_follow_stability_trace","expected_source_units",expected.length(),"samples",List.copyOf(trace)));}
         events.add(Map.of("phase","append_five_functions_reveals_eof","exact",true,"scroll_y",y,"source_units",expected.length(),"caret_preserved",true,"selection_before_reload",List.of(2,6),"selection_after_reload",List.of(Math.min(dot,mark),Math.max(dot,mark))));
         edt(()->{editor.toolWindowHost.watchAgentChanges("stop","Agent");editor.openFileAsync(project.resolve("ModelBlocks.java").toFile());return null;});
         await(()->project.resolve("ModelBlocks.java").toFile().equals(editor.getCurrentBuffer().getFile()),10);

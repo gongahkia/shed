@@ -4,6 +4,8 @@ DEMO_TARGETS := $(addprefix demo-,$(DEMO_ANIMATIONS))
 LOOP ?= 0
 ANIMATIONS ?=
 ARGS ?=
+SCM_BASELINE_JAR ?=
+SCM_PERF_PAIRS ?= 3
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib/shed
@@ -13,7 +15,7 @@ SOURCES := $(shell find src/main assets -type f 2>/dev/null)
 RUN_GOALS := $(if $(filter run,$(MAKECMDGOALS)),$(filter-out run,$(MAKECMDGOALS)),)
 RUN_ARGS := $(strip $(ARGS) $(RUN_GOALS))
 
-.PHONY: all build run demo demo-delegation demo-chat demo-completion demo-list $(DEMO_TARGETS) profile-startup test check clean install uninstall help $(RUN_GOALS)
+.PHONY: check-scm-performance all build run demo demo-delegation demo-chat demo-completion demo-list $(DEMO_TARGETS) profile-startup test check clean install uninstall help $(RUN_GOALS)
 
 all: build
 
@@ -45,6 +47,13 @@ demo-delegation demo-completion: $(JAR)
 demo-list:
 	@python3 scripts/test-agent-desktop.py --list-animations
 
+check-scm-performance: $(JAR)
+	@test -n "$(SCM_BASELINE_JAR)" || { printf '%s\n' 'Set SCM_BASELINE_JAR to a preserved pre-change Shed JAR.' >&2; exit 2; }
+	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
+	 output="$$(pwd -P)/target/scm-performance-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
+	 python3 scripts/test-scm-performance.py --jdk "$$java_home" --jar "$(abspath $(JAR))" \
+	   --baseline-jar "$(SCM_BASELINE_JAR)" --pairs "$(SCM_PERF_PAIRS)" --output "$$output"
+
 profile-startup: $(JAR)
 	@SHED_STARTUP_PROFILE=1 $(LAUNCHER) $(ARGS)
 
@@ -71,6 +80,7 @@ clean:
 	 JAVA_HOME="$$java_home" "$$maven" -B -q clean
 
 help:
+	@printf '%s\n' 'make check-scm-performance SCM_BASELINE_JAR=/path/to/before.jar  opt-in paired desktop performance check'
 	@printf '%s\n' 'make build              package Shed without tests'
 	@printf '%s\n' 'make run [path ...]     rebuild if needed, then launch files or folders (make run . opens this folder)'
 	@printf '%s\n' 'make demo               show the complete agent animation tour'

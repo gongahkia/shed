@@ -291,6 +291,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'ProjectDocumentInstallTest',
             'ProjectFileOpenTest',
             'EditorControlTest',
+            'AgentUiActionsTest',
             'EditorFreshnessTest',
             'AgentDelegationTest',
             'AgentTaskLaunchTest',

@@ -41,6 +41,7 @@ final class InlineFindBar extends JPanel {
     private final JPanel replaceRow = new JPanel(new BorderLayout(8, 0));
     private final JButton previous = button("Previous", this::previous);
     private final JButton next = button("Next", this::next);
+    private final JButton close = button("Close", this::close);
     private final JButton go = button("Go", this::goToLine);
     private final JButton replaceOne = button("Replace", this::replaceOne);
     private final JButton replaceAll = button("Replace All", this::replaceAll);
@@ -52,6 +53,8 @@ final class InlineFindBar extends JPanel {
     private int selected = -1;
     private int scanJobId = -1;
     private long scanGeneration;
+    private long uiRevision;
+    private java.util.Map<String,Object> uiFingerprint;
 
     InlineFindBar(Texteditor editor) {
         super(new BorderLayout(0, 3));
@@ -69,7 +72,7 @@ final class InlineFindBar extends JPanel {
         queryActions.add(previous);
         queryActions.add(next);
         queryActions.add(go);
-        queryActions.add(button("Close", this::close));
+        queryActions.add(close);
         queryRow.add(queryActions, BorderLayout.EAST);
         add(queryRow, BorderLayout.NORTH);
 
@@ -129,6 +132,40 @@ final class InlineFindBar extends JPanel {
 
     boolean hasSearchQuery() { return mode != Mode.GO_TO_LINE && !query.getText().isBlank(); }
     String queryText() { return hasSearchQuery() ? query.getText() : ""; }
+
+    java.awt.Component agentTarget(String action) {
+        return switch (action) {
+            case "find.open", "find.query" -> query;
+            case "find.next" -> next;
+            case "find.previous" -> previous;
+            case "find.case" -> matchCase;
+            case "find.regex" -> regex;
+            case "find.word" -> wholeWord;
+            case "find.close" -> close;
+            default -> throw new IllegalArgumentException("Unknown Find control");
+        };
+    }
+
+    void agentInvoke(String action) {
+        if (action.equals("find.open")) editor.inputController.performMenuAction(PlainKeymap.Action.FIND);
+        else ((javax.swing.AbstractButton)agentTarget(action)).doClick(0);
+    }
+
+    java.util.Map<String,Object> agentState() {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Find state belongs on the EDT");
+        String text = query.getText();
+        if (text.length() > AgentUiActions.MAX_TEXT) throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "Find query exceeds control limit");
+        var fingerprint = java.util.Map.<String,Object>of("visible", isVisible(), "mode", mode.name().toLowerCase(java.util.Locale.ROOT),
+            "query", text, "caret", query.getCaretPosition(), "start", query.getSelectionStart(), "end", query.getSelectionEnd(),
+            "case", matchCase.isSelected(), "regex", regex.isSelected(), "word", wholeWord.isSelected());
+        if (!fingerprint.equals(uiFingerprint)) { uiFingerprint = fingerprint; uiRevision++; }
+        var state = new java.util.LinkedHashMap<String,Object>(fingerprint);
+        state.put("kind", "ui"); state.put("schemaVersion", 1); state.put("revision", uiRevision);
+        state.put("phase", !isVisible() || text.isEmpty() ? "idle" : scan != null ? "ready" : scanTimer.isRunning() || scanJobId >= 0 ? "searching" : "error");
+        state.put("matches", scan == null ? 0 : scan.ranges().size()); state.put("selected", selected);
+        state.put("truncated", scan != null && scan.truncated());
+        return state;
+    }
 
     void navigate(boolean forward) {
         if (scan == null || scan.buffer() != editor.getCurrentBuffer()

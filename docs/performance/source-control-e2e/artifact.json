@@ -1,0 +1,14 @@
+{
+  "entry_head": "1884a1ea37e9d2ae08789dae0d8d7053fb24f4f1",
+  "baseline_commit": "5a01e783435112343201eca915a2a811b9eb46be",
+  "baseline_jar_sha256": "85a83ad649934a968023256f3dcecd516879816f364459af55621099b08c0087",
+  "candidate_jar_sha256": "a176ba1258dce576dd0c89def40c8306e4f1a2e4588f5c0735293b4ba2bd0c3b",
+  "readme_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "source_sha256": {
+    "src/benchmark/java/shed/SourceControlPerformanceProbe.java": "066fd7b2ea81ee87ddc2bbf57a22d60668f49582ca1f296f53e3265bd11a540e",
+    "src/benchmark/java/shed/AgentWorkflowDesktopProbe.java": "90aa5530580720e8a264cc55b6c63fd07cf7b3c030673ce4e615dd65a8012964",
+    "scripts/test-scm-performance.py": "0891eedf038315e8ff263c0684fe21dccc9b8fcc679d87e5c4ff8cdcd3ba2804",
+    "scripts/test_scm_performance.py": "b7fc21e5cc251aec1f9fb636685657e84b1420b451d622e980fcb12c81f49e9a",
+    "Makefile": "646eae62ec21ddefe8b6ad37ed093a5157589207f6413d23eab55e0eeb2aa84f"
+  }
+}

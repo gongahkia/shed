@@ -10,6 +10,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -169,21 +171,29 @@ public class AsyncJobService {
     }
 
     public AsyncJobService(int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
-        this(Executors.newFixedThreadPool(workerCount(), task -> {
-            Thread thread = new Thread(task, "shed-worker");
-            thread.setDaemon(true);
-            return thread;
-        }), maxHistoryEntries, errorReporter);
+        this(workerExecutor(30_000), maxHistoryEntries, errorReporter);
     }
 
     AsyncJobService(ExecutorService executor, int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
-        this.executor = executor == null ? Executors.newFixedThreadPool(workerCount()) : executor;
+        this.executor = executor == null ? workerExecutor(30_000) : executor;
         this.longRunningExecutor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("shed-long-running-", 0).factory());
         this.nextId = new AtomicInteger(1);
         this.jobs = new ConcurrentHashMap<>();
         this.maxHistoryEntries = Math.max(10, maxHistoryEntries);
         this.errorReporter = errorReporter;
         this.failedJobListener = snapshot -> { };
+    }
+
+    static ThreadPoolExecutor workerExecutor(long idleMillis) {
+        if (idleMillis <= 0) throw new IllegalArgumentException("worker idle timeout must be positive");
+        var executor = new ThreadPoolExecutor(workerCount(), workerCount(), idleMillis, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(), task -> {
+                Thread thread = new Thread(task, "shed-worker");
+                thread.setDaemon(true);
+                return thread;
+            });
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
     }
 
     static int workerCount() {

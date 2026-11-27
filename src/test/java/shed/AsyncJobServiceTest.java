@@ -263,4 +263,46 @@ public class AsyncJobServiceTest {
         assertTrue(log.contains("background secret"));
         service.shutdownNow();
     }
+    @Test
+    void idleWorkersRetireAndResumeWithoutChangingActiveConcurrency() throws Exception {
+        SwingUtilities.invokeAndWait(() -> { });
+        var pool = AsyncJobService.workerExecutor(40);
+        var service = new AsyncJobService(pool, 20, null);
+        int count = AsyncJobService.workerCount();
+        var entered = new CountDownLatch(count);
+        var release = new CountDownLatch(1);
+        var completed = new CountDownLatch(count);
+        try {
+            assertTrue(pool.allowsCoreThreadTimeOut());
+            assertEquals(count, pool.getCorePoolSize());
+            assertEquals(count, pool.getMaximumPoolSize());
+            for (int i = 0; i < count; i++) service.submit("idle retirement fixture", token -> {
+                assertTrue(Thread.currentThread().isDaemon());
+                assertEquals("shed-worker", Thread.currentThread().getName());
+                entered.countDown();
+                assertTrue(release.await(2, TimeUnit.SECONDS));
+                return "done";
+            }, (job, result, error) -> completed.countDown());
+            assertTrue(entered.await(2, TimeUnit.SECONDS));
+            Thread.sleep(80);
+            assertEquals(count, pool.getActiveCount());
+            release.countDown();
+            assertTrue(completed.await(2, TimeUnit.SECONDS));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (pool.getPoolSize() != 0 && System.nanoTime() < deadline) Thread.sleep(5);
+            assertEquals(0, pool.getPoolSize());
+            assertFalse(pool.isShutdown());
+            var resumed = new CountDownLatch(1);
+            var value = new AtomicReference<String>();
+            service.submit("resumed fixture", token -> "resumed", (job, result, error) -> { value.set(result); resumed.countDown(); });
+            assertTrue(resumed.await(2, TimeUnit.SECONDS));
+            assertEquals("resumed", value.get());
+        } finally { release.countDown(); service.shutdownNow(); }
+    }
+
+    @Test
+    void workerIdleTimeoutMustBePositive() {
+        assertThrows(IllegalArgumentException.class, () -> AsyncJobService.workerExecutor(0));
+    }
+
 }

@@ -15,7 +15,7 @@ The right-side **Source Control** surface now presents Git, Mercurial and Subver
 | New parser/service/renderer selection | 14 passes, zero failures/errors/skips | `focused-renderer.json.gz` |
 | Final broad safe Maven with LSP measurement | **617 total; 611 passes, six existing skips; zero failures/errors** | `maven.json.gz` |
 | Python tooling | **116 passes**, zero failures | `tooling-media-final.json.gz` |
-| Packaged Mermaid/math/local-image smoke | PASS | `tooling-media-final.json.gz`, `media-*.json.gz` |
+| Packaged Mermaid/math/local-image smoke | PASS | `tooling-media-final.json.gz` |
 | Final real Swing + fixed Java Chat/SCM client | PASS; both provider pages, source/context guards and existing Git/Chat | `scm-chat-final-evidence.json.gz`, `scm-chat-final-result.json.gz`, PNGs |
 | Final disposable fixed-Git/watcher desktop workflow | PASS, including EOF follow | `scm-watch-final-report.json.gz` |
 | Earlier same-artifact watcher failure / unchanged rerun | FAIL at late EOF viewport stability / PASS | `scm-watcher-release-report.json.gz`, `scm-watcher-release2-report.json.gz` |

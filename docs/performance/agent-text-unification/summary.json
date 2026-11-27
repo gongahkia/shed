@@ -1,0 +1,252 @@
+{
+  "scope": "unified agent pulses, badge-only chunks and shared action tints",
+  "artifact": {
+    "sha256": "cd25792da2cce0a24ee7df580bfebeab9ca05b98078b4900fba836de59696c5d",
+    "main_classes": 1650,
+    "mismatches": [],
+    "state": "PASS"
+  },
+  "maven_before_tool_removal": {
+    "passed": 689,
+    "total": 695,
+    "skips": 6,
+    "failures": 0
+  },
+  "direct_jdk_junit": {
+    "passed": 689,
+    "total": 695,
+    "skipped": 5,
+    "aborted_assumption": 1,
+    "failures": 0,
+    "gate": "unchanged reviewed selection, source hashes and fixture/context checks"
+  },
+  "live_source": {
+    "state": "PASS",
+    "source_integrity": true,
+    "artifact": "cd25792da2cce0a24ee7df580bfebeab9ca05b98078b4900fba836de59696c5d"
+  },
+  "live_workbench": {
+    "state": "PASS",
+    "calls": 131,
+    "stages": 53,
+    "remaining_processes": 0,
+    "artifact": "cd25792da2cce0a24ee7df580bfebeab9ca05b98078b4900fba836de59696c5d"
+  },
+  "media": "PASS",
+  "maven_packaging": "unavailable: temporary installation/cache removed",
+  "readme_sha256_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_sha256_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "native_shell_benchmarks": "NO-GO; not run",
+  "environment": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "performance": {
+    "state": "PASS",
+    "pairs": 3,
+    "comparisons": [
+      {
+        "operation": "buffer_switch",
+        "baseline": 8.037084,
+        "candidate": 2.362417,
+        "limit": 12.055626,
+        "pass": true
+      },
+      {
+        "operation": "caret",
+        "baseline": 9.541917,
+        "candidate": 2.402459,
+        "limit": 14.3128755,
+        "pass": true
+      },
+      {
+        "operation": "deletion",
+        "baseline": 7.828375,
+        "candidate": 1.238416,
+        "limit": 11.7425625,
+        "pass": true
+      },
+      {
+        "operation": "newline",
+        "baseline": 9.021,
+        "candidate": 1.826334,
+        "limit": 13.531500000000001,
+        "pass": true
+      },
+      {
+        "operation": "redo",
+        "baseline": 0.688916,
+        "candidate": 0.844708,
+        "limit": 2.688916,
+        "pass": true
+      },
+      {
+        "operation": "scroll",
+        "baseline": 8.375166,
+        "candidate": 1.648375,
+        "limit": 12.562749,
+        "pass": true
+      },
+      {
+        "operation": "selection",
+        "baseline": 7.951458,
+        "candidate": 1.392125,
+        "limit": 11.927187,
+        "pass": true
+      },
+      {
+        "operation": "split_cycle",
+        "baseline": 9.017709,
+        "candidate": 3.314375,
+        "limit": 14.017709,
+        "pass": true
+      },
+      {
+        "operation": "typing.5000_rows.MERCURIAL",
+        "baseline": 0.832584,
+        "candidate": 0.829875,
+        "limit": 1.832584,
+        "pass": true
+      },
+      {
+        "operation": "typing.5000_rows.SUBVERSION",
+        "baseline": 0.946709,
+        "candidate": 0.774916,
+        "limit": 1.946709,
+        "pass": true
+      },
+      {
+        "operation": "typing.failed.MERCURIAL",
+        "baseline": 0.749041,
+        "candidate": 1.349125,
+        "limit": 1.749041,
+        "pass": true
+      },
+      {
+        "operation": "typing.failed.SUBVERSION",
+        "baseline": 0.973083,
+        "candidate": 0.985084,
+        "limit": 1.973083,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.100KiB.txt",
+        "baseline": 8.576042,
+        "candidate": 2.051,
+        "limit": 12.864062999999998,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.1MiB.txt",
+        "baseline": 8.150667,
+        "candidate": 1.386459,
+        "limit": 12.226000500000001,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.Small.txt",
+        "baseline": 9.157625,
+        "candidate": 2.746375,
+        "limit": 13.7364375,
+        "pass": true
+      },
+      {
+        "operation": "typing.installing.MERCURIAL",
+        "baseline": 1.026583,
+        "candidate": 1.225208,
+        "limit": 2.026583,
+        "pass": true
+      },
+      {
+        "operation": "typing.installing.SUBVERSION",
+        "baseline": 1.579875,
+        "candidate": 1.768208,
+        "limit": 2.579875,
+        "pass": true
+      },
+      {
+        "operation": "typing.pending.MERCURIAL",
+        "baseline": 0.93375,
+        "candidate": 0.886,
+        "limit": 1.9337499999999999,
+        "pass": true
+      },
+      {
+        "operation": "typing.pending.SUBVERSION",
+        "baseline": 0.98475,
+        "candidate": 0.818125,
+        "limit": 1.98475,
+        "pass": true
+      },
+      {
+        "operation": "typing.source_control_open",
+        "baseline": 8.197458,
+        "candidate": 1.459333,
+        "limit": 12.296187,
+        "pass": true
+      },
+      {
+        "operation": "undo",
+        "baseline": 7.52775,
+        "candidate": 0.682333,
+        "limit": 11.291625,
+        "pass": true
+      },
+      {
+        "operation": "open.Small.txt",
+        "baseline": 7.021958,
+        "candidate": 6.559042,
+        "limit": 27.021957999999998,
+        "pass": true
+      },
+      {
+        "operation": "open.100KiB.txt",
+        "baseline": 31.742875,
+        "candidate": 22.92875,
+        "limit": 51.742875,
+        "pass": true
+      },
+      {
+        "operation": "open.1MiB.txt",
+        "baseline": 79.507625,
+        "candidate": 76.061792,
+        "limit": 99.507625,
+        "pass": true
+      },
+      {
+        "operation": "startup",
+        "baseline": 1893,
+        "candidate": 1849,
+        "limit": 2271.6,
+        "pass": true
+      },
+      {
+        "operation": "used_heap_bytes",
+        "baseline": 32765992,
+        "candidate": 32832072,
+        "limit": 41154600,
+        "pass": true
+      },
+      {
+        "operation": "threads",
+        "baseline": 22,
+        "candidate": 22,
+        "limit": 24,
+        "pass": true
+      },
+      {
+        "operation": "open_descriptors",
+        "baseline": 11,
+        "candidate": 11,
+        "limit": 15,
+        "pass": true
+      }
+    ],
+    "budgets": "proposed practical regression gates; 16 ms typing target is pre-existing",
+    "limits": "fresh processes, warm OS caches; medians of per-process metrics; no statistical equivalence claim or real Hg/SVN qualification"
+  },
+  "tooling": {
+    "tests": 134,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 9.205789874999937
+  }
+}

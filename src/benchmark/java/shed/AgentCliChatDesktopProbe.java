@@ -123,6 +123,67 @@ public final class AgentCliChatDesktopProbe {
         events.add("Persistent local Outline navigates without source edits; normal Save captures history; explicit confirmed restore is one undoable buffer edit without disk writes; recorded shortcut persists through existing overlays");
     }
 
+    private static void acceptScmDialog(String title) throws Exception {
+        await(()->Arrays.stream(editor.getOwnedWindows()).anyMatch(w->w instanceof JDialog d&&d.isShowing()&&d.getTitle().contains(title)));
+        ui(()->{var dialog=Arrays.stream(editor.getOwnedWindows()).filter(w->w instanceof JDialog d&&d.isShowing()&&d.getTitle().contains(title)).findFirst().orElseThrow();button(dialog,"OK").doClick();return null;});
+    }
+    private static void qualifySourceControl(Path project,List<String> events)throws Exception {
+        var source=ui(editor::getCurrentBuffer);String before=ui(source::getContent);long revision=ui(source::documentRevision);boolean undo=ui(()->source.getUndoManager().canUndo());
+        var control=ui(()->editor.toolWindowHost.sourceControlPanel());var field=SourceControlPanel.class.getDeclaredField("nativeScm");field.setAccessible(true);var scm=(ScmChangesPanel)field.get(control);var serviceField=ScmChangesPanel.class.getDeclaredField("service");serviceField.setAccessible(true);var originalService=serviceField.get(scm);
+        var commands=new java.util.concurrent.CopyOnWriteArrayList<List<String>>();var added=new java.util.concurrent.atomic.AtomicBoolean();var hold=new java.util.concurrent.atomic.AtomicBoolean();var waiting=new java.util.concurrent.atomic.AtomicBoolean();var released=new java.util.concurrent.CountDownLatch(1);String node="a".repeat(40);
+        var fixture=new ScmWorkbenchService((root,command,token)->{
+            commands.add(command);boolean hg=command.getFirst().equals("hg");
+            if(command.contains("status")){
+                if(hold.get()){waiting.set(true);token.onCancel(released::countDown);released.await(3,TimeUnit.SECONDS);if(token.isCancelled())throw new java.util.concurrent.CancellationException();}
+                return new CommandResult(0,hg?"M Source.txt\0"+(added.get()?"A ":"? ")+"New.txt\0":"<status><target path='.'><entry path='Source.txt'><wc-status item='modified' props='none'/></entry><entry path='New.txt'><wc-status item='"+(added.get()?"added":"unversioned")+"' props='none'/></entry></target></status>","");
+            }
+            if(command.contains("resolve")&&command.contains("--list"))return new CommandResult(0,"","");
+            if(command.contains("branch"))return new CommandResult(0,"default\n","");
+            if(command.contains("info"))return new CommandResult(0,"<info><entry><url>https://example.invalid/repository/trunk</url></entry></info>","");
+            if(command.contains("log"))return new CommandResult(0,hg?node+"\0Fixture\0"+"2026-11-27\0Fixture commit\0":"<log><logentry revision='12'><author>Fixture</author><date>2026-11-27</date><msg>Fixture commit</msg></logentry></log>","");
+            if(command.contains("add")){added.set(true);return new CommandResult(0,"Added synthetic file\n","");}
+            return new CommandResult(0,"@@ -1 +1 @@\n-before\n+after\n","");
+        });
+        serviceField.set(scm,fixture);
+        try{
+            for(var provider:List.of(ScmWorkbenchModel.Provider.MERCURIAL,ScmWorkbenchModel.Provider.SUBVERSION)){
+                Path root=Files.createDirectory(project.resolveSibling("fixture-"+provider.executable));Files.createDirectory(root.resolve(provider.marker));Files.writeString(root.resolve("Source.txt"),"after\n");Files.writeString(root.resolve("New.txt"),"new\n");added.set(false);
+                ui(()->{editor.workspaceController.addFolder(root,true);editor.showToolWindow(ToolWindowHost.Tab.GIT);control.refresh();return null;});
+                await(()->((JComboBox<?>)find(editor.getRootPane(),"scm.provider")).getSelectedItem()==provider&&((JTable)find(scm.component(),"scm.files")).getRowCount()==2&&!scm.busy());
+                ui(()->{((JTable)find(scm.component(),"scm.files")).setRowSelectionInterval(0,0);return null;});await(()->!scm.busy()&&((JTextPane)find(scm.component(),"scm.diff")).getText().contains("+after"));
+                ui(()->{button(scm.component(),"Open Diff").doClick();if(find(editor.getRootPane(),"comparison.text")==null||editor.getCurrentBuffer()!=source||source.documentRevision()!=revision)throw new AssertionError("SCM diff changed source context");return null;});picture("00f-"+provider.executable+"-source-control");
+                ui(()->{((JButton)find(editor.getRootPane(),"comparison.close")).doClick();((JTable)find(scm.component(),"scm.files")).setRowSelectionInterval(1,1);return null;});
+                SwingUtilities.invokeLater(()->button(scm.component(),"Add").doClick());acceptScmDialog(provider.label+" · Add");await(()->added.get()&&!scm.busy());
+                if(!commands.stream().anyMatch(c->c.getFirst().equals(provider.executable)&&c.contains("add")&&c.getLast().equals(provider==ScmWorkbenchModel.Provider.MERCURIAL?"path:New.txt":"New.txt@")))throw new AssertionError("Add did not use checked literal argv");
+                ui(()->{((JTextArea)find(scm.component(),"scm.commit.message")).setText("Fixture commit; literal $(no-shell)");return null;});
+                SwingUtilities.invokeLater(()->button(scm.component(),"Commit").doClick());acceptScmDialog(provider.label+" · Commit");await(()->!scm.busy()&&((JTextArea)find(scm.component(),"scm.commit.message")).getText().isEmpty());
+                if(!commands.stream().anyMatch(c->c.getFirst().equals(provider.executable)&&c.contains("commit")&&c.getLast().equals("Fixture commit; literal $(no-shell)")))throw new AssertionError("Commit did not preserve literal message");
+                SwingUtilities.invokeLater(()->button(scm.component(),"History").doClick());if(provider==ScmWorkbenchModel.Provider.SUBVERSION)acceptScmDialog("Load Subversion History");await(()->!scm.busy()&&((JTable)find(scm.component(),"scm.history")).getRowCount()==1);
+                ui(()->{((JTable)find(scm.component(),"scm.history")).setRowSelectionInterval(0,0);return null;});SwingUtilities.invokeLater(()->button(scm.component(),"Open revision comparison").doClick());if(provider==ScmWorkbenchModel.Provider.SUBVERSION)acceptScmDialog("Revision Comparison");await(()->!scm.busy()&&find(editor.getRootPane(),"comparison.text")!=null);
+                ui(()->{((JButton)find(editor.getRootPane(),"comparison.close")).doClick();return null;});
+                if(!Files.readString(root.resolve("Source.txt")).equals("after\n")||!Files.readString(root.resolve("New.txt")).equals("new\n"))throw new AssertionError("Fixture backend mutated source unexpectedly");
+                ui(()->{button(scm.component(),"Changes").doClick();return null;});await(()->!scm.busy());
+                ui(()->{((JTable)find(scm.component(),"scm.files")).setRowSelectionInterval(0,0);return null;});await(()->!scm.busy());
+                long mutations=commands.stream().filter(c->c.contains("revert")).count();
+                SwingUtilities.invokeLater(()->button(scm.component(),"Revert…").doClick());
+                await(()->Arrays.stream(editor.getOwnedWindows()).anyMatch(w->w instanceof JDialog d&&d.isShowing()&&d.getTitle().equals(provider.label+" · Revert")));
+                ui(()->{var dialog=Arrays.stream(editor.getOwnedWindows()).filter(w->w instanceof JDialog d&&d.isShowing()&&d.getTitle().equals(provider.label+" · Revert")).findFirst().orElseThrow();button(dialog,"Cancel").doClick();return null;});
+                if(commands.stream().filter(c->c.contains("revert")).count()!=mutations)throw new AssertionError("Cancelled confirmation executed a mutation");
+                if(provider==ScmWorkbenchModel.Provider.MERCURIAL){
+                    SwingUtilities.invokeLater(()->button(scm.component(),"Revert…").doClick());
+                    await(()->Arrays.stream(editor.getOwnedWindows()).anyMatch(w->w instanceof JDialog d&&d.isShowing()&&d.getTitle().equals("Mercurial · Revert")));
+                    ui(()->{editor.workspaceController.activateFolder(project,true);control.refresh();return null;});acceptScmDialog("Mercurial · Revert");
+                    ui(()->null);if(commands.stream().filter(c->c.contains("revert")).count()!=mutations)throw new AssertionError("Project change inside confirmation executed a stale mutation");
+                }
+            }
+            ui(()->{button(scm.component(),"Changes").doClick();return null;});await(()->!scm.busy());hold.set(true);ui(()->{button(scm.component(),"Refresh").doClick();return null;});await(waiting::get);ui(()->{button(scm.component(),"Cancel").doClick();return null;});await(()->!scm.busy());
+            if(!ui(()->source.getContent().equals(before)&&source.documentRevision()==revision&&source.getUndoManager().canUndo()==undo))throw new AssertionError("Source Control changed source/history");
+            events.add("Source Control auto-detects Mercurial/Subversion fixture roots, presents parsed status/history and central read-only diffs, confirms literal Add/Commit, rejects cancelled/stale confirmations, requires SVN server consent and cancels pending work without source/Undo mutation; clients are in-process doubles");
+        }finally{
+            released.countDown();ui(()->{editor.workspaceController.activateFolder(project,true);control.git();control.refresh();return null;});serviceField.set(scm,originalService);
+        }
+    }
+
     public static void main(String[] args)throws Exception{
         if(args.length==2&&args[0].equals("--fake-agent")){fake(Integer.parseInt(args[1]));return;}
         output=Path.of(args[0]).toRealPath();project=Path.of(args[1]).toRealPath();Path fixture=Path.of(System.getenv("SHED_PORTABLE_FIXTURE_ROOT")).toRealPath();if(!project.startsWith(fixture.resolve("run"))||!output.startsWith(fixture.resolve("run")))throw new AssertionError("Disposable fixture required");
@@ -175,10 +236,11 @@ public final class AgentCliChatDesktopProbe {
                 editor.hideToolWindow();editor.toolWindowHost.showAgentChat();return null;
             });events.add("LSP/Debug/Tasks reports, navigable quickfix and a central read-only comparison leave source identity, text, revision, Undo, dirty state, caret and document count unchanged");
             qualifyEssentials(project,events);
+            qualifySourceControl(project,events);
             syntheticGit();events.add("Synthetic Git data renders in the right sidebar and opens a central read-only comparison; switching projects invalidates the old repository action context");
             picture("00-chat-layout");ui(()->{
                 if(editor.editorToolSplit.getOrientation()!=JSplitPane.VERTICAL_SPLIT||!editor.workbenchDocks.rightVisible())throw new AssertionError("Chat must be in the independent right dock");
-                var bottomTabs=(JTabbedPane)find(editor.toolWindowHost,"workbench.tools");if(bottomTabs.indexOfTab("Git")>=0||bottomTabs.indexOfTab("Chat")>=0)throw new AssertionError("Right tools leaked into bottom tabs");
+                var bottomTabs=(JTabbedPane)find(editor.toolWindowHost,"workbench.tools");if(bottomTabs.indexOfTab("Git")>=0||bottomTabs.indexOfTab("Source Control")>=0||bottomTabs.indexOfTab("Chat")>=0)throw new AssertionError("Right tools leaked into bottom tabs");
                 editor.toolWindowHost.showTab(ToolWindowHost.Tab.SEARCH);if(!editor.toolWindowHost.isSelected(ToolWindowHost.Tab.SEARCH)||!editor.toolWindowHost.isSelected(ToolWindowHost.Tab.AGENT))throw new AssertionError("Bottom tool hid chat");
                 editor.validate();editor.workbenchDocks.setDividerLocation(880);editor.editorToolSplit.setDividerLocation(430);editor.validate();var dockState=editor.workbenchDocks.snapshot();
                 editor.toolWindowHost.toggleRight(ToolWindowHost.Tab.AGENT);if(editor.workbenchDocks.rightVisible()||!editor.workbenchDocks.bottomVisible())throw new AssertionError("Sidebar toggle changed bottom visibility");editor.toolWindowHost.showAgentChat();

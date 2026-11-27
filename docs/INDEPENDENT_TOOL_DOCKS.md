@@ -3,20 +3,24 @@
 Shed now keeps three presentation regions independent of source documents:
 
 - **Left:** the existing toggleable File Explorer.
-- **Right:** Git and Agent Chat pages in one resizable, toggleable sidebar.
+- **Right:** Source Control and Agent Chat pages in one resizable, toggleable sidebar.
 - **Bottom:** Search, Problems, Replace, Tasks, Tests, Debug, Language reports and navigation Results.
 
 Terminal tabs and terminal editor splits remain unchanged, per the user's decision. No terminal process/session, keymap, font or environment code was modified. Native terminal behavior was not newly exercised.
 
 ## Use the docks
 
-**View → Git Changes** and **View → Agent Chat…** toggle the corresponding right-side page. Switching between Git and Chat keeps both surfaces alive. The sidebar close control hides the right region; the bottom close control hides only the bottom region. **Tools → Hide docked tools** hides both. Opening a bottom tool leaves the right sidebar visible and in place.
+**View → Source Control** and **View → Agent Chat…** toggle the corresponding right-side page. Switching between Source Control and Chat keeps both surfaces alive. The sidebar close control hides the right region; the bottom close control hides only the bottom region. **Tools → Hide docked tools** hides both. Opening a bottom tool leaves the right sidebar visible and in place.
 
 Dragged right width and bottom height are retained independently within the window, through hide/reopen and focus-mode entry/exit. The existing session payload now records both regions and their selected pages. Legacy single-dock selections/ratios are read as compatible placement hints. Automatic bottom sizing still grows for denser tools until the user manually resizes it. Opening a tool does not start its task, test or debugger. Chat remains subject to the existing explicit control approval and source-input shield; other tool controls remain shielded during an active approved turn.
 
-Existing bottom-tool detach/reattach remains available. Git and Chat stay pinned to the right. Separate advanced Git dialogs retain their previous behavior. Restoring a saved Chat placement does not implicitly start an agent or restore control authorization.
+Existing bottom-tool detach/reattach remains available. Source Control and Chat stay pinned to the right. Separate advanced Git dialogs retain their previous behavior. Restoring a saved Chat placement does not implicitly start an agent or restore control authorization.
 
-## Git
+## Source Control
+
+The right sidebar now has a Git / Mercurial / Subversion selector. Git retains the controls described below; the other providers have structured changes, diffs, history and native working-copy actions. See [Source Control](SOURCE_CONTROL.md) for current behavior and qualification boundaries. The earlier dock evidence remains historical.
+
+### Git
 
 Normal `:git`, `:git status`, `:git changes` and the View action open the Git sidebar. Changes are listed above a compact patch preview, with existing Open/Stage/Unstage/Revert/Commit controls. Their confirmation, repository and source-file rules remain. **Open Diff** shows the full bounded patch in the center, with **Back to source** and an explicit **Export displayed patch** action. It does not create a source buffer, alter the active file or add Undo entries.
 

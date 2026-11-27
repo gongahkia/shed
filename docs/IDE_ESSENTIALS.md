@@ -30,6 +30,6 @@ The editor shows existing mappings with the same physical key/modifiers in the c
 
 ## Other VCS systems
 
-Shed already includes explicit Mercurial and Subversion providers through `:scm`; see `ScmContributionService`, `BuiltInScmContributions` and the existing SCM command help. Their installed command-line clients are required. These are command integrations, not Git-sidebar feature parity, and were not executed against personal repositories during this pass. No additional VCS, native dependency or provider process is added here.
+Mercurial and Subversion now have graphical working-copy pages alongside Git in **View → Source Control**. Select a provider or use automatic working-copy detection; inspect changes, central diffs and history, then perform explicitly confirmed provider operations. Existing `:scm` text commands remain available. Installed `hg` / `svn` clients are required. See [Source Control usage, native semantics and qualification limits](SOURCE_CONTROL.md). The earlier IDE-essentials evidence remains a record of its original command-only scope.
 
 Run `make run .` to try the features. The existing `make demo-chat` now exercises Outline, a normal save/history capture, confirmed undoable restore, comparison, shortcut recording/persistence, and the existing Chat/dock flow using a disposable fixed Java client. It does not run a real coding model or the unqualified native-shell harness. See [qualification commands, exact counts and limitations](performance/ide-essentials/INDEX.md).

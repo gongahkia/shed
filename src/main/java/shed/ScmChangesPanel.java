@@ -16,8 +16,18 @@ final class ScmChangesPanel implements ToolWindowHost.ToolSurface {
     private final Texteditor editor;
     private final JPanel panel=new JPanel(new BorderLayout(6,6)),pages=new JPanel(new CardLayout());
     private final JLabel repository=new JLabel("Open a working copy."),state=new JLabel("Select a provider and refresh.");
-    private final DefaultTableModel files=new DefaultTableModel(new Object[]{"State","Path"},0){public boolean isCellEditable(int r,int c){return false;}};
-    private final DefaultTableModel revisions=new DefaultTableModel(new Object[]{"Revision","Message","Author","Date"},0){public boolean isCellEditable(int r,int c){return false;}};
+    static final class RowsModel extends DefaultTableModel {
+        RowsModel(Object... columns){super(columns,0);}
+        @Override public boolean isCellEditable(int row,int column){return false;}
+        void replaceRows(List<Object[]> rows){
+            if(!SwingUtilities.isEventDispatchThread())throw new IllegalStateException("SCM rows belong to the EDT");
+            var replacement=new Vector<Vector>();
+            for(var row:rows){if(row.length!=getColumnCount())throw new IllegalArgumentException("Wrong SCM column count");replacement.add(new Vector<>(Arrays.asList(row)));}
+            dataVector=replacement;fireTableDataChanged();
+        }
+    }
+    private final RowsModel files=new RowsModel("State","Path");
+    private final RowsModel revisions=new RowsModel("Revision","Message","Author","Date");
     private final JTable fileTable=new JTable(files),historyTable=new JTable(revisions);
     private final ChangeDiffView patch=new ChangeDiffView();
     private final JTextArea message=new JTextArea(2,20);
@@ -91,8 +101,8 @@ final class ScmChangesPanel implements ToolWindowHost.ToolSurface {
     @Override public void refresh(){
         if(!current()||busy)return;Provider p=provider;Path r=root;String selected=selectedChange()==null?null:selectedChange().path();
         work("Refreshing "+p.label+" status",token->service.status(p,r,token),value->{
-            snapshot=value;selectedPatch=null;files.setRowCount(0);patch.showPatch("",editor.resolveEditorFont());
-            for(var c:value.changes())files.addRow(new Object[]{c.state(),c.path()});ready=true;controls(false);repository.setText(p.label+" · "+r);repository.setToolTipText(r.toString());state.setText(value.changes().size()+" changes · "+value.location());WorkbenchStyle.emptyText(fileTable,"Working copy is clean");
+            snapshot=value;selectedPatch=null;patch.showPatch("",editor.resolveEditorFont());
+            files.replaceRows(value.changes().stream().map(c->new Object[]{c.state(),c.path()}).toList());ready=true;controls(false);repository.setText(p.label+" · "+r);repository.setToolTipText(r.toString());state.setText(value.changes().size()+" changes · "+value.location());WorkbenchStyle.emptyText(fileTable,"Working copy is clean");
             if(selected!=null)for(int i=0;i<value.changes().size();i++)if(selected.equals(value.changes().get(i).path())){fileTable.setRowSelectionInterval(i,i);break;}
         });
     }
@@ -109,7 +119,7 @@ final class ScmChangesPanel implements ToolWindowHost.ToolSurface {
         if(!current()||busy)return;Provider p=provider;Path r=root;long w=workspace;Path expectedProject=project;
         if(p==Provider.SUBVERSION&&confirm("Retrieve revision history from the Subversion repository server?","Load Subversion History",JOptionPane.QUESTION_MESSAGE)!=JOptionPane.OK_OPTION)return;
         if(!sameContext(p,r,w,expectedProject))return;
-        work("Loading "+p.label+" history",token->service.history(p,r,token),rows->{history=rows;historyVisible=true;revisions.setRowCount(0);for(var entry:rows)revisions.addRow(new Object[]{entry.id(),entry.subject(),entry.author(),entry.date()});((CardLayout)pages.getLayout()).show(pages,"history");state.setText(rows.size()+" revisions. Comparisons do not edit source.");});
+        work("Loading "+p.label+" history",token->service.history(p,r,token),rows->{history=rows;historyVisible=true;revisions.replaceRows(rows.stream().map(entry->new Object[]{entry.id(),entry.subject(),entry.author(),entry.date()}).toList());((CardLayout)pages.getLayout()).show(pages,"history");state.setText(rows.size()+" revisions. Comparisons do not edit source.");});
     }
     private void openRevision(){
         var revision=selectedRevision();if(revision==null||!current()||busy)return;

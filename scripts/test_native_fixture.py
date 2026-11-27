@@ -299,7 +299,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'AgentChatTranscriptTest',
             'FileExplorerSidebarTest',
             'WorkbenchDocksTest',
-            'GitSidebarContextTest',
+            'LocalHistoryStoreTest','ShortcutEditingTest','OutlineSidebarTest','GitSidebarContextTest',
             'ToolReportPanelTest',
             'ReadOnlyComparisonPanelTest',
 

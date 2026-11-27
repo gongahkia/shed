@@ -23,7 +23,8 @@ public final class AgentCliChatDesktopProbe {
     static JTextArea composer(){return (JTextArea)find(editor.getRootPane(),"agent.chat.composer");}
     static JButton send(){return (JButton)find(editor.getRootPane(),"agent.chat.send");}
     static List<String> javaCommand(int turn){return List.of(Path.of(System.getProperty("java.home"),"bin/java").toString(),"-Djava.awt.headless=true","-Duser.home="+System.getProperty("user.home"),"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir"),"-cp",System.getProperty("java.class.path"),AgentCliChatDesktopProbe.class.getName(),"--fake-agent",Integer.toString(turn));}
-    static void picture(String name)throws Exception{var image=ui(()->{var root=editor.getRootPane();return SwingComponentCapture.capture(root,0,0,root.getWidth(),root.getHeight(),8_000_000);});try{javax.imageio.ImageIO.write(image,"png",output.resolve(name+".png").toFile());}finally{image.flush();}}
+    static void picture(String name)throws Exception{picture(name,editor.getRootPane());}
+    static void picture(String name,JComponent root)throws Exception{var image=ui(()->SwingComponentCapture.capture(root,0,0,root.getWidth(),root.getHeight(),8_000_000));try{javax.imageio.ImageIO.write(image,"png",output.resolve(name+".png").toFile());}finally{image.flush();}}
     static void ctl(String...args)throws Exception{var argv=new ArrayList<String>(List.of("ctl"));argv.addAll(List.of(args));var out=new ByteArrayOutputStream();int exit=ShedControlCli.run(argv.toArray(String[]::new),InputStream.nullInputStream(),out,OutputStream.nullOutputStream());if(exit!=0)throw new AssertionError(out.toString(StandardCharsets.UTF_8));}
     static String sourceHash(String text)throws Exception{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));}
     static Map<String,Object> inlineDemo()throws Exception{
@@ -84,6 +85,44 @@ public final class AgentCliChatDesktopProbe {
         String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(source)));ctl("sync","Demo.txt","--sha256",hash,"--timeout-ms","3000");
         System.out.println(MiniJson.stringify(Map.of("type","item.completed","item",Map.of("id","answer","type","agent_message","text",turn==1?"**First reply**: updated `Demo.txt`.\n\n```java\nString message = \"Hello from Shed\";\n```":"**Follow-up reply**: continued the same conversation and updated `Demo.txt` again.\n\n- Kept the original source.\n- Added the requested follow-up."))));
     }
+    private static void qualifyEssentials(Path project, List<String> events) throws Exception {
+        var original=ui(editor::getCurrentBuffer);
+        Path file=project.resolve("OutlineFixture.java");Files.writeString(file,"class OutlineFixture {\n    void greet() {}\n}\n");
+        ui(()->{editor.openFileAsync(file.toFile());return null;});await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().toPath().equals(file));
+        ui(()->{editor.toggleOutline();return null;});
+        await(()->{var list=(JList<?>)find(editor.getRootPane(),"outline.symbols");return list!=null&&list.getModel().getSize()>=2;});
+        var source=ui(editor::getCurrentBuffer);String before=ui(source::getContent);
+        ui(()->{var list=(JList<?>)find(editor.getRootPane(),"outline.symbols");list.setSelectedIndex(1);list.getActionMap().get("reveal").actionPerformed(new java.awt.event.ActionEvent(list,0,"reveal"));if(editor.writingArea.getCaretPosition()!=before.indexOf("    void"))throw new AssertionError("Outline did not reveal method line");editor.writingArea.append("// saved revision\n");int caret=editor.writingArea.getCaretPosition();list.getActionMap().get("reveal").actionPerformed(new java.awt.event.ActionEvent(list,0,"reveal"));if(editor.writingArea.getCaretPosition()!=caret)throw new AssertionError("Stale Outline moved the caret");editor.commandHandler.execute("w");return null;});
+        await(()->!source.isModified());
+        var saved=editor.localHistoryStore().versions(file);if(saved.size()!=2)throw new AssertionError("Normal save did not capture baseline and new version: "+saved.size());
+        ui(()->{LocalHistoryDialog.showFor(editor);return null;});
+        await(()->{var window=Arrays.stream(editor.getOwnedWindows()).filter(w->w instanceof LocalHistoryDialog&&w.isShowing()).findFirst().orElse(null);return window!=null&&((JList<?>)find((Container)window,"history.versions")).getModel().getSize()==2;});
+        var history=ui(()->(LocalHistoryDialog)Arrays.stream(editor.getOwnedWindows()).filter(w->w instanceof LocalHistoryDialog&&w.isShowing()).findFirst().orElseThrow());
+        ui(()->{((JList<?>)find(history,"history.versions")).setSelectedIndex(1);return null;});
+        await(()->button(history,"Restore to buffer").isEnabled());
+        picture("00d-outline-and-history");picture("00d-saved-history-dialog",history.getRootPane());
+        String disk=Files.readString(file);long revision=ui(source::documentRevision);
+        SwingUtilities.invokeLater(()->button(history,"Restore to buffer").doClick());
+        await(()->Arrays.stream(history.getOwnedWindows()).anyMatch(Window::isShowing));
+        ui(()->{var confirm=Arrays.stream(history.getOwnedWindows()).filter(Window::isShowing).findFirst().orElseThrow();button((Container)confirm,"OK").doClick();return null;});
+        await(()->!history.isDisplayable());
+        ui(()->{if(!source.getContent().equals(before)||source.documentRevision()==revision||!source.isModified())throw new AssertionError("History restore did not edit authoritative source");source.getUndoManager().undo();if(!source.getContent().equals(disk))throw new AssertionError("History restore did not form one Undo step");return null;});
+        if(!Files.readString(file).equals(disk))throw new AssertionError("History restore wrote disk without Save");
+        ui(()->{LocalHistoryDialog.showFor(editor);return null;});
+        var comparisonHistory=ui(()->(LocalHistoryDialog)Arrays.stream(editor.getOwnedWindows()).filter(w->w instanceof LocalHistoryDialog&&w.isShowing()).findFirst().orElseThrow());
+        await(()->((JList<?>)find(comparisonHistory,"history.versions")).getModel().getSize()==2);
+        ui(()->{((JList<?>)find(comparisonHistory,"history.versions")).setSelectedIndex(1);return null;});await(()->button(comparisonHistory,"Compare with buffer").isEnabled());
+        ui(()->{button(comparisonHistory,"Compare with buffer").doClick();return null;});await(()->!comparisonHistory.isDisplayable());
+        ui(()->{if(find(editor.getRootPane(),"comparison.text")==null||!source.getContent().equals(disk))throw new AssertionError("History comparison changed source or failed to open");((JButton)find(editor.getRootPane(),"comparison.close")).doClick();return null;});
+        ui(()->{KeymapInspectorDialog.showFor(editor);return null;});
+        var shortcuts=ui(()->(JDialog)Arrays.stream(editor.getOwnedWindows()).filter(w->w instanceof KeymapInspectorDialog&&w.isShowing()).findFirst().orElseThrow());
+        ui(()->{var record=(JToggleButton)find(shortcuts,"shortcuts.record");var key=(JTextField)find(shortcuts,"shortcuts.key");record.doClick();var event=new java.awt.event.KeyEvent(key,java.awt.event.KeyEvent.KEY_PRESSED,System.currentTimeMillis(),ShortcutKey.primaryMask()|java.awt.event.InputEvent.SHIFT_DOWN_MASK,java.awt.event.KeyEvent.VK_F11,java.awt.event.KeyEvent.CHAR_UNDEFINED);for(var listener:key.getKeyListeners())listener.keyPressed(event);if(!key.getText().equals("<mod-s-f11>"))throw new AssertionError("Shortcut recorder lost modifiers");((JTextField)find(shortcuts,"shortcuts.mapping")).setText("action:save");button(shortcuts,"Save Overlay").doClick();if(!editor.configManager.get("keybind.plain.<mod-s-f11>","").equals("action:save"))throw new AssertionError("Shortcut overlay did not persist");return null;});
+        picture("00e-keyboard-shortcuts",shortcuts.getRootPane());
+        ui(()->{shortcuts.dispose();editor.commandHandler.execute("w");return null;});await(()->!source.isModified());
+        ui(()->{editor.toggleOutline();editor.loadBufferIntoEditor(original);return null;});
+        events.add("Persistent local Outline navigates without source edits; normal Save captures history; explicit confirmed restore is one undoable buffer edit without disk writes; recorded shortcut persists through existing overlays");
+    }
+
     public static void main(String[] args)throws Exception{
         if(args.length==2&&args[0].equals("--fake-agent")){fake(Integer.parseInt(args[1]));return;}
         output=Path.of(args[0]).toRealPath();project=Path.of(args[1]).toRealPath();Path fixture=Path.of(System.getenv("SHED_PORTABLE_FIXTURE_ROOT")).toRealPath();if(!project.startsWith(fixture.resolve("run"))||!output.startsWith(fixture.resolve("run")))throw new AssertionError("Disposable fixture required");
@@ -135,6 +174,7 @@ public final class AgentCliChatDesktopProbe {
                 if(editor.getCurrentBuffer()!=source||!source.getContent().equals(text)||source.documentRevision()!=revision||source.isModified()!=dirty||source.getUndoManager().canUndo()!=undo||editor.buffers.size()!=count||editor.writingArea.getCaretPosition()!=caret)throw new AssertionError("Tool presentation mutated source/Undo/caret or created documents");
                 editor.hideToolWindow();editor.toolWindowHost.showAgentChat();return null;
             });events.add("LSP/Debug/Tasks reports, navigable quickfix and a central read-only comparison leave source identity, text, revision, Undo, dirty state, caret and document count unchanged");
+            qualifyEssentials(project,events);
             syntheticGit();events.add("Synthetic Git data renders in the right sidebar and opens a central read-only comparison; switching projects invalidates the old repository action context");
             picture("00-chat-layout");ui(()->{
                 if(editor.editorToolSplit.getOrientation()!=JSplitPane.VERTICAL_SPLIT||!editor.workbenchDocks.rightVisible())throw new AssertionError("Chat must be in the independent right dock");

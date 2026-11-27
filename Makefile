@@ -6,6 +6,7 @@ ANIMATIONS ?=
 ARGS ?=
 SCM_BASELINE_JAR ?=
 SCM_PERF_PAIRS ?= 3
+SCM_PERF_IDLE ?= 0
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib/shed
@@ -52,7 +53,7 @@ check-scm-performance: $(JAR)
 	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
 	 output="$$(pwd -P)/target/scm-performance-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
 	 python3 scripts/test-scm-performance.py --jdk "$$java_home" --jar "$(abspath $(JAR))" \
-	   --baseline-jar "$(SCM_BASELINE_JAR)" --pairs "$(SCM_PERF_PAIRS)" --output "$$output"
+	   --baseline-jar "$(SCM_BASELINE_JAR)" --pairs "$(SCM_PERF_PAIRS)" $(if $(filter 1,$(SCM_PERF_IDLE)),--idle-workers,) --output "$$output"
 
 profile-startup: $(JAR)
 	@SHED_STARTUP_PROFILE=1 $(LAUNCHER) $(ARGS)

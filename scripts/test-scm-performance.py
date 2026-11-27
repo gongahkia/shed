@@ -103,6 +103,19 @@ def compare(runs):
                   for kind, results in groups.items()}
         if all(key in row for rows in memory.values() for row in rows):
             gate(key, [finite(x[key]) for x in memory['baseline']], [finite(x[key]) for x in memory['candidate']], 1, allowance)
+    idle = {kind: [next((r for r in result['rows'] if r['operation'] == 'idle_workers'), None) for result in results]
+            for kind, results in groups.items()}
+    if any(row is not None for values in idle.values() for row in values):
+        if any(row is None for values in idle.values() for row in values):
+            raise ValueError('Idle profiling must cover both artifacts in every pair')
+        for row in idle['candidate']:
+            if row['idle_ms'] < 35000 or row['after']['shed_workers'] != 0:
+                raise ValueError('Idle workers did not retire')
+            if finite(row['resume_edt_submit_ms']) > 16 or finite(row['resume_completion_ms']) > 50:
+                raise ValueError('First request after idle exceeded resumption budgets')
+        comparisons.append({'operation': 'idle_shed_workers', 'baseline': statistics.median(r['after']['shed_workers'] for r in idle['baseline']),
+                            'candidate': statistics.median(r['after']['shed_workers'] for r in idle['candidate']), 'limit': 0, 'pass': True})
+        gate('idle_total_threads', [r['after']['memory']['threads'] for r in idle['baseline']], [r['after']['memory']['threads'] for r in idle['candidate']], 1, 0)
     passed = all(row['pass'] for row in comparisons)
     return {'state': 'FAIL' if not passed else 'PASS' if len(groups['baseline']) >= 3 else 'INSUFFICIENT_PAIRS',
             'pairs': len(groups['baseline']), 'comparisons': comparisons,
@@ -110,7 +123,7 @@ def compare(runs):
             'limits': 'fresh processes, warm OS caches; medians of per-process metrics; no statistical equivalence claim or real Hg/SVN qualification'}
 
 
-def run_one(jdk, jar, output, compile_only=False):
+def run_one(jdk, jar, output, compile_only=False, idle_profile=False):
     output.mkdir()
     f, process = Fixture(), None
     report = {'jar_sha256': digest(jar), 'probe_sha256': digest(PROBE), 'native_shell': 'NOT_USED',
@@ -137,6 +150,8 @@ def run_one(jdk, jar, output, compile_only=False):
         report.update(compile_command=compile_cmd, compile_exit=compiled.returncode, compile_output=compiled.stdout + compiled.stderr)
         if compiled.returncode:
             raise UnsafeFixture('Probe compilation failed')
+        if idle_profile:
+            env['SHED_SCM_IDLE_PROFILE'] = '1'
         if not compile_only:
             for key in ('DISPLAY', 'XAUTHORITY'):
                 if os.environ.get(key):
@@ -196,6 +211,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--pairs', type=int, default=3, choices=range(1, MAX_PAIRS + 1))
     parser.add_argument('--compile-only', action='store_true')
+    parser.add_argument('--idle-workers', action='store_true', help='Also measure 35-second idle retirement and first request resumption per process')
     args = parser.parse_args()
     jdk, candidate, baseline = [p.resolve(strict=True) for p in (args.jdk, args.jar, args.baseline_jar)]
     output = args.output.absolute()
@@ -208,7 +224,7 @@ def main():
     try:
         for i, kind in enumerate(order(1 if args.compile_only else args.pairs)):
             print('PERF_START', i, kind, flush=True)
-            run = run_one(jdk, baseline if kind == 'baseline' else candidate, output / (str(i) + '-' + kind), args.compile_only)
+            run = run_one(jdk, baseline if kind == 'baseline' else candidate, output / (str(i) + '-' + kind), args.compile_only, args.idle_workers)
             run['kind'] = kind
             report['runs'].append(run)
             print('PERF_END', i, kind, run['state'], flush=True)

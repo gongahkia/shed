@@ -117,6 +117,16 @@ class SourceControlPerformanceToolingTest(unittest.TestCase):
         self.assertEqual(2, perf.exit_code('INSUFFICIENT_PAIRS'))
         self.assertEqual(1, perf.exit_code('FAIL'))
 
+    def test_idle_qualification_requires_retirement_and_bounded_resumption(self):
+        for workers, submit, completion in [(1, 1, 1), (0, 17, 1), (0, 1, 51)]:
+            data = runs()
+            for run in data:
+                run['result']['rows'].append({'operation': 'idle_workers', 'idle_ms': 35001,
+                    'after': {'shed_workers': 4 if run['kind'] == 'baseline' else workers, 'memory': {'threads': 22 if run['kind'] == 'baseline' else 18}},
+                    'resume_edt_submit_ms': submit, 'resume_completion_ms': completion})
+            with self.assertRaises(ValueError):
+                perf.compare(data)
+
     def test_incomplete_pairs_are_rejected(self):
         with self.assertRaises(ValueError):
             perf.compare(runs()[:-1])

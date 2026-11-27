@@ -48,6 +48,7 @@ final class InlineFindBar extends JPanel {
     private final Timer scanTimer;
     private final List<Object> highlightTags = new ArrayList<>();
     private Highlighter highlightedIn;
+    private javax.swing.text.JTextComponent highlightedOwner;
     private Mode mode = Mode.FIND;
     private Scan scan;
     private int selected = -1;
@@ -303,6 +304,7 @@ final class InlineFindBar extends JPanel {
         if (scan == null || selected < 0) return;
         Highlighter highlighter = editor.writingArea.getHighlighter();
         highlightedIn = highlighter;
+        highlightedOwner = editor.writingArea;
         int first = Math.max(0, selected - 75);
         int last = Math.min(scan.ranges().size(), selected + 76);
         for (int index = first; index < last; index++) {
@@ -316,10 +318,12 @@ final class InlineFindBar extends JPanel {
     }
 
     private void clearHighlights() {
-        if (highlightedIn != null) {
+        // a theme can deinstall the old highlighter before the next query change
+        if (highlightedIn != null && highlightedOwner != null && highlightedOwner.getHighlighter() == highlightedIn) {
             for (Object tag : highlightTags) highlightedIn.removeHighlight(tag);
         }
         highlightTags.clear();
+        highlightedOwner = null;
         highlightedIn = null;
     }
 

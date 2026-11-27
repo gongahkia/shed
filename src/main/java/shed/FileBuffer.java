@@ -348,6 +348,19 @@ public class FileBuffer {
         return text.split("\n", -1).length;
     }
 
+    private LocalHistoryStore localHistory;
+    private volatile String localHistoryError = "";
+    void localHistory(LocalHistoryStore store) { localHistory = store; }
+    String localHistoryError() { return localHistoryError; }
+    private void recordHistory(File target, String previous, String saved) {
+        if (localHistory == null) return;
+        try {
+            if (previous != null) localHistory.record(target.toPath(), previous);
+            localHistory.record(target.toPath(), saved);
+            localHistoryError = "";
+        } catch (IOException | RuntimeException error) { localHistoryError = String.valueOf(error.getMessage()); }
+    }
+
     // Save content to disk
     public void save() throws IOException {
         if (scratch || file == null) {
@@ -381,6 +394,7 @@ public class FileBuffer {
         Path target = file.toPath();
         AtomicFileWriter.write(target, bytes, this::requireUnchangedSource);
 
+        recordHistory(file, savedDiskDigest == null ? null : savedContent, textToWrite);
         this.modified = false;
         this.savedContent = textToWrite;
         this.lastKnownModifiedTime = Files.getLastModifiedTime(target).toMillis();
@@ -439,8 +453,10 @@ public class FileBuffer {
         }
         String content = getFullContent();
         ExternalFileStamp expected = requestedTarget == null ? externalFileStamp : observeExternalFile(target);
-        return new SaveSnapshot(target, requestedTarget != null, content, encodingName, lineEnding, byteOrderMark, diskTextImage, explicitLineEnding,
+        SaveSnapshot snapshot = new SaveSnapshot(target, requestedTarget != null, content, encodingName, lineEnding, byteOrderMark, diskTextImage, explicitLineEnding,
             expected, requestedTarget == null ? savedDiskDigest : null, diskBindingRevision);
+        snapshot.historyBefore = requestedTarget == null ? savedContent : null;
+        return snapshot;
     }
 
     void writeSaveSnapshot(SaveSnapshot snapshot) throws IOException {
@@ -456,6 +472,7 @@ public class FileBuffer {
             }
             requireMatchingDigest(snapshot.target, snapshot.expectedDigest);
         });
+        recordHistory(snapshot.target, snapshot.historyBefore, snapshot.content);
         snapshot.bytes = bytes;
         snapshot.writtenImage = TextFileCodec.image(raw, snapshot.encodingName, snapshot.byteOrderMark);
         snapshot.writtenDigest = digest(bytes);
@@ -486,6 +503,7 @@ public class FileBuffer {
     }
 
     static final class SaveSnapshot {
+        private String historyBefore;
         private final File target;
         private final boolean saveAs;
         private final String content;

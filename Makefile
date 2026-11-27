@@ -16,7 +16,7 @@ SOURCES := $(shell find src/main assets -type f 2>/dev/null)
 RUN_GOALS := $(if $(filter run,$(MAKECMDGOALS)),$(filter-out run,$(MAKECMDGOALS)),)
 RUN_ARGS := $(strip $(ARGS) $(RUN_GOALS))
 
-.PHONY: demo-ui check-scm-performance all build run demo demo-delegation demo-chat demo-completion demo-list $(DEMO_TARGETS) profile-startup test check clean install uninstall help $(RUN_GOALS)
+.PHONY: demo-workbench demo-find demo-ui check-scm-performance all build run demo demo-delegation demo-chat demo-completion demo-list $(DEMO_TARGETS) profile-startup test check clean install uninstall help $(RUN_GOALS)
 
 all: build
 
@@ -36,12 +36,18 @@ demo $(DEMO_TARGETS): $(JAR)
 	 printf 'Starting the disposable live agent demo: changes, navigation, checks and conflicts. Watch the Shed window.\nResults: %s\n' "$$output"; \
 	 python3 scripts/test-agent-desktop.py --jdk "$$java_home" --jar "$(abspath $(JAR))" \
 	   --output "$$output" --git-fixture --visual-only --animation-demo $(if $(filter demo,$@),$(if $(ANIMATIONS),--animation $(ANIMATIONS),),--animation $(@:demo-%=%)) $(if $(filter 1,$(LOOP)),--loop,)
+	$(if $(and $(filter demo,$@),$(if $(ANIMATIONS),,yes),$(if $(filter 1,$(LOOP)),,yes)),@$(MAKE) demo-workbench,@true)
 
 demo-chat: demo-delegation
 
-demo-ui: $(JAR)
+demo-ui demo-workbench: $(JAR)
 	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
 	 output="$$(pwd -P)/target/agent-ui-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
+	 python3 scripts/test-agent-delegation.py --jdk "$$java_home" --jar "$(abspath $(JAR))" --output "$$output" --workbench --demo
+
+demo-find: $(JAR)
+	@java_home=$$($(TOOLCHAIN) home) || exit $$?; \
+	 output="$$(pwd -P)/target/agent-find-$$(date +%Y%m%d-%H%M%S)-$$$$"; \
 	 python3 scripts/test-agent-delegation.py --jdk "$$java_home" --jar "$(abspath $(JAR))" --output "$$output" --ui --demo
 
 demo-delegation demo-completion: $(JAR)
@@ -86,7 +92,8 @@ clean:
 	 JAVA_HOME="$$java_home" "$$maven" -B -q clean
 
 help:
-	@printf '%s\n' 'make demo-ui            show the agent pointer, typed Find queries and real button interactions'
+	@printf '%s\n' 'make demo-ui            show the complete agent workbench tour (also make demo-workbench)'
+	@printf '%s\n' 'make demo-find          show just the agent Find/pointer tour'
 	@printf '%s\n' 'make check-scm-performance SCM_BASELINE_JAR=/path/to/before.jar  opt-in paired desktop performance check'
 	@printf '%s\n' 'make build              package Shed without tests'
 	@printf '%s\n' 'make run [path ...]     rebuild if needed, then launch files or folders (make run . opens this folder)'

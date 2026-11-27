@@ -20,10 +20,17 @@ def main():
     parser.add_argument('--jar', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--chat', action='store_true', help='Exercise the ongoing CLI chat and editor visualization')
+    parser.add_argument('--workbench', action='store_true', help='Exercise project-approved workbench interactions with an external Java CLI')
+    parser.add_argument('--workbench-readonly', action='store_true', help='With --workbench: navigation/read permission, rejected source writes')
+    parser.add_argument('--workbench-context', action='store_true', help='With --workbench: bounded context-menu/private clipboard stress probe')
     parser.add_argument('--ui', action='store_true', help='Exercise shared Find actions with a fixed external Java CLI')
     parser.add_argument('--inline', action='store_true', help='With --chat: opt into the interactive completion demo; click the owned editor and avoid typing')
     parser.add_argument('--demo', action='store_true', help='Pause on the owned dialogs and reading stage for a visible demonstration')
     args = parser.parse_args()
+    if args.workbench_readonly and (not args.workbench or args.workbench_context):parser.error('--workbench-readonly requires --workbench and excludes --workbench-context')
+    if args.workbench_context and not args.workbench:parser.error('--workbench-context requires --workbench')
+    if args.workbench and (args.ui or args.chat or args.inline):
+        parser.error('--workbench is a separate owned-window fixture')
     if args.ui and (args.chat or args.inline):
         parser.error('--ui is a separate owned-window fixture')
     if args.inline and not args.chat:
@@ -54,7 +61,7 @@ def main():
         if args.inline:
             env['SHED_INLINE_DEMO'] = '1'
         props = ['-Duser.home=' + env['HOME'], '-Djava.io.tmpdir=' + env['TMPDIR'], '-Djava.util.prefs.userRoot=' + str(f.run_root / 'config')]
-        probe = 'AgentUiDesktopProbe' if args.ui else 'AgentCliChatDesktopProbe' if args.chat else 'AgentDelegationDesktopProbe'
+        probe = 'AgentWorkbenchDesktopProbe' if args.workbench else 'AgentUiDesktopProbe' if args.ui else 'AgentCliChatDesktopProbe' if args.chat else 'AgentDelegationDesktopProbe'
         source = ROOT / 'src/benchmark/java/shed' / (probe + '.java')
         report['probe_sha256'] = digest(source)
         compile_cmd = [str(jdk / 'bin/javac'), *['-J' + p for p in props], '-proc:none', '-encoding', 'UTF-8', '-cp', str(jar), '-d', str(classes), str(source)]
@@ -66,12 +73,12 @@ def main():
         for key in ('DISPLAY', 'XAUTHORITY'):
             if os.environ.get(key):
                 desktop_env[key] = os.environ[key]
-        command = [str(jdk / 'bin/java'), '-Djava.awt.headless=false', *props, '-cp', str(classes) + os.pathsep + str(jar), 'shed.' + probe, str(work), str(project)]
+        command = [str(jdk / 'bin/java'), '-Djava.awt.headless=false', *(['-Dshed.workbench.contextOnly=true'] if args.workbench_context else []), *(['-Dshed.workbench.readOnly=true'] if args.workbench_readonly else []), *props, '-cp', str(classes) + os.pathsep + str(jar), 'shed.' + probe, str(work), str(project)]
         report['command'] = command
         with (work / 'stdout.log').open('w') as log:
             process = subprocess.Popen(command, cwd=project, env=desktop_env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
             try:
-                report['exit'] = process.wait(timeout=110)
+                report['exit'] = process.wait(timeout=240 if args.workbench else 110)
             except subprocess.TimeoutExpired:
                 report['timeout'] = True
                 raise UnsafeFixture('Delegation fixture deadline exceeded')

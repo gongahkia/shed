@@ -19,6 +19,9 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     private Point2D.Double point = new Point2D.Double(), origin = new Point2D.Double();
     private float progress, morph;
     private boolean typing, motion, settled;
+    private Point explicitPoint;
+    private String activity = "";
+    private double activityPhase;
 
     AgentUiPresentation() { setOpaque(false); setFocusable(false); }
     @Override public boolean contains(int x, int y) { return false; }
@@ -36,15 +39,25 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
             point = new Point2D.Double(initial.x - 35, initial.y + 25);
         }
         this.target = new WeakReference<>(control); this.agent = agent; this.motion = motion;
+        explicitPoint = null; activity = "";
         logo = ProviderIcons.forValue(agent, COLOR);
         origin = new Point2D.Double(point.x, point.y); progress = 0; typing = false; settled = false;
         frame(0, false);
+    }
+
+    void showAt(Component control, Point point, String agent, boolean motion) {
+        show(control,agent,motion); explicitPoint = new Point(point); frame(0,false);
+    }
+
+    void activity(String value,double phase) {
+        requireEdt(); activity=value; activityPhase=Math.clamp(phase,0,1); repaint(drawingBounds());
     }
 
     void frame(float progress, boolean typing) {
         requireEdt();
         Rectangle old = drawingBounds();
         this.progress = Math.clamp(progress, 0, 1); this.typing = typing;
+        if(typing)explicitPoint=null;
         morph = motion ? Math.clamp(morph + (typing ? .16f : -.16f), 0, 1) : typing ? 1 : 0;
         Component control = target.get();
         if (layer != null && control != null) {
@@ -63,6 +76,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     }
 
     private Point anchor(Component control) {
+        if(explicitPoint!=null)return SwingUtilities.convertPoint(control,explicitPoint,this);
         Point result = new Point(Math.max(0, control.getWidth() / 2), Math.max(0, control.getHeight() / 2));
         if (control instanceof JTextComponent field) {
             try {
@@ -73,7 +87,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
         return SwingUtilities.convertPoint(control, result, this);
     }
 
-    private Rectangle drawingBounds() { return new Rectangle((int)point.x - 210, (int)point.y - 35, 440, 90); }
+    private Rectangle drawingBounds() { return new Rectangle((int)point.x - 300, (int)point.y - 35, 600, 90); }
 
     @Override protected void paintComponent(Graphics graphics) {
         if (layer == null) return;
@@ -91,8 +105,12 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
             g.setColor(new Color(0,0,0,85));g.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));g.draw(shape);
             g.setColor(Color.WHITE);g.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));g.draw(shape);
             g.setColor(COLOR);g.fill(shape);
+            if(activity.equals("scrolling")) {
+                g.setColor(Color.WHITE);g.setStroke(new BasicStroke(2));g.drawRoundRect(-12,9,8,15,5,5);
+                int position=12+(int)(6*activityPhase);g.drawLine(-8,position,-8,position+2);
+            }
             g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
-            String label = agent.length() > 22 ? agent.substring(0, 22) : agent;
+            String label = AgentUiTarget.bounded(agent,22)+(activity.isEmpty()?"":" · "+activity);
             int iconWidth = logo == null ? 0 : logo.getIconWidth() + 5;
             int width = g.getFontMetrics().stringWidth(label) + iconWidth + 12;
             int badgeX = point.x + 26 + width > getWidth() - 8 ? -width - 8 : 26;
@@ -115,7 +133,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     }
 
     /** Keep the last location between requests without retaining a control or running a timer. */
-    void settle() { requireEdt(); settled = true; morph = 0; typing = false; target.clear(); repaint(drawingBounds()); }
+    void settle() { requireEdt(); Rectangle old=drawingBounds(); settled = true; morph = 0; typing = false; activity=""; target.clear(); repaint(old.union(drawingBounds())); }
     boolean installed() { return layer != null; }
     Point2D pointerPosition() { return new Point2D.Double(point.x,point.y); }
     float morph() { return morph; }

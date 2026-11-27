@@ -23,7 +23,7 @@ record AgentUiRequest(String kind,String target,String agent,long revision,Map<S
         if(!args.keySet().equals(keys))throw invalid();
         if(kind.equals("scroll")) {
             if(!Set.of("vertical","horizontal").contains(string(args,"axis",16))||!Set.of("pixels","lines","pages").contains(string(args,"unit",16)))throw invalid();
-            long amount=integer(args,"amount");if(Math.abs(amount)>10_000)throw invalid();
+            long amount=integer(args,"amount");if(amount < -10_000 || amount > 10_000)throw invalid();
         }
         if(kind.equals("text")){
             if(!Set.of("set","insert","delete","select","read").contains(string(args,"mode",16)))throw invalid();
@@ -31,7 +31,7 @@ record AgentUiRequest(String kind,String target,String agent,long revision,Map<S
             if(!Set.of("set","insert").contains(args.get("mode"))&&!text.isEmpty())throw invalid();
         }
         for(String key:List.of("start","end","index"))if(args.containsKey(key)&&(integer(args,key)<0||integer(args,key)>1_048_576))throw invalid();
-        if(args.containsKey("start")&&integer(args,"start")>integer(args,"end"))throw invalid();
+        if(!kind.equals("drag")&&args.containsKey("start")&&integer(args,"start")>integer(args,"end"))throw invalid();
         if(kind.equals("key"))string(args,"key",64);
         if(kind.equals("action"))string(args,"value",4096);
     }

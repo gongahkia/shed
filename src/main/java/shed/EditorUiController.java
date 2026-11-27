@@ -218,6 +218,8 @@ final class EditorUiController {
         documentArea.add(documentHeader, BorderLayout.NORTH);
         documentArea.add(editor.workbenchDocks, BorderLayout.CENTER);
         editor.explorerSidebar = new FileExplorerSidebar(documentArea, UiZoom.scale(260, editor.configManager.getUiZoom()), UiZoom.scale(6, editor.configManager.getUiZoom()));
+        editor.outlinePanel = new OutlinePanel(editor);
+        editor.explorerSidebar.outline(editor.outlinePanel, Boolean.parseBoolean(editor.configManager.get("ui.outline.visible", "false")));
         editor.add(editor.explorerSidebar, BorderLayout.CENTER);
         editor.add(editor.workbenchHeader, BorderLayout.NORTH);
         if (!editor.stagedStartupPending) editor.add(editor.footerPanel, BorderLayout.SOUTH);

@@ -1164,6 +1164,14 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxUiController.clearGitBlameCache();
     }
 
+    OutlinePanel outlinePanel;
+    void toggleOutline() {
+        boolean visible = !explorerSidebar.showingOutline();
+        try { configManager.setAndPersist("ui.outline.visible", Boolean.toString(visible)); } catch (java.io.IOException error) { showMessage("Outline preference could not be saved: "+error.getMessage()); }
+        explorerSidebar.outline(outlinePanel, visible);
+        syntaxUiController.publishOutline();
+    }
+
     String findCurrentBreadcrumb() {
         return syntaxUiController.findCurrentBreadcrumb();
     }

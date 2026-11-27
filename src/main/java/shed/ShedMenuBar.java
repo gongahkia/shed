@@ -74,6 +74,7 @@ final class ShedMenuBar {
             public void menuDeselected(javax.swing.event.MenuEvent e) { }
             public void menuCanceled(javax.swing.event.MenuEvent e) { }
         });
+        item(view, "Toggle Outline", -1, 0, editor::toggleOutline);
         item(view, "Toggle Minimap", -1, 0, () -> command("minimap toggle"));
         view.addSeparator();
         item(view, "Problems", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS));

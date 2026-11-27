@@ -460,6 +460,7 @@ final class SessionConfigController {
         }
         editor.applyUiFont();
         if (editor.fileExplorer != null) editor.fileExplorer.refreshAppearance();
+        if (editor.explorerSidebar != null && editor.outlinePanel != null) editor.explorerSidebar.outline(editor.outlinePanel, Boolean.parseBoolean(editor.configManager.get("ui.outline.visible", "false")));
         for (EditorPane pane : editor.editorPanes) {
             if (pane.getAlternateComponent() instanceof FileTreePanel explorer) {
                 explorer.refreshAppearance();

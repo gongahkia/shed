@@ -222,6 +222,7 @@ final class SyntaxUiController {
 
 
     String findCurrentBreadcrumb() {
+        publishOutline();
         try {
             FileBuffer buffer = editor.getCurrentBuffer();
             if (buffer == null || cachedSymbolBuffer != buffer || cachedSymbolText != buffer.textSnapshot()) {
@@ -261,7 +262,15 @@ final class SyntaxUiController {
         scheduleSymbolRefresh();
     }
 
+    void publishOutline() {
+        if (editor.outlinePanel == null) return;
+        if (editor.explorerSidebar == null || !editor.explorerSidebar.showingOutline()) { editor.outlinePanel.update(null,null,List.of()); return; }
+        var buffer=editor.getCurrentBuffer();var text=buffer==null?null:buffer.textSnapshot();
+        editor.outlinePanel.update(buffer,text,buffer==cachedSymbolBuffer&&text==cachedSymbolText?cachedSymbols:List.of());
+    }
+
     void scheduleSymbolRefresh() {
+        publishOutline();
         FileBuffer buffer = editor.getCurrentBuffer();
         VersionedTextSnapshot text = buffer == null ? null : buffer.textSnapshot();
         if (buffer == cachedSymbolBuffer && text == cachedSymbolText) return;
@@ -329,6 +338,7 @@ final class SyntaxUiController {
         cachedSymbolBuffer = request.buffer();
         cachedSymbolText = request.text();
         cachedSymbols = result.symbols();
+        publishOutline();
         editor.requestStatusBarRefresh();
     }
 

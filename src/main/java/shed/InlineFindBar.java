@@ -93,6 +93,7 @@ final class InlineFindBar extends JPanel {
         for (javax.swing.JCheckBox option : List.of(matchCase, regex, wholeWord)) {
             optionsRow.add(option);
             option.addActionListener(event -> queryChanged());
+            option.addItemListener(event -> uiRevision++);
             option.setOpaque(false);
         }
         optionsRow.setOpaque(false);
@@ -112,6 +113,7 @@ final class InlineFindBar extends JPanel {
         scanTimer = new Timer(90, event -> submitScan());
         scanTimer.setRepeats(false);
         query.getDocument().addDocumentListener(new SimpleDocumentListener(this::queryChanged));
+        query.addCaretListener(event -> uiRevision++);
         replacement.getDocument().addDocumentListener(new SimpleDocumentListener(this::updateFeedback));
         query.addActionListener(event -> { if (mode == Mode.GO_TO_LINE) goToLine(); else next(); });
         replacement.addActionListener(event -> replaceOne());
@@ -246,6 +248,7 @@ final class InlineFindBar extends JPanel {
     }
 
     private void queryChanged() {
+        uiRevision++;
         scanGeneration++;
         if (scanJobId >= 0) editor.asyncJobService.cancel(scanJobId);
         scanJobId = -1;
@@ -416,6 +419,7 @@ final class InlineFindBar extends JPanel {
     }
 
     private void close() {
+        uiRevision++;
         scanTimer.stop();
         if (scanJobId >= 0) editor.asyncJobService.cancel(scanJobId);
         scanJobId = -1;

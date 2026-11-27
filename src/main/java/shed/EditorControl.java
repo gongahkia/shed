@@ -14,9 +14,9 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/delegation", "editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal");
+    static final Set<String> OPERATIONS = Set.of("editor/delegation", "editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal", "editor/ui/actions", "editor/ui/state", "editor/ui/invoke");
     static boolean mutation(String method) {
-        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/source/sync","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture").contains(method);
+        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/source/sync","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture","editor/ui/actions","editor/ui/state").contains(method);
     }
     static final int MAX_READ = 2048, MAX_REPLACEMENT = 8192, MAX_DOCUMENT = 1024 * 1024;
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
@@ -36,6 +36,8 @@ final class EditorControl implements AutoCloseable {
         default java.awt.image.BufferedImage capturePreview(){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default Map<String,Object> terminal(String action,String id,String agent,String body,BooleanSupplier authorized){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default void revokeTerminals(){}
+        default CompletableFuture<Map<String,Object>> uiAction(String operation, Map<String,Object> params, BooleanSupplier authorized) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
+        default void revokeUiActions(){}
         default Map<String,Object> delegation(String action,String id,String agent,String task) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
         default boolean delegationAllowed(String id) { return true; }
         void review(String proposal);
@@ -102,6 +104,8 @@ final class EditorControl implements AutoCloseable {
         var fields = new java.util.HashSet<>(initialOpen?Set.of("schemaVersion","instanceId","windowId","projectId"):CONTEXT);
         fields.addAll(switch (method) {
             case "editor/file/open" -> Set.of("path");
+            case "editor/ui/actions", "editor/ui/state" -> Set.of();
+            case "editor/ui/invoke" -> Set.of("action", "expectedUiRevision", "agent", "text");
             case "editor/source/read" -> Set.of("offset", "limit");
             case "editor/source/read-visible" -> Set.of("offset", "limit", "agent");
             case "editor/edits/propose" -> Set.of("start", "end", "text", "requestId");
@@ -135,6 +139,23 @@ final class EditorControl implements AutoCloseable {
             EditorNavigation.State before = ui(lease, () -> initialOpen?owner().prepareOpening():owner().state());
             if(initialOpen)grant.authorizeProject(before.metadata().activeRoot(),before.metadata().generation());
             else{verify(params, before); grant.authorize(before.metadata());}
+            if (method.startsWith("editor/ui/")) {
+                if (method.endsWith("invoke")) AgentUiContract.command(params);
+                var completed = ui(lease, () -> {
+                    requireState(lease,before);
+                    return owner().uiAction(method,params,()->{try {lease.require();return true;}catch(RuntimeException revoked){return false;}});
+                });
+                final Map<String,Object> observation;
+                try { observation = completed.get(4,TimeUnit.SECONDS); }
+                catch (InterruptedException interrupted) { completed.cancel(false); Thread.currentThread().interrupt(); throw fail(WorkspaceApiException.Code.CANCELLED); }
+                catch (TimeoutException timeout) { completed.cancel(false); throw fail(WorkspaceApiException.Code.TIMEOUT); }
+                catch (ExecutionException failed) {
+                    if (failed.getCause() instanceof WorkspaceApiException known) throw known;
+                    throw fail(WorkspaceApiException.Code.INVALID_CONTEXT);
+                }
+                var after=ui(lease,()->owner().state());grant.authorize(after.metadata());
+                var reply=result(method,after,"observed");reply.put("observation",observation);return reply;
+            }
             if (method.equals("editor/file/open")) return open(lease, params, before, current);
             if (method.equals("editor/diagnostics")||method.equals("editor/feedback")||method.startsWith("editor/preview/")) {
                 Map<String,Object> observation;
@@ -379,6 +400,6 @@ final class EditorControl implements AutoCloseable {
     @Override public void close() {
         var lease = active.get(); if (lease != null) lease.close();
         Host old = host.getAndSet(null); services.set(null); activity.close();
-        if (old != null) SwingUtilities.invokeLater(()->{old.clearActivity();old.revokeTerminals();});
+        if (old != null) SwingUtilities.invokeLater(()->{old.clearActivity();old.revokeTerminals();old.revokeUiActions();});
     }
 }

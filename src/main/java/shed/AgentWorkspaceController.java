@@ -177,6 +177,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     private static EditorControl.Host navigationHost(java.lang.ref.WeakReference<Texteditor> editorOwner, boolean controlMode,boolean terminalMode) {
         String terminalOwner=java.util.UUID.randomUUID().toString();
         return new EditorControl.Host() {
+            private AgentUiActions uiActions;
             private Texteditor owner() {
                 var live = editorOwner.get();
                 if (live == null) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
@@ -242,6 +243,26 @@ final class AgentWorkspaceController implements AutoCloseable {
                 return owner().agentTerminalRequest(terminalOwner,action,id,agent,body,authorized);
             }
             public void revokeTerminals(){var live=editorOwner.get();if(live!=null)live.revokeAgentTerminalRequests(terminalOwner);}
+            public java.util.concurrent.CompletableFuture<java.util.Map<String,Object>> uiAction(String operation,java.util.Map<String,Object> params,java.util.function.BooleanSupplier authorized) {
+                if (uiActions == null) uiActions = new AgentUiActions(new AgentUiActions.Surface() {
+                    public java.util.Map<String,Object> state(){return owner().inlineFindBar.agentState();}
+                    public java.awt.Component target(String action){return owner().inlineFindBar.agentTarget(action);}
+                    public void invoke(String action){owner().inlineFindBar.agentInvoke(action);}
+                    public boolean current(){return owner().isDisplayable() && !owner().isTreePaneActive();}
+                    public boolean motion(){return !Boolean.FALSE.equals(owner().writingArea.getClientProperty("shed.caretAnimation")) && !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"));}
+                });
+                if (operation.endsWith("actions")) return java.util.concurrent.CompletableFuture.completedFuture(uiActions.catalog());
+                if (operation.endsWith("state")) return java.util.concurrent.CompletableFuture.completedFuture(uiActions.state());
+                var expected=owner().captureEditorNavigation().metadata();
+                return uiActions.invoke(AgentUiContract.command(params),()->{
+                    if(!authorized.getAsBoolean())return false;
+                    var current=owner().captureEditorNavigation().metadata();
+                    return expected.paneId().equals(current.paneId()) && expected.documentId().equals(current.documentId())
+                        && expected.revision()==current.revision() && expected.generation()==current.generation()
+                        && java.util.Objects.equals(expected.activeRoot(),current.activeRoot());
+                });
+            }
+            public void revokeUiActions(){if(uiActions!=null){uiActions.close();uiActions=null;}}
             public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(owner().workspaceController.activeRoot(),owner().workspaceRoots.generation());}
             public java.util.Map<String,Object> watch(String action,String agent){var app=owner();if(app.agentOwnsEditor()&&java.util.Set.of("start","stop").contains(action))throw EditorMetadata.failure(WorkspaceApiException.Code.PERMISSION_DENIED);return app.toolWindowHost.watchAgentChanges(action,agent);}
             public java.util.Map<String,Object> observe(String operation){return EditorObservation.read(owner(),operation);}

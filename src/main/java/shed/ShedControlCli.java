@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms","--delegation","--task-file").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms","--delegation","--task-file","--ui-revision").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -104,6 +104,21 @@ final class ShedControlCli {
                 Map<String,Object> context=result(client.exchange(client.navigationContextRequest()));
                 var params=context(context); String method;
                 switch(command) {
+                    case "ui-actions", "ui-state" -> {
+                        if(path!=null)throw new IllegalArgumentException();method="editor/ui/"+command.substring(3);
+                    }
+                    case "ui-action", "ui-text" -> {
+                        if(command.equals("ui-action") && path==null || command.equals("ui-text") && path!=null)throw new IllegalArgumentException();
+                        String action=command.equals("ui-text")?"find.query":path;
+                        long revision=number(options,"--ui-revision",-1);String agent=options.remove("--agent");if(agent==null)agent="Agent";
+                        String text="";
+                        if(command.equals("ui-text")) {
+                            String file=required(options,"--text-file");byte[] bytes=file.equals("-")?input.readNBytes(AgentUiActions.MAX_TEXT*4+1):boundedFile(Path.of(file),AgentUiActions.MAX_TEXT*4);
+                            text=WorkspaceFrames.decode(bytes);
+                        }
+                        new AgentUiActions.Command(action,revision,agent,text);
+                        params.put("action",action);params.put("expectedUiRevision",revision);params.put("agent",agent);params.put("text",text);method="editor/ui/invoke";
+                    }
                     case "open" -> { if(path==null)throw new IllegalArgumentException();params.put("path",path);method="editor/file/open"; }
                     case "read" -> {
                         if(path!=null)throw new IllegalArgumentException();

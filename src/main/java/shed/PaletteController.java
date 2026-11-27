@@ -23,6 +23,7 @@ final class PaletteController {
         action("Open Folder", "open folder", "Choose a local folder, activate it as the workspace, and show its file tree."),
         action("Toggle File Tree", "tree toggle", "Open or close the workspace file tree."),
         action("File Finder", "files", "Open the project file finder."),
+        action("Local File History", "localhistory", "Compare saved versions or restore an undoable buffer draft."),
         action("Toggle Outline Sidebar", "outline-sidebar", "Show symbols for the active file beside Explorer."),
         action("Recent Files", "recent", "Search and open recently used files."),
         action("Buffer Picker", "buffers", "Show every open buffer, filter the list, and switch to a selected buffer."),

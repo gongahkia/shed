@@ -126,6 +126,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleDiscard(args), "discard");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
         registerCommand((args, range, force) -> handleConfig(args, force), "settings", "config");
+        registerCommand((args, range, force) -> { LocalHistoryDialog.showFor(editor); return "Local history requested"; }, "localhistory");
         registerCommand((args, range, force) -> { editor.toggleOutline(); return "Outline toggled"; }, "outline-sidebar");
         registerCommand((args, range, force) -> handleKeymap(args), "keymap", "keymaps");
         registerCommand((args, range, force) -> handleCommand(args), "command");

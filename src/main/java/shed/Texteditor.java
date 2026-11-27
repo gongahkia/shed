@@ -1172,6 +1172,12 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxUiController.publishOutline();
     }
 
+    private LocalHistoryStore localHistoryStore;
+    LocalHistoryStore localHistoryStore() {
+        if (localHistoryStore == null) { var config=configManager; localHistoryStore = new LocalHistoryStore(Path.of(config.getShedDirectoryPath(), "local-history"), () -> Boolean.parseBoolean(config.get("history.local.enabled", "true"))); }
+        return localHistoryStore;
+    }
+
     String findCurrentBreadcrumb() {
         return syntaxUiController.findCurrentBreadcrumb();
     }

@@ -351,6 +351,7 @@ public class ConfigManager {
         defineDefault("scrolloff", DEFAULT_SCROLLOFF);
         defineDefault("editor.scrollbars.visible", DEFAULT_EDITOR_SCROLLBARS_VISIBLE);
         defineDefault("ui.open_editors.visible", true);
+        defineDefault("history.local.enabled", true);
         defineDefault("ui.outline.visible", false);
         defineDefault("auto.pairs", DEFAULT_AUTO_PAIRS);
         defineDefault("textwidth", DEFAULT_TEXTWIDTH);
@@ -498,6 +499,7 @@ public class ConfigManager {
             case "shell.command.enabled" -> "Enable shell command execution";
             case "shell.command.max.length" -> "Maximum accepted shell command length";
             case "scrolloff" -> "Context lines retained while scrolling";
+            case "history.local.enabled" -> "Retain bounded owner-private saved source versions; disabling stops future captures";
             case "ui.outline.visible" -> "Show the persistent local-symbol Outline beside Explorer";
             case "ui.open_editors.visible" -> "Show the open document strip with unsaved indicators and close controls";
             case "editor.scrollbars.visible" -> "Show horizontal and vertical scrollbars in editor windows";

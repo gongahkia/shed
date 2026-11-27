@@ -5,12 +5,13 @@ import java.util.*;
 import java.util.function.BooleanSupplier;
 import javax.swing.*;
 
-/** Per-attachment command requests; every execution has its own visible human decision. */
+/** Command requests use explicit session tool consent, or their existing individual review. */
 final class AgentTerminalRequests implements AutoCloseable {
     private final Texteditor editor;
     private final Map<String,Request> requests=new LinkedHashMap<>();
     private static final class Request {
         final String owner,id,agent,body;final Path root;final long generation;final AgentCommandPlan plan;final BooleanSupplier authorized;
+        String session;
         String state="awaiting-approval",output="",error="";int job=-1;JDialog dialog;javax.swing.Timer expiry;
         Request(String owner,String id,String agent,String body,Path root,long generation,AgentCommandPlan plan,BooleanSupplier authorized){this.owner=owner;this.id=id;this.agent=agent;this.body=body;this.root=root;this.generation=generation;this.plan=plan;this.authorized=authorized;}
         Map<String,Object> snapshot(){return Map.of("requestId",id,"agent",agent,"state",state,"result",boundedResult(output),"error",error);}
@@ -42,7 +43,7 @@ final class AgentTerminalRequests implements AutoCloseable {
             while(requests.size()>=8)requests.remove(requests.keySet().iterator().next());
             Path root=editor.workspaceController.activeRoot();if(root==null)throw fail("Select a workspace folder first");
             var plan=AgentCommandPlan.requested(body,editor.workspaceQueries(root,AgentPolicy.readOnly()));if(plan==null)throw fail("A command plan is required");
-            var request=new Request(owner,id,agent,body,root,editor.workspaceRoots.generation(),plan,authorized);requests.put(id,request);
+            var request=new Request(owner,id,agent,body,root,editor.workspaceRoots.generation(),plan,authorized);if(editor.agentOwnsEditor()&&editor.agentDelegation().uiAllowed(AgentUiPermission.TOOLS))request.session=editor.agentDelegation().lease.id();requests.put(id,request);
             SwingUtilities.invokeLater(()->review(request));return request.snapshot();
         }
         if(existing==null||!existing.owner.equals(owner))throw fail("Terminal request is unavailable");
@@ -53,6 +54,7 @@ final class AgentTerminalRequests implements AutoCloseable {
     private void review(Request request){
         if(!request.state.equals("awaiting-approval"))return;
         if(!current(request)){cancel(request,"Workspace or authorization changed");return;}
+        if(editor.agentOwnsEditor()){if(editor.agentDelegation().uiAllowed(AgentUiPermission.TOOLS)){run(request);return;}cancel(request,"Project tool permission was not approved");return;}
         var details=new JTextArea(request.plan.describe()+"\nThese commands will be visibly typed into the normal Shed terminal. Human keyboard input takes control.");details.setEditable(false);details.setLineWrap(true);details.setWrapStyleWord(true);details.setRows(16);details.setColumns(70);details.setFont(editor.resolveEditorFont());
         var option=new JOptionPane(new JScrollPane(details),JOptionPane.QUESTION_MESSAGE,JOptionPane.DEFAULT_OPTION,null,new Object[]{"Run once","Reject"},"Reject");
         request.dialog=option.createDialog(editor,request.agent+" requests terminal commands");request.dialog.setModal(false);
@@ -83,6 +85,7 @@ final class AgentTerminalRequests implements AutoCloseable {
     }
     private void disposeReview(Request request){if(request.expiry!=null){request.expiry.stop();request.expiry=null;}if(request.dialog!=null){var dialog=request.dialog;request.dialog=null;dialog.dispose();}}
     private void cancel(Request request,String reason){if(!request.state.equals("running")&&!request.state.equals("awaiting-approval"))return;request.state="cancelled";request.error=reason;disposeReview(request);if(request.job>=0)editor.asyncJobService.cancel(request.job);}
+    void revokeDelegated(String session){for(var request:List.copyOf(requests.values()))if(session.equals(request.session))cancel(request,"Project session ended");}
     void revoke(String owner){for(var request:List.copyOf(requests.values()))if(request.owner.equals(owner)){cancel(request,"Terminal authorization revoked");requests.remove(request.id);}}
     public void close(){for(var request:requests.values())cancel(request,"Shed is closing");requests.clear();}
     private static WorkspaceApiException fail(String text){return new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST,text);}

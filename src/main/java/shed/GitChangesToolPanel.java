@@ -256,10 +256,12 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
 
     private void stage() { runForSelection("Stage", (root, change) -> editor.treeGitController.runGitAdd(root, change.path())); }
     private void unstage() { runForSelection("Unstage", (root, change) -> editor.treeGitController.runGitRestoreStaged(root, change.path())); }
+    private boolean approvedAgentRoot(File root){return !editor.agentOwnsEditor()||root!=null&&editor.agentDelegation().uiAllowed(AgentUiPermission.VCS)&&root.toPath().toAbsolutePath().normalize().equals(editor.workspaceController.activeRoot());}
     private void revert() {
         GitChangesWorkbenchModel.Change change = selected();
         if (change == null) { message("Select a changed file."); return; }
-        if (JOptionPane.showConfirmDialog(panel, "Discard working-tree changes in '" + change.displayPath() + "'?", "Revert Changes",
+        if(!approvedAgentRoot(root())){message("Agent repository action requires this project's VCS approval.");return;}
+        if (editor.agentOwnsEditor() || JOptionPane.showConfirmDialog(panel, "Discard working-tree changes in '" + change.displayPath() + "'?", "Revert Changes",
             JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION) {
             runForSelection("Revert", (root, selected) -> editor.treeGitController.runGitRestoreWorktree(root, selected.path()));
         }
@@ -268,12 +270,14 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private void runForSelection(String label, GitAction action) {
         GitChangesWorkbenchModel.Change change = selected(); File root = root();
         if (change == null || root == null) { message("Select a changed file."); return; }
+        if(!approvedAgentRoot(root)){message("Agent repository action requires this project's VCS approval.");return;}
         message(action.run(root, change));
     }
 
     private void commit() {
         File root = root();
         if (root == null) { message("Repository is unavailable."); return; }
+        if(!approvedAgentRoot(root)){message("Agent repository action requires this project's VCS approval.");return;}
         message(editor.treeGitController.runGitCommit(root, commit.getText()));
         commit.setText("");
     }
@@ -281,6 +285,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private void switchBranch() {
         File root = root();
         if (root == null) { message("Repository is unavailable."); return; }
+        if(!approvedAgentRoot(root)){message("Agent repository action requires this project's VCS approval.");return;}
         List<String> branches = editor.treeGitController.localBranchesForPanel(root);
         if (branches.isEmpty()) { message("No local branches."); return; }
         JComboBox<String> picker = new JComboBox<>(branches.toArray(String[]::new));

@@ -184,6 +184,7 @@ final class AgentWorkspaceController implements AutoCloseable {
             private java.util.Map<Path,Path> checkedPaths=java.util.Map.of();
             public java.util.List<Path> workbenchPaths(java.util.Map<String,Object> params){
                 var app=owner();var paths=new java.util.ArrayList<Path>(app.buffers.stream().filter(b->b.getFile()!=null).limit(EditorMetadata.MAX_OPEN_DOCUMENTS+1).map(b->b.getFile().toPath().toAbsolutePath().normalize()).toList());
+                for(var pane:app.editorPanes)if(!pane.isDisposed()&&pane.getTerminalPane()!=null)paths.add(pane.getTerminalPane().getWorkingDirectory().toPath().toAbsolutePath().normalize());
                 if(app.fileExplorer!=null){var selected=app.fileExplorer.selectedFile();if(selected!=null)paths.add(selected.toPath().toAbsolutePath().normalize());var request=MiniJson.asObject(params.get("request"));var args=request==null?null:MiniJson.asObject(request.get("args"));if(args!=null&&args.get("index") instanceof Long index){var file=app.fileExplorer.agentFileAtRow(index.intValue());if(file!=null)paths.add(file.toPath().toAbsolutePath().normalize());}}
                 return paths;
             }
@@ -247,8 +248,10 @@ final class AgentWorkspaceController implements AutoCloseable {
                 owner().showMessage(state.label());
             }
             public java.util.Map<String,Object> terminal(String action,String id,String agent,String body,java.util.function.BooleanSupplier authorized){
-                if(!terminalMode)throw new WorkspaceApiException(WorkspaceApiException.Code.UNSUPPORTED,"Start :agent api start terminal to request reviewed terminal commands");
-                return owner().agentTerminalRequest(terminalOwner,action,id,agent,body,authorized);
+                boolean approved=owner().agentOwnsEditor()&&owner().agentDelegation().uiAllowed(AgentUiPermission.TOOLS);
+                if(!terminalMode&&!approved)throw new WorkspaceApiException(WorkspaceApiException.Code.UNSUPPORTED,"Start :agent api start terminal to request reviewed terminal commands");
+                String session=approved?owner().agentDelegation().lease.id():null;
+                return owner().agentTerminalRequest(terminalOwner,action,id,agent,body,()->authorized.getAsBoolean()&&(session==null||owner().agentDelegationAllowed(session)));
             }
             public void revokeTerminals(){var live=editorOwner.get();if(live!=null)live.revokeAgentTerminalRequests(terminalOwner);}
             public java.util.concurrent.CompletableFuture<java.util.Map<String,Object>> uiAction(String operation,java.util.Map<String,Object> params,java.util.function.BooleanSupplier authorized) {

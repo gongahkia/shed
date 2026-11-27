@@ -275,6 +275,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     WorkspaceDocumentEditor workspaceDocuments() { return workspaceDocumentSource; }
+    String agentDocumentIdentity(FileBuffer buffer){return workspaceDocumentSource.metadataIdentity(buffer);}
 
     java.util.function.Supplier<AgentSelection> captureAgentSelection() {
         FileBuffer buffer = getCurrentBuffer();

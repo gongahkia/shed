@@ -102,12 +102,15 @@ final class TerminalController {
         return selected.warning().isBlank() ? result : result + "; " + selected.warning();
     }
 
+    String openProjectTerminal(java.nio.file.Path root){var selected=resolveDefaultProfile();return openSelectedTerminal(selected.profile(),WindowLayoutNode.Orientation.VERTICAL,null,root.toFile());}
     private String openSelectedTerminal(ProfileChoice profile, WindowLayoutNode.Orientation orientation, String defaultMessage) {
+        return openSelectedTerminal(profile,orientation,defaultMessage,resolveTerminalStartDirectory());
+    }
+    private String openSelectedTerminal(ProfileChoice profile,WindowLayoutNode.Orientation orientation,String defaultMessage,File startDirectory){
         String label = profile == null ? "Terminal" : profile.displayName();
         List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.command();
         String message = profile == null ? (defaultMessage == null ? "Terminal opened" : defaultMessage)
             : "Terminal opened with " + profile.id();
-        File startDirectory = resolveTerminalStartDirectory();
         RemoteWorkspaceSessionService.Connection remoteConnection = editor.remoteWorkspaceSessions == null
             ? null : editor.remoteWorkspaceSessions.connectionFor(startDirectory.toPath());
         if (remoteConnection != null) {
@@ -227,6 +230,7 @@ final class TerminalController {
 
 
     Map<String,Object> agentRequest(String owner,String action,String id,String agent,String body,java.util.function.BooleanSupplier authorized){return agentRequests.action(owner,action,id,agent,body,authorized);}
+    void revokeDelegatedRequests(String session){agentRequests.revokeDelegated(session);}
     void revokeAgentRequests(String owner){agentRequests.revoke(owner);}
 
     void closeAllTerminalSessions() {

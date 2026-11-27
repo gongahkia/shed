@@ -190,7 +190,7 @@ final class ShedControlCli {
             boolean unknown=mutationSent && Set.of(WorkspaceApiException.Code.TIMEOUT,WorkspaceApiException.Code.SESSION_INVALID,WorkspaceApiException.Code.SESSION_EXPIRED,WorkspaceApiException.Code.OUTCOME_UNKNOWN).contains(failure.code());
             out.println(WorkspaceRpc.error("ctl",-32000,"Control request failed",Map.of("code",unknown?"OUTCOME_UNKNOWN":failure.code().name(),"outcome",unknown?"unknown":"rejected")));return unknown?79:65;
         } catch(IllegalArgumentException invalid) {
-            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|sync|session-request|session-status|session-finish|intent|activity|propose|replace|terminal-run|terminal-status|terminal-cancel [options]",Map.of("code","INVALID_REQUEST")));return 64;
+            out.println(WorkspaceRpc.error("ctl",-32602,"Usage: shed ctl --connect <descriptor> state|open <path>|read|sync|session-request|session-status|session-finish|intent|activity|propose|replace|terminal-run|terminal-status|terminal-cancel|ui-targets|ui-inspect|ui-run|ui-type|ui-key|ui-scroll|ui-click|ui-select|ui-drag|ui-read|ui-copy|ui-paste|ui-wait|ui-sequence [options]",Map.of("code","INVALID_REQUEST")));return 64;
         } catch(IOException failure) {
             out.println(WorkspaceRpc.error("ctl",-32000,"Control connection or input unavailable",Map.of("code",mutationSent?"OUTCOME_UNKNOWN":"TRANSPORT_ERROR","outcome",mutationSent?"unknown":"rejected")));return mutationSent?79:74;
         }

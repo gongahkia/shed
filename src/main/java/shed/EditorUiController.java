@@ -610,7 +610,7 @@ final class EditorUiController {
                 EditorPane pane = editor.editorPanes.stream().filter(candidate -> candidate.getTextArea() == textArea)
                     .findFirst().orElse(null);
                 if (pane != null) activateEditorPane(pane);
-                boolean agent=Boolean.TRUE.equals(textArea.getClientProperty("shed.agent.context"))&&editor.agentOwnsEditor();
+                boolean agent=editor.agentOwnsEditor();
                 boolean editable = agent?editor.agentDelegation().uiAllowed(AgentUiPermission.EDIT):textArea.isEditable();
                 boolean selected = textArea.getSelectionStart() != textArea.getSelectionEnd()
                     || editor.extraSelections.stream().anyMatch(selection -> !selection.collapsed());

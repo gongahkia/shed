@@ -87,9 +87,8 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
             Point anchor = anchor(control);
             double blend = motion ? 1 - Math.pow(1 - Math.min(1, this.progress / .55), 3) : 1;
             if (typing) {
-                double followBlend=motion?Math.max(.15,blend):1;
-                point.x += (anchor.x - point.x) * followBlend;
-                point.y += (anchor.y - point.y) * followBlend;
+                if(following&&this.progress<1){point.x=origin.x+(anchor.x-origin.x)*blend;point.y=origin.y+(anchor.y-origin.y)*blend;}
+                else {point.x += (anchor.x - point.x) * (motion?.65:1);point.y += (anchor.y - point.y) * (motion?.65:1);}
             } else if (morph == 0 && !settled) {
                 point.x = origin.x + (anchor.x - origin.x) * blend;
                 point.y = origin.y + (anchor.y - origin.y) * blend;

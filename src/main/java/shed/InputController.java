@@ -2703,7 +2703,8 @@ final class InputController {
     }
 
 
-    void completionPopupAccept() {
+    void completionPopupAccept() { completionPopupAccept(null); }
+    void completionPopupAccept(java.util.function.Consumer<LspCompletionApplication.Result> checkedApply) {
         if (editor.completionList == null) return;
         LspClient.CompletionItem selected = editor.completionList.getSelectedValue();
         if (!isCurrentCompletion(editor.completionPrefix)) {
@@ -2714,9 +2715,9 @@ final class InputController {
         LspCompletionApplication.Result result = LspCompletionApplication.apply(editor.writingArea.getText(),
             editor.writingArea.getCaretPosition(), prefix, selected);
         dismissCompletionPopup();
-        editor.suppressDocumentEvents = true;
-        editor.writingArea.setText(result.text());
-        editor.suppressDocumentEvents = false;
+        if(checkedApply!=null)checkedApply.accept(result);
+        else {editor.suppressDocumentEvents = true;
+            try{editor.writingArea.setText(result.text());}finally{editor.suppressDocumentEvents = false;}}
         editor.markModified();
         editor.scheduleSyntaxHighlighting();
         scheduleOpenBufferWordIndex();

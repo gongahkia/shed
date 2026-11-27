@@ -143,17 +143,18 @@ final class ScmChangesPanel implements ToolWindowHost.ToolSurface {
         if(sameContext(p,expectedRoot,w,expectedProject))operation(action,value);
     }
     private void operation(Action action,String argument){
-        if(!current()||!ready||busy||editor.agentOwnsEditor())return;
+        if(!current()||!ready||busy)return;
+        if(editor.agentOwnsEditor()&&(!editor.agentDelegation().uiAllowed(AgentUiPermission.VCS)||!Objects.equals(root,editor.workspaceController.activeRoot()))){state.setText("Agent repository action requires this project's VCS approval.");return;}
         var change=selectedChange();boolean file=Set.of(Action.ADD,Action.FORGET,Action.REVERT,Action.REMOVE,Action.RENAME,Action.RESOLVE).contains(action);
         if(file&&change==null){state.setText("Select a changed file first.");return;}
         if(!editor.canDelegateWindow()){state.setText("Save unsaved buffers and finish pending saves/reload prompts before repository changes.");return;}
         Provider p=provider;Path r=root;long w=workspace;Path expectedProject=project;String path=file?change.path():null;
         String detail=ScmWorkbenchService.actionLabel(action)+" in "+r+"?"+(file?"\nSelected path: "+path:"")+(action==Action.COMMIT?"\nCommits all saved tracked/scheduled changes. Untracked files are not added automatically.":"")+(action==Action.REVERT?"\nDiscard selected working-copy changes. This is not editor Undo.":"")+(action==Action.REMOVE?"\nRemove the selected path from disk and schedule its removal.":"")+(action==Action.RESOLVE?"\nUse the current working file as the resolved result; no merge tool is launched.":"")+(network(p,action)?"\nThis operation contacts the configured repository server.":"");
-        if(confirm(detail,p.label+" · "+ScmWorkbenchService.actionLabel(action),JOptionPane.WARNING_MESSAGE)!=JOptionPane.OK_OPTION)return;
+        if(!editor.agentOwnsEditor()&&confirm(detail,p.label+" · "+ScmWorkbenchService.actionLabel(action),JOptionPane.WARNING_MESSAGE)!=JOptionPane.OK_OPTION)return;
         if(!sameContext(p,r,w,expectedProject)||!editor.canDelegateWindow())return;
         try{mutation(p,action,path,argument);}catch(Exception invalid){state.setText(invalid.getMessage());return;}
         work(p.label+" "+ScmWorkbenchService.actionLabel(action),token->{
-            var check=new FutureTask<Boolean>(()->sameContext(p,r,w,expectedProject)&&editor.canDelegateWindow()&&!editor.agentOwnsEditor());SwingUtilities.invokeLater(check);if(!check.get(3,TimeUnit.SECONDS))throw new java.util.concurrent.CancellationException("Repository context changed before execution");
+            var check=new FutureTask<Boolean>(()->sameContext(p,r,w,expectedProject)&&editor.canDelegateWindow()&&(!editor.agentOwnsEditor()||editor.agentDelegation().uiAllowed(AgentUiPermission.VCS)&&Objects.equals(r,editor.workspaceController.activeRoot())));SwingUtilities.invokeLater(check);if(!check.get(3,TimeUnit.SECONDS))throw new java.util.concurrent.CancellationException("Repository context changed before execution");
             return service.mutate(p,r,action,path,argument,token);
         },output->{if(action==Action.COMMIT)message.setText("");state.setText(ScmWorkbenchService.actionLabel(action)+" completed. Refreshing…");state.setToolTipText(ScmWorkbenchService.cleanError(output));editor.checkForExternalChanges();refresh();});
     }

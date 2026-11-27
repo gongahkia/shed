@@ -64,7 +64,7 @@ final class AgentDelegationController implements AutoCloseable {
     }
     void chatTurnDone(String id) {
         if(!lease.id().equals(id)||chatSurface==null)return;
-        if(ownership!=null){ownership.close();ownership=null;}AgentWorkbenchUi.retire(editor);editor.clearAgentActivity();
+        if(ownership!=null){ownership.close();ownership=null;}AgentWorkbenchUi.retire(editor);editor.terminalController.revokeDelegatedRequests(lease.id());editor.clearAgentActivity();
         editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());
         onActive=()->{};editor.showMessage(lease.agent()+" replied · ready for your next message.");
     }
@@ -126,7 +126,7 @@ final class AgentDelegationController implements AutoCloseable {
         boolean worked=ownership!=null;
         if(ownership!=null){ownership.close();ownership=null;}
         if(handedBack)return;handedBack=true;
-        uiPermissions=Set.of();AgentWorkbenchUi.retire(editor);
+        uiPermissions=Set.of();AgentWorkbenchUi.retire(editor);editor.terminalController.revokeDelegatedRequests(lease.id());
         try{onEnd.run();}finally{onActive=()->{};onEnd=()->{};launchDescription="External CLI; Shed does not own its process.";}
         editor.clearAgentActivity();
         if(worked&&!closed){editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());}

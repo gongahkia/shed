@@ -1,0 +1,375 @@
+{
+  "scope": "bounded semantic workbench; reviewed safe tests and owned Java desktop/client fixtures",
+  "artifact": {
+    "jar_sha256": "4f195d7def1cdb1a88bee8ab5d9c63ce3763c58a1ecf0ccdcbcd0dd4ed3caeff",
+    "compiled_main_classes": 1649,
+    "mismatches": [],
+    "state": "PASS"
+  },
+  "maven": {
+    "tests": 686,
+    "passes": 680,
+    "failures": 0,
+    "errors": 0,
+    "skips": 6
+  },
+  "tooling": {
+    "tests": 134,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 10.459800458003883
+  },
+  "media": {
+    "state": "PASS"
+  },
+  "source_demo": {
+    "state": "PASS",
+    "artifact": "4f195d7def1cdb1a88bee8ab5d9c63ce3763c58a1ecf0ccdcbcd0dd4ed3caeff",
+    "typing_samples": [
+      1.545083,
+      10.355417,
+      1.552958,
+      1.067167,
+      1.052625,
+      9.418958,
+      1.227125,
+      0.990458,
+      0.958042,
+      9.379166,
+      1.242333,
+      1.145375,
+      1.0285,
+      1.556,
+      1.160209,
+      0.955459,
+      10.554583,
+      1.030916,
+      0.96025,
+      0.852333,
+      10.185917
+    ],
+    "modes": [
+      "deleting",
+      "typing",
+      "complete",
+      "chunks"
+    ],
+    "directions": [
+      "top-to-bottom",
+      "right-to-left",
+      "left-to-right"
+    ],
+    "intents": [
+      "search",
+      "navigate",
+      "target",
+      "verify",
+      "conflict"
+    ],
+    "fixture_removed": true
+  },
+  "native_shell_benchmarks": "NO-GO; NOT RUN",
+  "readme_sha256_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "workbench_demo": {
+    "state": "PASS",
+    "jar_sha256": "4f195d7def1cdb1a88bee8ab5d9c63ce3763c58a1ecf0ccdcbcd0dd4ed3caeff",
+    "cli_calls": 126,
+    "stages": [
+      "Project consent approved; private clipboard",
+      "Typing into find/find.query",
+      "Real Find, typing and checkbox",
+      "Smooth vertical and horizontal scrolling",
+      "Drag the real Explorer divider",
+      "Typing into dialog.picker-find-file/picker.query",
+      "Picker: files.open",
+      "preview.open",
+      "Open actual Markdown preview",
+      "Typing into dialog.picker-open-buffers/picker.query",
+      "Picker: buffers.open",
+      "pane.split.vertical",
+      "pane.close",
+      "Split and pane closure",
+      "panel.search",
+      "Typing into tool.search/field.find",
+      "Project search surface",
+      "bottom.hide",
+      "source.new",
+      "Typing into editor.active",
+      "Actual source typing and project-relative Save As",
+      "Typing into find/find.query",
+      "Private copy/paste through shortcuts",
+      "Actual editor context menu with private clipboard",
+      "Open the real View menu",
+      "Create a file through existing checked project changes",
+      "Checked project rename",
+      "Checked project deletion",
+      "Create an empty project folder",
+      "Rename and remove the empty project folder",
+      "source.new",
+      "Typing into editor.active",
+      "completion.show",
+      "source.undo",
+      "Actual local completion, Tab acceptance and one-step Undo",
+      "Typing into dialog.picker-open-buffers/picker.query",
+      "Picker: buffers.open",
+      "source.save",
+      "density.compact",
+      "density.default",
+      "focus.toggle",
+      "focus.toggle",
+      "panel.git",
+      "Provider dropdown uses the real Source Control view",
+      "Source Control Add under project approval; fixed in-process client, no native VCS",
+      "panel.agent",
+      "Settings dialog opens through existing controller",
+      "Typing into dialog.dialog0/field.search-settings",
+      "Change the real typed Settings density control",
+      "right.hide"
+    ],
+    "remaining_processes": 0,
+    "fixture_removed": true,
+    "sentinel_sha256_before": "b415f4d4f4b7bc55c644d3a6ba5bad7939706cd445794b47d83abf18d916902e",
+    "sentinel_sha256_after": "b415f4d4f4b7bc55c644d3a6ba5bad7939706cd445794b47d83abf18d916902e",
+    "sentinel_metadata_unchanged": true,
+    "queued_paint_ms": {
+      "samples": 100,
+      "p50": 3.491333,
+      "p95": 6.748,
+      "p99": 9.824583,
+      "max": 18.524542
+    }
+  },
+  "paired_performance": {
+    "state": "PASS",
+    "pairs": 3,
+    "comparisons": [
+      {
+        "operation": "buffer_switch",
+        "baseline": 2.342334,
+        "candidate": 2.320292,
+        "limit": 4.342334,
+        "pass": true
+      },
+      {
+        "operation": "caret",
+        "baseline": 2.5415,
+        "candidate": 2.204625,
+        "limit": 4.5415,
+        "pass": true
+      },
+      {
+        "operation": "deletion",
+        "baseline": 1.127625,
+        "candidate": 0.980041,
+        "limit": 3.127625,
+        "pass": true
+      },
+      {
+        "operation": "newline",
+        "baseline": 1.599417,
+        "candidate": 1.759875,
+        "limit": 3.599417,
+        "pass": true
+      },
+      {
+        "operation": "redo",
+        "baseline": 0.85,
+        "candidate": 0.765083,
+        "limit": 2.85,
+        "pass": true
+      },
+      {
+        "operation": "scroll",
+        "baseline": 1.713541,
+        "candidate": 1.731792,
+        "limit": 3.713541,
+        "pass": true
+      },
+      {
+        "operation": "selection",
+        "baseline": 1.284458,
+        "candidate": 1.195542,
+        "limit": 3.284458,
+        "pass": true
+      },
+      {
+        "operation": "split_cycle",
+        "baseline": 2.863542,
+        "candidate": 3.527542,
+        "limit": 7.863542,
+        "pass": true
+      },
+      {
+        "operation": "typing.5000_rows.MERCURIAL",
+        "baseline": 1.171166,
+        "candidate": 1.026792,
+        "limit": 2.171166,
+        "pass": true
+      },
+      {
+        "operation": "typing.5000_rows.SUBVERSION",
+        "baseline": 0.894458,
+        "candidate": 0.788791,
+        "limit": 1.894458,
+        "pass": true
+      },
+      {
+        "operation": "typing.failed.MERCURIAL",
+        "baseline": 1.318375,
+        "candidate": 1.347958,
+        "limit": 2.318375,
+        "pass": true
+      },
+      {
+        "operation": "typing.failed.SUBVERSION",
+        "baseline": 1.100375,
+        "candidate": 1.129208,
+        "limit": 2.100375,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.100KiB.txt",
+        "baseline": 2.237375,
+        "candidate": 1.922959,
+        "limit": 3.3560625,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.1MiB.txt",
+        "baseline": 1.172583,
+        "candidate": 1.492417,
+        "limit": 2.172583,
+        "pass": true
+      },
+      {
+        "operation": "typing.hidden.Small.txt",
+        "baseline": 2.437333,
+        "candidate": 2.604667,
+        "limit": 3.6559995,
+        "pass": true
+      },
+      {
+        "operation": "typing.installing.MERCURIAL",
+        "baseline": 1.530541,
+        "candidate": 1.37775,
+        "limit": 2.530541,
+        "pass": true
+      },
+      {
+        "operation": "typing.installing.SUBVERSION",
+        "baseline": 1.67525,
+        "candidate": 1.793,
+        "limit": 2.67525,
+        "pass": true
+      },
+      {
+        "operation": "typing.pending.MERCURIAL",
+        "baseline": 0.886,
+        "candidate": 1.072917,
+        "limit": 1.8860000000000001,
+        "pass": true
+      },
+      {
+        "operation": "typing.pending.SUBVERSION",
+        "baseline": 0.841625,
+        "candidate": 0.911041,
+        "limit": 1.841625,
+        "pass": true
+      },
+      {
+        "operation": "typing.source_control_open",
+        "baseline": 1.513959,
+        "candidate": 1.39225,
+        "limit": 2.513959,
+        "pass": true
+      },
+      {
+        "operation": "undo",
+        "baseline": 0.663125,
+        "candidate": 0.802833,
+        "limit": 2.663125,
+        "pass": true
+      },
+      {
+        "operation": "open.Small.txt",
+        "baseline": 6.355417,
+        "candidate": 6.437334,
+        "limit": 26.355417,
+        "pass": true
+      },
+      {
+        "operation": "open.100KiB.txt",
+        "baseline": 22.727958,
+        "candidate": 22.279834,
+        "limit": 42.727958,
+        "pass": true
+      },
+      {
+        "operation": "open.1MiB.txt",
+        "baseline": 75.9335,
+        "candidate": 65.426125,
+        "limit": 95.9335,
+        "pass": true
+      },
+      {
+        "operation": "startup",
+        "baseline": 1886,
+        "candidate": 1909,
+        "limit": 2263.2,
+        "pass": true
+      },
+      {
+        "operation": "used_heap_bytes",
+        "baseline": 32642344,
+        "candidate": 32900288,
+        "limit": 41030952,
+        "pass": true
+      },
+      {
+        "operation": "threads",
+        "baseline": 22,
+        "candidate": 22,
+        "limit": 24,
+        "pass": true
+      },
+      {
+        "operation": "open_descriptors",
+        "baseline": 11,
+        "candidate": 11,
+        "limit": 15,
+        "pass": true
+      }
+    ],
+    "budgets": "proposed practical regression gates; 16 ms typing target is pre-existing",
+    "limits": "fresh processes, warm OS caches; medians of per-process metrics; no statistical equivalence claim or real Hg/SVN qualification"
+  },
+  "readme_sha256_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readonly_probe": {
+    "state": "PASS",
+    "jar_sha256": "4f195d7def1cdb1a88bee8ab5d9c63ce3763c58a1ecf0ccdcbcd0dd4ed3caeff",
+    "source_write_rejected": true,
+    "sentinel_content_unchanged": true,
+    "sentinel_metadata_unchanged": true,
+    "fixture_removed": true
+  },
+  "context_probe": {
+    "state": "PASS",
+    "jar_sha256": "4f195d7def1cdb1a88bee8ab5d9c63ce3763c58a1ecf0ccdcbcd0dd4ed3caeff",
+    "cycles": 10,
+    "cli_calls": 42,
+    "remaining_processes": 0,
+    "sentinel_content_unchanged": true,
+    "sentinel_metadata_unchanged": true,
+    "fixture_removed": true
+  },
+  "implementation_commits": [
+    "6675eaffd",
+    "99fd2fd19",
+    "7a22a986c",
+    "1f45c435b",
+    "6993fdc6d",
+    "50cb4b933"
+  ],
+  "preserved_external_commit": "506370447"
+}

@@ -104,3 +104,7 @@ The optional Make variable `SCM_PERF_PAIRS` supports 1–5; one pair is a non-qu
 This is synthetic source-insertion-to-forced-component-paint timing on owned native Swing windows, not physical keymap/keyboard-to-compositor timing. It covers bounded ordinary ASCII text through 1 MiB; it does not qualify 10 MiB files, Unicode first-edit stalls, missing glyphs, Markdown HTML-preview stalls, real native SCM/network work, cold OS caches, whole-process RSS/native attribution, every IDE capability or Windows/Linux native GUI. Hg/SVN remain absent on this host. B0.1 native-shell confinement remains NO-GO; it was not used or bypassed. No real coding model/language server, personal repository, credentials or shell history was involved.
 
 Entry working tree was clean. Changes are opt-in benchmark/tooling, one bounded diagnostic addition to the existing watcher fixture, Make discoverability and documentation/evidence. Production source, UI/UX, defaults, preferences and the candidate JAR remain unchanged. No dependencies were installed, no user work was discarded, and no pushes were made. README before/after SHA-256: `48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`. `git diff --check` passes. Local commits separate tests/tooling from the report/evidence.
+
+## Resource follow-up
+
+The subsequent [idle-resource optimization](../idle-resource-optimization/INDEX.md) compares this candidate against worker retirement and batched table installation, retaining the same latency gates. The original measurements above remain historical evidence.

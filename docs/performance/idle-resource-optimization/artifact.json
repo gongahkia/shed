@@ -1,0 +1,13 @@
+{
+  "entry_head": "979f784960b5f2442ec1965d38098dbe0a0f78b9",
+  "baseline_sha256": "a176ba1258dce576dd0c89def40c8306e4f1a2e4588f5c0735293b4ba2bd0c3b",
+  "candidate_sha256": "1fedffb99194bbc633e7fc7bb37d68f0d5469725995e0a44fe61f9af2b356268",
+  "compiled_classes_matching_jar": 1627,
+  "readme_before_after_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "sources": {
+    "src/main/java/shed/AsyncJobService.java": "da824fe9fe4ae2c133687c94c81d7ab41cef78a0ea5fe62bf836cc81636588eb",
+    "src/main/java/shed/ScmChangesPanel.java": "f698089bcb04f3d804796c429b142bf49d4d3ebffd44718902bcf83f00b735d2",
+    "src/benchmark/java/shed/SourceControlPerformanceProbe.java": "53ad3697619769ce7a715afd3d3ba72bd5a60c9ba6cee8724c7dc36abecfce1c",
+    "scripts/test-scm-performance.py": "2add83f5e843da6a6d72c7d29a7aede9edda38166ccb42c5922d7727dba05c8f"
+  }
+}

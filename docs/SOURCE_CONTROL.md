@@ -47,3 +47,5 @@ The sidebar, central comparisons and source ownership share Shed's existing Swin
 Try `make run <working-copy-folder>`, then **View → Source Control**. `make demo-chat` now also exercises both graphical providers using fixed in-process client responses and disposable data. It continues to use the existing fixed Java chat client, rather than a real coding model.
 
 For an opt-in before/after performance check, use `make check-scm-performance SCM_BASELINE_JAR=/path/to/preserved-before.jar`. See the [matched test definitions and results](performance/source-control-e2e/INDEX.md). Normal startup and unit tests do not enable it.
+
+The [idle-resource follow-up](performance/idle-resource-optimization/INDEX.md) documents worker retirement and batched status/history installation. Add `SCM_PERF_IDLE=1` to the performance target to include the longer idle/resumption checks.

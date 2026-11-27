@@ -1,0 +1,14 @@
+{
+  "baseline": {
+    "heap": 31.43170928955078,
+    "threads": 22,
+    "fds": 11,
+    "resume": 0.755917
+  },
+  "candidate": {
+    "heap": 31.3876953125,
+    "threads": 18,
+    "fds": 11,
+    "resume": 0.945625
+  }
+}

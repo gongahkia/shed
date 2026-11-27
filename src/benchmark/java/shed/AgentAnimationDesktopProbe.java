@@ -48,9 +48,14 @@ public class AgentAnimationDesktopProbe {
         finally{if(child.isAlive()){child.destroy();if(!child.waitFor(2,TimeUnit.SECONDS)){child.destroyForcibly();child.waitFor(2,TimeUnit.SECONDS);}}child.getInputStream().close();child.getErrorStream().close();}
     }
     static void picture(String name)throws Exception{var image=ui(()->{var root=editor.getRootPane();return SwingComponentCapture.capture(root,0,0,root.getWidth(),root.getHeight(),16_000_000);});javax.imageio.ImageIO.write(image,"png",output.resolve(name+".png").toFile());}
+    static final Set<String> observedColors=new LinkedHashSet<>();
+    static void verifyActionTint(String stage){
+        var color=editor.getActivePane().agentPresentation().agentColor();if(!color.equals(editor.agentPresence().activityColor()))throw new AssertionError("Agent cursor/badge tint differs from its active text highlight: "+stage);
+        String value=stage+" #"+String.format("%06x",color.getRGB()&0xffffff);if(observedColors.add(value))System.out.println("ACTION_COLOR "+value);
+    }
     static void read(String path,int offset)throws Exception{
         cli("read",path,"--offset",Integer.toString(offset),"--limit","900","--agent",readingAgent);
-        ui(()->{directions.add(Objects.toString(editor.writingArea.getClientProperty("shed.agentDirection")));return null;});
+        ui(()->{verifyActionTint("reading");directions.add(Objects.toString(editor.writingArea.getClientProperty("shed.agentDirection")));return null;});
         if(readingFrames++<2){picture("reading-"+readingFrames+"-top");Thread.sleep(750);picture("reading-"+readingFrames+"-down");}
         stage("READ: "+path+" at UTF-16 offset "+offset,3000);
     }
@@ -61,7 +66,7 @@ public class AgentAnimationDesktopProbe {
         var buffer=ui(editor::getCurrentBuffer);String source=ui(buffer::getContent);long revision=ui(buffer::documentRevision);int caret=ui(()->editor.writingArea.getCaretPosition()),mark=ui(()->editor.writingArea.getCaret().getMark());boolean undo=ui(()->buffer.getUndoManager().canUndo());
         for(int i=0;i<count;i++){
             final int frame=i;
-            var image=ui(()->{String mode=Objects.toString(editor.writingArea.getClientProperty("shed.agentAnimation"),"complete");modes.add(mode);if(editor.writingArea.getClientProperty("shed.agentDirection") instanceof String direction)directions.add(direction);
+            var image=ui(()->{if(editor.writingArea.getClientProperty("shed.agentTour")!=null)verifyActionTint(name);String mode=Objects.toString(editor.writingArea.getClientProperty("shed.agentAnimation"),"complete");modes.add(mode);if(editor.writingArea.getClientProperty("shed.agentDirection") instanceof String direction)directions.add(direction);
                 if(editor.writingArea.getClientProperty("shed.agentCursorCount") instanceof Integer cursors)maximumCursors=Math.max(maximumCursors,cursors);
                 if(!buffer.getContent().equals(source)||buffer.documentRevision()!=revision||buffer.isModified()||editor.writingArea.getCaretPosition()!=caret||editor.writingArea.getCaret().getMark()!=mark||buffer.getUndoManager().canUndo()!=undo)throw new AssertionError("Playback changed source/revision/dirty/caret/history");
                 var root=editor.getRootPane();return SwingComponentCapture.capture(root,0,0,root.getWidth(),root.getHeight(),16_000_000);});
@@ -87,7 +92,7 @@ public class AgentAnimationDesktopProbe {
         String pairs=Arrays.stream(ranges).map(r->r.start()+":"+r.end()).collect(java.util.stream.Collectors.joining(","));
         long started=System.nanoTime();var response=cli("intent","--kind",kind,"--status",status,"--ranges",pairs,"--focus",Integer.toString(focus),"--agent",agent,"--document",ui(()->editor.captureEditorMetadata().documentId()),"--revision",Long.toString(revision));intentMs.add((System.nanoTime()-started)/1e6);
         if(!"shown".equals(response.get("outcome")))throw new AssertionError("Intent not acknowledged");Thread.sleep(400);
-        ui(()->{var area=editor.writingArea;
+        ui(()->{verifyActionTint(kind+"-"+status);var area=editor.writingArea;
             if(!kind.equals(area.getClientProperty("shed.agentIntent"))||!status.equals(area.getClientProperty("shed.agentIntentStatus")))throw new AssertionError("Intent not visible: "+kind);
             if(buffer!=editor.getCurrentBuffer()||!source.equals(buffer.getContent())||revision!=buffer.documentRevision()||dirty!=buffer.isModified()||undo!=buffer.getUndoManager().canUndo()||dot!=area.getCaret().getDot()||mark!=area.getCaret().getMark())throw new AssertionError("Intent changed source or human state");
             var bounds=area.modelToView2D(ranges[focus].start());if(bounds==null||!area.getVisibleRect().intersects(bounds))throw new AssertionError("Intent target not revealed: "+kind);

@@ -55,7 +55,9 @@ public class AgentAnimationDesktopProbe {
         stage("READ: "+path+" at UTF-16 offset "+offset,3000);
     }
     static void frames(String name,int count)throws Exception {
-        await(()->editor.writingArea.getClientProperty("shed.agentTour")!=null);
+        try{await(()->editor.writingArea.getClientProperty("shed.agentTour")!=null);}catch(IllegalStateException timeout){
+            System.err.println("TOUR_TIMEOUT_STATE "+MiniJson.stringify(ui(()->Map.of("watch",editor.toolWindowHost.watchAgentChanges("state","Codex"),"source_length",editor.writingArea.getDocument().getLength(),"revision",editor.getCurrentBuffer().documentRevision(),"dirty",editor.getCurrentBuffer().isModified(),"animation",Objects.toString(editor.writingArea.getClientProperty("shed.agentAnimation")),"activity",Objects.toString(editor.writingArea.getClientProperty("shed.agentActivity")),"native_threads",Thread.getAllStackTraces().keySet().stream().filter(Thread::isAlive).count()))));throw timeout;
+        }
         var buffer=ui(editor::getCurrentBuffer);String source=ui(buffer::getContent);long revision=ui(buffer::documentRevision);int caret=ui(()->editor.writingArea.getCaretPosition()),mark=ui(()->editor.writingArea.getCaret().getMark());boolean undo=ui(()->buffer.getUndoManager().canUndo());
         for(int i=0;i<count;i++){
             final int frame=i;

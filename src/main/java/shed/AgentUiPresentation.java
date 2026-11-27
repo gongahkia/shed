@@ -10,7 +10,7 @@ import javax.swing.text.JTextComponent;
 /** Click-through, window-owned feedback; never moves the system pointer. */
 final class AgentUiPresentation extends JComponent implements AutoCloseable {
     private static final String KEY="shed.agentUiPresence";
-    private static final Color COLOR = new Color(20, 115, 82);
+    private Color color=new Color(0x27815C);
     private static final double[][] POINTER = {{0,0},{20,7},{21,9},{14,12},{12,14},{10,22},{8,23},{6,20},{0,3},{-1,1},{0,0},{0,0}};
     private static final double[][] BEAM = {{2,-10},{14,-10},{14,-8},{10,-8},{10,14},{14,14},{14,16},{2,16},{2,14},{6,14},{6,-8},{2,-8}};
     private JLayeredPane layer;
@@ -38,10 +38,14 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
         follow(token,anchor,typing,activity,false);
     }
     void follow(long token,Point anchor,boolean typing,String activity,boolean badgeOnly) {
-        if(!follows(token))return;this.explicitPoint=new Point(anchor);this.activity=activity;
-        this.badgeOnly=badgeOnly;
+        if(follows(token))follow(token,anchor,typing,activity,badgeOnly,AgentTextPulse.color(component(),AgentTextPulse.role(activity)));
+    }
+    void follow(long token,Point anchor,boolean typing,String activity,boolean badgeOnly,Color color){
+        if(!follows(token))return;this.explicitPoint=new Point(anchor);this.activity=activity;this.badgeOnly=badgeOnly;setColor(color);
         frame(Math.min(1,(System.nanoTime()-followStarted)/300_000_000f),typing);
     }
+    private Component component(){var component=target.get();return component==null?this:component;}
+    private void setColor(Color value){if(value==null||value.equals(color))return;color=value;logo=ProviderIcons.forValue(agent,color);repaint(drawingBounds());}
     void endFollow(long token) { if(follows(token))settle(); }
 
     @Override public boolean contains(int x, int y) { return false; }
@@ -64,7 +68,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
         }
         this.target = new WeakReference<>(control); this.agent = agent; this.motion = motion;
         explicitPoint = null; activity = ""; badgeOnly=false;
-        logo = ProviderIcons.forValue(agent, COLOR);
+        color=AgentTextPulse.color(control,"success");logo = ProviderIcons.forValue(agent, color);
         origin = new Point2D.Double(point.x, point.y); progress = 0; typing = false; settled = false;
         frame(0, false);
     }
@@ -76,7 +80,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     void anchor(Point point) {requireEdt();explicitPoint=new Point(point);}
 
     void activity(String value,double phase) {
-        requireEdt(); activity=value; activityPhase=Math.clamp(phase,0,1); repaint(drawingBounds());
+        requireEdt(); activity=value;setColor(AgentTextPulse.color(component(),AgentTextPulse.role(value))); activityPhase=Math.clamp(phase,0,1); repaint(drawingBounds());
     }
     void badgeOnly(boolean value){requireEdt();badgeOnly=value;}
 
@@ -131,16 +135,16 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
                     if (!settled && progress >= .55f && !typing && !badgeOnly) {
                         float phase = (progress - .55f) / .45f;
                         int radius = motion ? 5 + (int)(18 * phase) : 10;
-                        cursor.setColor(new Color(COLOR.getRed(), COLOR.getGreen(), COLOR.getBlue(), (int)(130 * (1 - phase))));
+                        cursor.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), (int)(130 * (1 - phase))));
                         cursor.setStroke(new BasicStroke(2)); cursor.drawOval(-radius, -radius, radius * 2, radius * 2);
                     }
                     Path2D shape = shape(morph);
                     cursor.setColor(new Color(0,0,0,85));cursor.setStroke(new BasicStroke(4, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));cursor.draw(shape);
                     cursor.setColor(Color.WHITE);cursor.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));cursor.draw(shape);
-                    cursor.setColor(COLOR);cursor.fill(shape);
+                    cursor.setColor(color);cursor.fill(shape);
                 }finally{cursor.dispose();}
             }
-            g.setColor(COLOR);
+            g.setColor(color);
             if(activity.equals("scrolling")) {
                 g.setColor(Color.WHITE);g.setStroke(new BasicStroke(2));g.drawRoundRect(-12,9,8,15,5,5);
                 int position=12+(int)(6*activityPhase);g.drawLine(-8,position,-8,position+2);
@@ -152,7 +156,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
             int badgeX = point.x + 26 + width > getWidth() - 8 ? -width - 8 : 26;
             g.fillRoundRect(badgeX, 16, width, 24, 7, 7);
             if (logo != null) logo.paintIcon(this,g,badgeX + 5,19);
-            g.setColor(Color.WHITE);g.drawString(label,badgeX + 6 + iconWidth,32);
+            g.setColor(AccessibilitySupport.meetsTextContrast(Color.WHITE,color)?Color.WHITE:Color.BLACK);g.drawString(label,badgeX + 6 + iconWidth,32);
         } finally { g.dispose(); }
     }
 
@@ -175,6 +179,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     float morph() { return morph; }
     float cursorAlpha(){return cursorAlpha;}
     boolean badgeOnly(){return badgeOnly;}
+    Color activityColor(){return color;}
     @Override public void close() {
         requireEdt();
         if (layer != null) { JLayeredPane old = layer; Rectangle bounds = drawingBounds(); old.remove(this); old.repaint(bounds); }

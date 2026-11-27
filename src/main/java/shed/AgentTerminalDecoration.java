@@ -82,7 +82,7 @@ final class AgentTerminalDecoration implements AutoCloseable {
             if(!cursor.isEmpty()&&input.isShowing()){
                 var anchor=new Point(cursor.x,cursor.y+cursor.height/2);
                 if(!presenceAttempted){presenceAttempted=true;presence=AgentUiPresentation.find(input);if(presence!=null)presenceToken=presence.beginFollow(input,anchor,agent,animated());}
-                if(presence!=null)presence.follow(presenceToken,anchor,phase.equals("typing"),phase.equals("typing")?"writing":phase);
+                if(presence!=null)presence.follow(presenceToken,anchor,phase.equals("typing"),phase.equals("typing")?"writing":phase,false,color());
             }
             var metrics=input.getFontMetrics(panel.agentFont());
             if(!cursor.isEmpty()){

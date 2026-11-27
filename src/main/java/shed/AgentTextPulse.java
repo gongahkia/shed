@@ -21,12 +21,20 @@ final class AgentTextPulse extends LayeredHighlighter.LayerPainter implements Au
     }
     static boolean small(String text){return text.length()<=160&&text.chars().filter(c->c=='\n').count()<=2;}
     static int typedUnits(String text,long elapsed,boolean motion){return motion&&small(text)&&text.chars().allMatch(c->c<128)?Math.min(text.length(),(int)(Math.max(0,elapsed)/Math.max(1,Math.min(14,650/Math.max(1,text.length()))))+1):text.length();}
-    static Color color(JTextComponent field,String role){
-        Color base=UIManager.getColor("shed."+role);
-        if(base==null)base=new Color(role.equals("navigation")?0x8B52C7:role.equals("info")?0x087F9C:role.equals("warning")?0xA87808:role.equals("error")?0xCC4855:0x27815C);
-        Color human=field.getCaretColor();if(human!=null&&Math.abs(base.getRed()-human.getRed())+Math.abs(base.getGreen()-human.getGreen())+Math.abs(base.getBlue()-human.getBlue())<100)base=new Color(0x8B52C7);
+    static Color color(Component field,String role){
+        Color base=role.equals("info")?new Color(0x2563EB):UIManager.getColor("shed."+role);
+        if(base==null)base=new Color(role.equals("navigation")?0x8B52C7:role.equals("info")?0x2563EB:role.equals("warning")?0xA87808:role.equals("error")?0xCC4855:0x27815C);
+        Color human=field instanceof JTextComponent text?text.getCaretColor():null;
+        if(human!=null&&Math.abs(base.getRed()-human.getRed())+Math.abs(base.getGreen()-human.getGreen())+Math.abs(base.getBlue()-human.getBlue())<100)base=base.darker();
         return AccessibilitySupport.readableText(base,field.getBackground());
     }
+    static String role(String activity){return switch(activity){
+        case "reading","thinking","checking","queued","running"->"warning";
+        case "deleting","needs attention","check failed"->"error";
+        case "search","searching"->"info";
+        case "examining","navigating","scrolling","dragging"->"navigation";
+        default->activity.startsWith("exit ")&&!activity.equals("exit 0")?"error":"success";
+    };}
     static int alpha(boolean motion,boolean reading,boolean active,int tick){return !motion?48:reading?30+(int)(12*Math.sin(tick*.18)):active?36+(int)(22*Math.sin(tick*.45)):Math.max(8,60-tick);}
     static void fill(Graphics2D g,Rectangle line,Color color,int alpha){g.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),alpha));g.fill(line);}
     static void sweep(Graphics2D graphics,Rectangle line,Color color,String direction,double progress,Rectangle2D first,Rectangle2D last,int fontHeight){

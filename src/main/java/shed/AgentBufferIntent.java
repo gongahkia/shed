@@ -30,7 +30,8 @@ record AgentBufferIntent(String kind,String status,String agent,List<AgentEditPr
     Map<String,Object> json(){return Map.of("kind",kind,"status",status,"agent",agent,"ranges",ranges.stream().map(r->Map.of("start",r.start(),"end",r.end())).toList(),"focus",focus);}
     boolean examining(){return kind.equals("navigate")||kind.equals("target");}
     String role(int index){return examining()?"navigation":kind.equals("search")?"info":kind.equals("conflict")||kind.equals("verify")&&status.equals("failed")?"error":kind.equals("verify")&&status.equals("passed")?"success":"warning";}
-    String label(int index){return agent+" "+switch(kind){
+    String label(int index){return agent+" "+activity();}
+    String activity(){return switch(kind){
         case "search"->"searching";case "navigate","target"->"examining";
         case "verify"->status.equals("checking")?"checking":"check "+status;default->"needs attention";};}
     private static WorkspaceApiException invalid(){return WorkspaceApiException.invalidRequest("Invalid buffer intent");}

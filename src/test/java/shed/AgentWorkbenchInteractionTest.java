@@ -10,6 +10,18 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
 class AgentWorkbenchInteractionTest {
+    @Test void sourceBadgeAndCursorUseTheSameTintAsReadingDeletionAndSearchHighlights()throws Exception{
+        edt(()->{var f=new Fixture();try(f){f.presence.attach(f.root);try(var presentation=new AgentEditPresentation(f.area)){
+            presentation.showReading(0,10,"Codex");assertEquals(presentation.agentColor(),f.presence.activityColor());var reading=f.presence.activityColor();assertTrue(reading.getRed()>reading.getBlue()&&reading.getGreen()>reading.getBlue());
+            presentation.showIntent(new AgentBufferIntent("search","active","Codex",List.of(new AgentEditPresentation.Range(0,10)),0));assertEquals(presentation.agentColor(),f.presence.activityColor());var search=f.presence.activityColor();assertTrue(search.getBlue()>search.getRed()&&search.getBlue()>search.getGreen(),"Search must remain blue even when the human caret is blue");
+            presentation.showApplied(0,10);try(var playback=new AgentChangePlayback(f.area,f.area.getText(),List.of(new AgentChangePlayback.Edit(new AgentEditPresentation.Range(0,10),"removed")),presentation::agentColor)){playback.frame(0,0);presentation.moveMarker(0,0);assertEquals(presentation.agentColor(),f.presence.activityColor());var deletion=f.presence.activityColor();assertTrue(deletion.getRed()>deletion.getGreen()&&deletion.getRed()>deletion.getBlue());}
+        }}return null;});
+    }
+    @Test void fieldActionColorsMatchPulseColorsAcrossLightAndDarkBackgrounds()throws Exception{
+        edt(()->{var f=new Fixture();try(f){for(var background:List.of(Color.WHITE,new Color(0x202020))){f.query.setBackground(background);for(var entry:Map.of("writing","success","reading","warning","deleting","error","searching","info").entrySet()){
+            f.presence.show(f.query,"Claude Code",false);f.presence.activity(entry.getKey(),.5);assertEquals(AgentTextPulse.color(f.query,entry.getValue()),f.presence.activityColor());assertTrue(AccessibilitySupport.meetsTextContrast(f.presence.activityColor(),background));
+        }}}return null;});
+    }
     @Test void badgeOnlyPaintKeepsTheProviderLabelButRemovesThePointerAndRestoresItSmoothly()throws Exception{
         edt(()->{var f=new Fixture();try(f){var p=f.presence;p.showAt(f.query,new Point(20,12),"Codex",false);p.badgeOnly(true);p.frame(1,false);var position=p.pointerPosition();
             var image=new java.awt.image.BufferedImage(640,400,java.awt.image.BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();p.paint(g);g.dispose();int x=(int)position.getX(),y=(int)position.getY(),badge=0;

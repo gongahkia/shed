@@ -161,7 +161,7 @@ final class AgentEditPresentation implements AutoCloseable {
             var caret=area.modelToView2D(block?ranges.get(activeRange).start():markerOffset);if(caret==null)return;
             var visible=area.getVisibleRect();var anchor=new Point(Math.max(visible.x+4,Math.min(visible.x+visible.width-4,(int)caret.getX())),block?Math.max(visible.y+12,Math.min(visible.y+visible.height-45,(int)caret.getCenterY())):(int)caret.getCenterY());
             if(!presenceAttempted){presenceAttempted=true;presence=AgentUiPresentation.find(area);if(presence!=null)presenceToken=presence.beginFollow(area,anchor,agentProvider,animated());}
-            if(presence!=null)presence.follow(presenceToken,anchor,!reading,reading?"reading":"deleting".equals(area.getClientProperty("shed.agentAnimation"))?"deleting":"writing",block);
+            if(presence!=null)presence.follow(presenceToken,anchor,!reading,intent!=null?intent.activity():reading?"reading":"deleting".equals(area.getClientProperty("shed.agentAnimation"))?"deleting":"writing",block,agentColor());
         }catch(BadLocationException unavailable) { }
     }
     void clear() {

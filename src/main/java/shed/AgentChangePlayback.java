@@ -121,7 +121,7 @@ final class AgentChangePlayback implements AutoCloseable {
         int remaining=(int)(width*(1-erasing)),x=(int)anchor.getX(),y=(int)anchor.getY(),height=(int)Math.ceil(anchor.getHeight());
         if(!moveInlineTail(graphics,x+remaining))return false;
         graphics.setColor(area.getBackground());graphics.fillRect(x,y,remaining,height);
-        Color color=UIManager.getColor("shed.error");if(color==null)color=new Color(0xCC4855);color=AccessibilitySupport.readableText(color,area.getBackground());
+        Color color=AgentTextPulse.color(area,"error");
         int alpha=cursor?48+(int)(12*Math.sin(progress*durationMillis(first)*.009)):32;
         graphics.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),alpha));graphics.fillRect(x,y,remaining,height);
         if(cursor&&remaining>0){
@@ -193,8 +193,7 @@ final class AgentChangePlayback implements AutoCloseable {
         int rows=Math.min(Math.min(8,removedLines),Math.max(1,(visible.y+visible.height-y)/height));
         int panelHeight=rows*height;
         graphics.setColor(area.getBackground());graphics.fillRect(x,y,width,panelHeight);
-        Color color=UIManager.getColor("shed.error");if(color==null)color=new Color(0xCC4855);
-        color=AccessibilitySupport.readableText(color,area.getBackground());
+        Color color=AgentTextPulse.color(area,"error");
         graphics.setColor(new Color(color.getRed(),color.getGreen(),color.getBlue(),35));graphics.fillRect(x,y,width,panelHeight);
         graphics.setColor(color);graphics.setFont(area.getFont());
         String[] lines=preview.split("\n",9);int bodyWidth=8;

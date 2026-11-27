@@ -76,7 +76,7 @@ class AgentWorkbenchCoreTest {
         finally{edt(()->{f.close();return null;});}
     }
     @Test void arbitraryKeyBindingsCannotReadTheSystemClipboard()throws Exception{
-        var f=edt(Fixture::new);try{assertThrows(ExecutionException.class,()->run(f,"key","query",Map.of("key","meta V")));assertEquals("",edt(f.query::getText));}
+        var f=edt(Fixture::new);try{assertThrows(ExecutionException.class,()->run(f,"key","query",Map.of("key","meta P")));run(f,"key","query",Map.of("key","meta V"));assertEquals("",edt(f.query::getText));}
         finally{edt(()->{f.close();return null;});}
     }
     @Test void requestSchemaRejectsExtraFieldsUnknownKindsAndUnboundedDistances(){

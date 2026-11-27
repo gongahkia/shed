@@ -18,6 +18,9 @@ final class AgentUiSession implements AutoCloseable {
         boolean current();
         boolean motion();
         default void check(AgentUiTarget target,String kind){}
+        default void validate(AgentUiTarget target,AgentUiRequest request){}
+        default String contextKey(){return "";}
+        default boolean shortcut(AgentUiTarget target,String key){return false;}
         default void edit(AgentUiTarget target,int start,int end,String text) throws BadLocationException {
             var field=(JTextComponent)target.component();
             if(!field.isEditable())throw fail(WorkspaceApiException.Code.PERMISSION_DENIED);
@@ -40,8 +43,8 @@ final class AgentUiSession implements AutoCloseable {
 
     Map<String,Object> state(int offset){
         requireEdt();if(offset<0||offset>4096)throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
-        var targets=host.targets();var stamp=new StringBuilder();
-        for(var target:targets){var c=target.component();stamp.append(target.id()).append(':').append(System.identityHashCode(c)).append(':').append(c.isShowing()).append(':').append(c.isEnabled());}
+        var targets=host.targets();if(offset>targets.size())throw fail(WorkspaceApiException.Code.INVALID_OFFSET);var stamp=new StringBuilder(host.contextKey());
+        for(var target:targets){var c=target.component();if(c instanceof JTextComponent text)stamp.append(text.getCaretPosition()).append(text.getSelectionStart()).append(text.getSelectionEnd());stamp.append(target.id()).append(':').append(System.identityHashCode(c)).append(':').append(c.isShowing()).append(':').append(c.isEnabled());if(c instanceof JTextComponent text&&!Boolean.TRUE.equals(c.getClientProperty("shed.agent.source"))&&text.getDocument().getLength()<=AgentUiRequest.MAX_TEXT)stamp.append(text.getText()).append(text.getCaretPosition()).append(text.getSelectionStart());}
         String now=stamp.toString();if(!now.equals(fingerprint)){fingerprint=now;revision++;}
         var shown=new ArrayList<Map<String,Object>>();for(int i=offset;i<Math.min(targets.size(),offset+48);i++)shown.add(targets.get(i).metadata(host.permitted(targets.get(i).permission())));
         var m=new LinkedHashMap<String,Object>();m.put("kind","workbench");m.put("schemaVersion",2);m.put("revision",revision);m.put("targets",shown);
@@ -64,16 +67,18 @@ final class AgentUiSession implements AutoCloseable {
         requireEdt();state(0);
         if(pending!=null)throw fail(WorkspaceApiException.Code.BUSY);
         if(request.revision()!=revision)throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
-        var target=target(request.target());check(target,request.kind());
+        var target=target(request.target());check(target,request.kind());host.validate(target,request);
         if(!authorized.getAsBoolean())throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
         var c=target.component();var completed=new CompletableFuture<Map<String,Object>>();
         long id=++sequence,started=System.nanoTime();int approach=host.motion()?240:0,duration=host.motion()?360:0;
         int index=request.args().containsKey("index")?(int)AgentUiRequest.integer(request.args(),"index"):-1;
-        Point anchor=target.point(index);presence.showAt(c,anchor,request.agent(),host.motion());
+        Point anchor=target.point(index);
+        if(request.kind().equals("scroll")){var pane=AgentUiScroll.pane(c);if(pane==null)throw fail(WorkspaceApiException.Code.UNSUPPORTED);var viewport=pane.getViewport();presence.showAt(viewport,new Point(viewport.getWidth()/2,viewport.getHeight()/2),request.agent(),host.motion());}
+        else presence.showAt(c,anchor,request.agent(),host.motion());
         last=Map.of("id",id,"stage","requested","agent",request.agent(),"operation",request.kind(),"target",target.id());
         AgentUiScroll scrolling=request.kind().equals("scroll")?new AgentUiScroll(AgentUiScroll.pane(c),AgentUiScroll.Axis.valueOf(request.args().get("axis").toString().toUpperCase(Locale.ROOT)),AgentUiScroll.Unit.valueOf(request.args().get("unit").toString().toUpperCase(Locale.ROOT)),(int)AgentUiRequest.integer(request.args(),"amount")):null;
         if(c instanceof JTextComponent text)boundedText(text);
-        String[] desired={null};int[] written={0};boolean[] applied={false};long[] finishAt={-1};Object[] highlight={null};Highlighter[] highlighter={null};
+        String[] desired={null};int[] written={0};int dragOrigin=c instanceof JSplitPane split?(int)(1000.0*split.getDividerLocation()/Math.max(1,(split.getOrientation()==JSplitPane.HORIZONTAL_SPLIT?split.getWidth():split.getHeight()))):c instanceof JScrollBar bar?(int)(1000.0*(bar.getValue()-bar.getMinimum())/Math.max(1,bar.getMaximum()-bar.getVisibleAmount()-bar.getMinimum())):-1;boolean[] applied={false};long[] finishAt={-1};Object[] highlight={null};Highlighter[] highlighter={null};
         cleanup=()->{if(highlight[0]!=null&&c instanceof JTextComponent text&&text.getHighlighter()==highlighter[0])highlighter[0].removeHighlight(highlight[0]);};
         pending=completed;
         timer=new javax.swing.Timer(16,event->{
@@ -104,7 +109,7 @@ final class AgentUiSession implements AutoCloseable {
                     }
                     revision++;finishAt[0]=elapsed;return;
                 }
-                if(request.kind().equals("drag")){drag(target,request,phase);presence.activity("dragging",phase);if(phase<1)return;}
+                if(request.kind().equals("drag")){drag(target,request,phase,dragOrigin);presence.anchor(target.point(-1));presence.frame(1,c instanceof JTextComponent);presence.activity("dragging",phase);if(phase<1)return;}
                 else if(request.kind().equals("read")||request.kind().equals("text")&&Set.of("read","select").contains(request.args().get("mode"))){
                     var field=text(c);int a=(int)AgentUiRequest.integer(request.args(),"start"),b=(int)AgentUiRequest.integer(request.args(),"end");bounds(field,a,b);
                     if(b-a>AgentUiRequest.MAX_TEXT)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
@@ -115,8 +120,8 @@ final class AgentUiSession implements AutoCloseable {
                         String content=field.getDocument().getText(a,b-a);finish(id,request,target,Map.of("content",content,"start",a,"end",b),completed,highlight,highlighter,null);return;
                     }
                 }else if(request.kind().equals("text")){var field=text(c);int a=(int)AgentUiRequest.integer(request.args(),"start"),b=(int)AgentUiRequest.integer(request.args(),"end");bounds(field,a,b);host.edit(target,a,b,"");}
-                else if(request.kind().equals("copy")){var field=text(c);bounds(field,field.getSelectionStart(),field.getSelectionEnd());clipboard=field.getSelectedText()==null?"":field.getSelectedText();if(clipboard.length()>AgentUiRequest.MAX_TEXT)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);if(host.permitted(AgentUiPermission.SYSTEM_CLIPBOARD))Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(clipboard),null);}
-                else if(request.kind().equals("paste")){var field=text(c);String value=clipboard;if(host.permitted(AgentUiPermission.SYSTEM_CLIPBOARD)){Object data=Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);value=data instanceof String s?s:"";}if(value.length()>AgentUiRequest.MAX_TEXT)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);bounds(field,field.getSelectionStart(),field.getSelectionEnd());host.edit(target,field.getSelectionStart(),field.getSelectionEnd(),value);}
+                else if(request.kind().equals("copy"))copy(target,false);
+                else if(request.kind().equals("paste"))paste(target);
                 else if(request.kind().equals("select")){select(c,index);}
                 else if(request.kind().equals("key")){key(target,AgentUiRequest.string(request.args(),"key",64));}
                 else {
@@ -161,18 +166,34 @@ final class AgentUiSession implements AutoCloseable {
         else if(c instanceof JTabbedPane tabs&&index<tabs.getTabCount()&&index>=0)tabs.setSelectedIndex(index);
         else throw fail(WorkspaceApiException.Code.INVALID_OFFSET);
     }
-    private static void drag(AgentUiTarget target,AgentUiRequest r,double phase)throws BadLocationException{
-        int a=(int)AgentUiRequest.integer(r.args(),"start"),b=(int)AgentUiRequest.integer(r.args(),"end");double eased=1-Math.pow(1-phase,3);
+    private static void drag(AgentUiTarget target,AgentUiRequest r,double phase,int origin)throws BadLocationException{
+        int a=origin>=0?origin:(int)AgentUiRequest.integer(r.args(),"start"),b=(int)AgentUiRequest.integer(r.args(),"end");double eased=1-Math.pow(1-phase,3);
         if(target.component() instanceof JSplitPane split){if(a>1000||b>1000)throw fail(WorkspaceApiException.Code.INVALID_OFFSET);split.setDividerLocation((a+(b-a)*eased)/1000);}
         else if(target.component() instanceof JScrollBar bar){if(a>1000||b>1000)throw fail(WorkspaceApiException.Code.INVALID_OFFSET);bar.setValue(bar.getMinimum()+(int)((bar.getMaximum()-bar.getVisibleAmount()-bar.getMinimum())*(a+(b-a)*eased)/1000));}
         else if(target.component() instanceof JTextComponent field){bounds(field,Math.min(a,b),Math.max(a,b));int end=a+(int)((b-a)*eased);if(end>0&&end<field.getDocument().getLength()){String value=field.getDocument().getText(Math.max(0,end-64),Math.min(128,field.getDocument().getLength()-Math.max(0,end-64)));int base=Math.max(0,end-64);end=base+GraphemeBoundary.floor(value,end-base);}field.setCaretPosition(a);field.moveCaretPosition(end);}
         else throw fail(WorkspaceApiException.Code.UNSUPPORTED);
     }
-    private void key(AgentUiTarget target,String key)throws BadLocationException{
+    private void copy(AgentUiTarget target,boolean cut)throws Exception{
+        var field=text(target.component());bounds(field,field.getSelectionStart(),field.getSelectionEnd());
+        if(field.getSelectionEnd()-field.getSelectionStart()>AgentUiRequest.MAX_TEXT)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        clipboard=field.getSelectedText()==null?"":field.getSelectedText();
+        if(host.permitted(AgentUiPermission.SYSTEM_CLIPBOARD))Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(clipboard),null);
+        if(cut)host.edit(target,field.getSelectionStart(),field.getSelectionEnd(),"");
+    }
+    private void paste(AgentUiTarget target)throws Exception{
+        var field=text(target.component());String value=clipboard;
+        if(host.permitted(AgentUiPermission.SYSTEM_CLIPBOARD)){Object data=Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);value=data instanceof String s?s:"";}
+        if(value.length()>AgentUiRequest.MAX_TEXT||!AgentUiActions.validUtf16(value))throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        bounds(field,field.getSelectionStart(),field.getSelectionEnd());host.edit(target,field.getSelectionStart(),field.getSelectionEnd(),value);
+    }
+    private void key(AgentUiTarget target,String key)throws Exception{
+        key=key.replace("mod ",System.getProperty("os.name","").startsWith("Mac")?"meta ":"control ");
+        if(Set.of("meta C","control C","meta X","control X").contains(key)){copy(target,key.endsWith("X"));return;}
+        if(Set.of("meta V","control V").contains(key)){paste(target);return;}
+        if(host.shortcut(target,key))return;
         var c=target.component();if(!Set.of("ENTER","ESCAPE","TAB","shift TAB","UP","DOWN","LEFT","RIGHT","HOME","END","shift LEFT","shift RIGHT","shift UP","shift DOWN","control A","meta A","BACK_SPACE","DELETE").contains(key))throw fail(WorkspaceApiException.Code.UNSUPPORTED);KeyStroke stroke=KeyStroke.getKeyStroke(key);if(stroke==null)throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
         if(stroke.getKeyCode()==KeyEvent.VK_TAB){if((stroke.getModifiers()&InputEvent.SHIFT_DOWN_MASK)!=0)c.transferFocusBackward();else c.transferFocus();return;}
-        Object binding=c.getInputMap(JComponent.WHEN_FOCUSED).get(stroke);if(binding==null)binding=c.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).get(stroke);
-        var action=binding==null?null:c.getActionMap().get(binding);if(action==null||!action.isEnabled())throw fail(WorkspaceApiException.Code.UNSUPPORTED);
+        Object binding=null;Action action=null;for(Component owner=c;owner instanceof JComponent component;owner=owner.getParent()){binding=component.getInputMap(owner==c?JComponent.WHEN_FOCUSED:JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).get(stroke);if(binding!=null){action=component.getActionMap().get(binding);if(action!=null)break;}}if(action==null||!action.isEnabled())throw fail(WorkspaceApiException.Code.UNSUPPORTED);
         if(Boolean.TRUE.equals(c.getClientProperty("shed.agent.source"))&&(Set.of("cut-to-clipboard","paste-from-clipboard","delete-previous","delete-next","insert-break","insert-tab").contains(String.valueOf(binding))))throw fail(WorkspaceApiException.Code.UNSUPPORTED);
         action.actionPerformed(new ActionEvent(c,ActionEvent.ACTION_PERFORMED,String.valueOf(binding)));
     }

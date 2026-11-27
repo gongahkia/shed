@@ -32,13 +32,14 @@ final class AgentUiActions implements AutoCloseable {
         }
     }
     private final Surface surface;
-    private final AgentUiPresentation presentation = new AgentUiPresentation();
+    private final AgentUiPresentation presentation;
     private javax.swing.Timer timer;
     private AWTEventListener input;
     private CompletableFuture<Map<String,Object>> pending;
     private boolean closed;
 
-    AgentUiActions(Surface surface) { this.surface = surface; }
+    AgentUiActions(Surface surface) { this(surface,new AgentUiPresentation()); }
+    AgentUiActions(Surface surface,AgentUiPresentation presentation) { this.surface=surface;this.presentation=presentation; }
 
     Map<String,Object> catalog() {
         requireEdt();

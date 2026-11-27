@@ -908,12 +908,14 @@ final class PaletteController {
                                         java.util.function.Function<String, List<String>> matcher, String hint) {
         // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(editor, title, true);
+        dialog.setName("picker."+AgentUiTargets.slug(title));
         dialog.setUndecorated(true);
         dialog.getRootPane().setBorder(javax.swing.BorderFactory.createLineBorder(editor.configManager.getCaretColor(), 1));
         dialog.setLayout(new BorderLayout(6, 6));
         dialog.getContentPane().setBackground(editor.configManager.getCommandBarBackground());
         java.awt.Font uiFont = editor.resolveUiFont();
         JTextField filterField = new JTextField();
+        filterField.setName("picker.query");
         AccessibilitySupport.describe(filterField, title + " filter", "Filter available " + title.toLowerCase(Locale.ROOT) + " entries.");
         filterField.setFont(uiFont);
         filterField.setBackground(editor.configManager.getCommandBarBackground());
@@ -930,6 +932,7 @@ final class PaletteController {
             model.addElement(candidates.get(index));
         }
         JList<String> list = new JList<>(model);
+        list.setName("picker.results");
         list.putClientProperty(UiDensity.PICKER_LIST, Boolean.TRUE);
         AccessibilitySupport.describe(list, title + " results", "Matching " + title.toLowerCase(Locale.ROOT) + " entries. Use Up and Down to select, Enter to open, or Escape to dismiss.");
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);

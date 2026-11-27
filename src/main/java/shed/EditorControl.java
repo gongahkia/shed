@@ -14,9 +14,9 @@ import javax.swing.SwingUtilities;
 /** Explicit project grant for source-only opening, bounded reads and human-reviewed edits. */
 final class EditorControl implements AutoCloseable {
     static final String SCOPE = "editor-control";
-    static final Set<String> OPERATIONS = Set.of("editor/delegation", "editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal", "editor/ui/actions", "editor/ui/state", "editor/ui/invoke");
+    static final Set<String> OPERATIONS = Set.of("editor/delegation", "editor/file/open", "editor/source/read", "editor/source/read-visible", "editor/source/sync", "editor/edits/propose", "editor/agent/activity", "editor/agent/intent", "editor/agent/progress", "editor/agent/state", "editor/agent/cancel", "editor/project/read", "editor/project/propose", "editor/diagnostics", "editor/feedback", "editor/preview/open", "editor/preview/state", "editor/preview/capture", "editor/watch", "editor/terminal", "editor/ui/actions", "editor/ui/state", "editor/ui/invoke", "editor/ui/workbench-state", "editor/ui/workbench-inspect", "editor/ui/workbench-perform");
     static boolean mutation(String method) {
-        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/source/sync","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture","editor/ui/actions","editor/ui/state").contains(method);
+        return OPERATIONS.contains(method) && !Set.of("editor/source/read","editor/source/sync","editor/project/read","editor/agent/state","editor/diagnostics","editor/feedback","editor/preview/state","editor/preview/capture","editor/ui/actions","editor/ui/state","editor/ui/workbench-state","editor/ui/workbench-inspect").contains(method);
     }
     static final int MAX_READ = 2048, MAX_REPLACEMENT = 8192, MAX_DOCUMENT = 1024 * 1024;
     private static final Set<String> CONTEXT = Set.of("schemaVersion", "instanceId", "windowId", "projectId", "paneId", "documentId",
@@ -38,6 +38,7 @@ final class EditorControl implements AutoCloseable {
         default void revokeTerminals(){}
         default CompletableFuture<Map<String,Object>> uiAction(String operation, Map<String,Object> params, BooleanSupplier authorized) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
         default void revokeUiActions(){}
+        default CompletableFuture<Map<String,Object>> workbench(String operation,Map<String,Object> params,BooleanSupplier live,BooleanSupplier connection){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default Map<String,Object> delegation(String action,String id,String agent,String task) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
         default boolean delegationAllowed(String id) { return true; }
         void review(String proposal);
@@ -97,6 +98,7 @@ final class EditorControl implements AutoCloseable {
         if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Control dispatch belongs off the EDT");
         if (!OPERATIONS.contains(method)) throw fail(WorkspaceApiException.Code.UNSUPPORTED);
         if (method.equals("editor/delegation")) return delegation(params, connection);
+        if(method.startsWith("editor/ui/workbench-"))return workbench(method,params,connection);
         if (method.equals("editor/source/sync")) return sync(params, connection);
         if(method.equals("editor/watch"))return watch(params,connection);
         if(method.equals("editor/terminal"))return terminal(params,connection);
@@ -233,6 +235,29 @@ final class EditorControl implements AutoCloseable {
             var result = result(method, before, "proposed"); result.put("proposalId", proposal); result.put("reviewRequired", true);
             return result;
         } finally { active.compareAndSet(lease, null); }
+    }
+
+    private Map<String,Object> workbench(String method,Map<String,Object> params,BooleanSupplier connection){
+        var fields=new java.util.HashSet<>(Set.of("schemaVersion","instanceId","windowId","projectId"));
+        fields.addAll(method.endsWith("state")?Set.of("offset"):method.endsWith("inspect")?Set.of("target","offset"):Set.of("request"));
+        if(!params.keySet().equals(fields))throw fail(WorkspaceApiException.Code.INVALID_REQUEST);
+        if(!Long.valueOf(1).equals(params.get("schemaVersion")))throw fail(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
+        grant.requireIdentity(text(params,"instanceId",64),text(params,"windowId",64));
+        if(!grant.projectId.equals(text(params,"projectId",64)))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
+        if(method.endsWith("perform"))AgentUiRequest.parse(params.get("request"));
+        else{if(number(params,"offset")>4096)throw fail(WorkspaceApiException.Code.INVALID_OFFSET);if(method.endsWith("inspect"))text(params,"target",160);}
+        var lease=new Lease(connection);if(!active.compareAndSet(null,lease))throw fail(WorkspaceApiException.Code.BUSY);
+        try(lease){
+            var project=ui(lease,()->owner().watchRoot());grant.authorizeProject(project.root(),project.generation());
+            BooleanSupplier live=()->{try{grant.requireLive();return host.get()!=null;}catch(RuntimeException revoked){return false;}};
+            var completed=ui(lease,()->owner().workbench(method,params,live,lease::current));
+            Map<String,Object> observation;
+            try{observation=completed.get(4,TimeUnit.SECONDS);}
+            catch(TimeoutException timeout){completed.cancel(false);throw fail(WorkspaceApiException.Code.TIMEOUT);}
+            catch(InterruptedException interrupted){completed.cancel(false);Thread.currentThread().interrupt();throw fail(WorkspaceApiException.Code.CANCELLED);}
+            catch(ExecutionException failed){if(failed.getCause() instanceof WorkspaceApiException known)throw known;throw fail(WorkspaceApiException.Code.INVALID_CONTEXT);}
+            return Map.of("schemaVersion",1,"instanceId",params.get("instanceId"),"windowId",params.get("windowId"),"projectId",grant.projectId,"operation",method,"observation",observation);
+        }finally{active.compareAndSet(lease,null);}
     }
 
     private Map<String,Object> terminal(Map<String,Object> params,BooleanSupplier connection){

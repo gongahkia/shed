@@ -485,6 +485,13 @@ final class InputController {
     }
 
     void performMenuAction(PlainKeymap.Action action) {
+        performMenuAction(action,false);
+    }
+    void performAgentMenuAction(PlainKeymap.Action action) {
+        if(!editor.agentDelegation().uiAllowed(AgentUiPermission.EDIT)&&java.util.Set.of(PlainKeymap.Action.UNDO,PlainKeymap.Action.REDO,PlainKeymap.Action.SAVE,PlainKeymap.Action.SAVE_AS,PlainKeymap.Action.NEW,PlainKeymap.Action.CLOSE,PlainKeymap.Action.REPLACE).contains(action))throw EditorMetadata.failure(WorkspaceApiException.Code.PERMISSION_DENIED);
+        performMenuAction(action,true);
+    }
+    private void performMenuAction(PlainKeymap.Action action,boolean agent) {
         switch (action) {
             case NEW -> editor.sessionConfigController.openScratchBuffer("[No Name]", "", false);
             case SAVE -> {
@@ -509,11 +516,11 @@ final class InputController {
             }
             case UNDO -> {
                 editor.clearExtraCursors();
-                if (editor.documents.activeSurface().editable()) editor.documents.activeSurface().undo();
+                if (agent || editor.documents.activeSurface().editable()) editor.documents.activeSurface().undo();
             }
             case REDO -> {
                 editor.clearExtraCursors();
-                if (editor.documents.activeSurface().editable()) editor.documents.activeSurface().redo();
+                if (agent || editor.documents.activeSurface().editable()) editor.documents.activeSurface().redo();
             }
             case NEXT_SELECTION -> editor.addCursorAtNextMatch();
             case CURSOR_ABOVE -> editor.addCursorAbove();

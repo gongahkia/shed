@@ -63,6 +63,7 @@ final class AgentEditorOwnership implements AutoCloseable {
         return !closed&&interactive!=null&&focused!=null
             &&(SwingUtilities.isDescendingFrom(focused,interactive)||SwingUtilities.isDescendingFrom(focused,shield));
     }
+    void enableAgentMenus() { if(!closed)menus.forEach(JMenu::setEnabled); }
     @Override public void close() {
         if(!SwingUtilities.isEventDispatchThread())throw new IllegalStateException("Editor ownership belongs to the EDT");
         if(closed)return;closed=true;

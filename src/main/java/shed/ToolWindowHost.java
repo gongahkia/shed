@@ -130,6 +130,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     }
     GitChangesToolPanel gitPanel(){return sourceControlPanel().git();}
     SourceControlPanel sourceControlPanel(){return (SourceControlPanel)surfaces.get(Tab.GIT);}
+    Map<Tab,JPanel> agentSurfaces(){var result=new EnumMap<Tab,JPanel>(Tab.class);surfaces.forEach((tab,surface)->result.put(tab,surface.component()));return result;}
     void toggleRight(Tab tab){if(isSelected(tab)&&(tab==Tab.GIT||tab==Tab.AGENT))editor.workbenchDocks.showRight(false);else showTab(tab);}
     JPanel rightDock(){return chatDock;}
     boolean rightVisible(){return editor.workbenchDocks!=null&&editor.workbenchDocks.rightVisible();}

@@ -49,6 +49,8 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
         show(control,agent,motion); explicitPoint = new Point(point); frame(0,false);
     }
 
+    void anchor(Point point) {requireEdt();explicitPoint=new Point(point);}
+
     void activity(String value,double phase) {
         requireEdt(); activity=value; activityPhase=Math.clamp(phase,0,1); repaint(drawingBounds());
     }

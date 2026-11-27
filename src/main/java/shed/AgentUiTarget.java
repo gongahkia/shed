@@ -27,6 +27,8 @@ record AgentUiTarget(String id,String label,JComponent component,AgentUiPermissi
         return "surface";
     }
     Point point(int index){
+        if(component instanceof JSplitPane split)return split.getOrientation()==JSplitPane.HORIZONTAL_SPLIT?new Point(split.getDividerLocation()+split.getDividerSize()/2,split.getHeight()/2):new Point(split.getWidth()/2,split.getDividerLocation()+split.getDividerSize()/2);
+        if(component instanceof JScrollBar bar){double fraction=(double)(bar.getValue()-bar.getMinimum())/Math.max(1,bar.getMaximum()-bar.getMinimum());return bar.getOrientation()==JScrollBar.VERTICAL?new Point(bar.getWidth()/2,(int)(bar.getHeight()*fraction)+Math.min(12,bar.getHeight()/2)):new Point((int)(bar.getWidth()*fraction)+Math.min(12,bar.getWidth()/2),bar.getHeight()/2);}
         Rectangle bounds=null;
         if(index>=0){
             if(component instanceof JList<?> list&&index<list.getModel().getSize())bounds=list.getCellBounds(index,index);
@@ -40,7 +42,7 @@ record AgentUiTarget(String id,String label,JComponent component,AgentUiPermissi
     Map<String,Object> metadata(boolean permitted){
         var m=new LinkedHashMap<String,Object>();m.put("id",id);m.put("label",bounded(label,100));m.put("role",role());
         m.put("permission",permission.name().toLowerCase(Locale.ROOT));m.put("enabled",permitted&&component.isEnabled());m.put("visible",component.isShowing());
-        if(component instanceof JTextComponent text){m.put("length",text.getDocument().getLength());m.put("editable",text.isEditable());}
+        if(component instanceof JTextComponent text){m.put("length",text.getDocument().getLength());m.put("editable",text.isEditable());m.put("caret",text.getCaretPosition());m.put("start",text.getSelectionStart());m.put("end",text.getSelectionEnd());}
         if(component instanceof JList<?> list){m.put("count",list.getModel().getSize());m.put("selected",list.getSelectedIndex());}
         if(component instanceof JTable table){m.put("count",table.getRowCount());m.put("selected",table.getSelectedRow());}
         if(component instanceof JTree tree){m.put("count",tree.getRowCount());m.put("selected",tree.getMinSelectionRow());}

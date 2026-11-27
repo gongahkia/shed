@@ -17,7 +17,7 @@ final class ShedControlCli {
                 String arg=args[i];
                 if (arg.equals("--json")) continue;
                 if (arg.startsWith("--")) {
-                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms","--delegation","--task-file","--ui-revision").contains(arg)
+                    if (!Set.of("--connect","--credential","--offset","--limit","--start","--end","--revision","--document","--text-file","--request-id","--session-id","--agent","--phase","--completed","--total","--changes-file","--commands-file","--output","--kind","--status","--ranges","--focus","--sha256","--timeout-ms","--delegation","--task-file","--ui-revision","--args-file","--steps-file","--axis","--unit","--amount","--mode","--key","--index","--value-file").contains(arg)
                             || ++i==args.length || options.putIfAbsent(arg,args[i])!=null) throw new IllegalArgumentException();
                 } else if(command==null) command=arg;
                 else if(path==null) path=arg;
@@ -32,6 +32,7 @@ final class ShedControlCli {
             Path credential=key==null?descriptor.resolveSibling("status-"+identity.attachmentId()+".key"):Path.of(key);
             try(var client=WorkspaceBridgeClient.control(descriptor,credential)) {
                 String delegation=options.remove("--delegation");if(delegation==null)delegation=System.getenv("SHED_DELEGATION");client.delegation(delegation);
+                if(ShedWorkbenchCli.COMMANDS.contains(command)){mutationSent=!ShedWorkbenchCli.readonly(command);return ShedWorkbenchCli.run(client,identity,command,path,options,input,out);}
                 if(Set.of("session-request","session-status","session-finish").contains(command)) {
                     if(path!=null)throw new IllegalArgumentException();String id=required(options,"--request-id"),agent="",task="";
                     if(command.equals("session-request")) { agent=required(options,"--agent");String file=required(options,"--task-file");task=WorkspaceFrames.decode(file.equals("-")?input.readNBytes(4097):boundedFile(Path.of(file),4096)); }

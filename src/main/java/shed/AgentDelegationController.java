@@ -17,6 +17,11 @@ final class AgentDelegationController implements AutoCloseable {
     private boolean closed,handedBack;
     private volatile JComponent chatSurface;
     private String launchDescription="External CLI; Shed does not own its process.";
+    private Set<AgentUiPermission> uiPermissions=Set.of();
+    boolean uiAllowed(AgentUiPermission permission){
+        if(!lease.approvalRequired())return permission==AgentUiPermission.NAVIGATE;
+        return ownership!=null&&validProject()&&lease.allowed(lease.id())&&uiPermissions.contains(permission);
+    }
     void launchDescription(String value){launchDescription=value;}
     AgentDelegationController(Texteditor editor) {
         this.editor=editor;timer=new javax.swing.Timer(100,e->tick());
@@ -47,6 +52,7 @@ final class AgentDelegationController implements AutoCloseable {
             if(chatSurface!=surface||!validProject()||ownership!=null)throw EditorMetadata.failure(WorkspaceApiException.Code.BUSY);
             onActive=ready;onEnd=ended;
             ownership=new AgentEditorOwnership(editor.getRootPane(),()->List.copyOf(editor.editorPanes),lease.agent(),this::takeBack,chatSurface);
+            ownership.enableAgentMenus();
             editor.toolWindowHost.watchAgentChanges("follow",agent);ready.run();return;
         }
         if(lease.running())throw EditorMetadata.failure(WorkspaceApiException.Code.BUSY);
@@ -66,6 +72,17 @@ final class AgentDelegationController implements AutoCloseable {
         var task=new JTextArea(lease.task(),6,52);task.setFont(UIManager.getFont("Label.font"));task.setEditable(false);task.setLineWrap(true);task.setWrapStyleWord(true);task.setCaretPosition(0);body.add(new JScrollPane(task));
         var notice=new JTextArea("Allow "+lease.agent()+" to control this Shed window for up to 8 minutes?\nProject: "+root+"\nCLI: "+launchDescription+"\n\nEditor input pauses while the agent works. Take Back Control is always available.\nA fresh change baseline starts now. An external CLI keeps its own filesystem permissions.");
         notice.setFont(UIManager.getFont("Label.font"));notice.setEditable(false);notice.setLineWrap(true);notice.setWrapStyleWord(true);notice.setOpaque(false);body.add(notice,java.awt.BorderLayout.SOUTH);
+        var permissions=new EnumMap<AgentUiPermission,JCheckBox>(AgentUiPermission.class);
+        var choices=new JPanel();choices.setLayout(new BoxLayout(choices,BoxLayout.Y_AXIS));
+        choices.setBorder(BorderFactory.createTitledBorder("Allow for this project and session"));
+        for(var permission:AgentUiPermission.values()){
+            var option=new JCheckBox(permission.label,permission!=AgentUiPermission.SYSTEM_CLIPBOARD);
+            option.setName("agent.approval.permission."+permission.name().toLowerCase(Locale.ROOT));
+            if(permission==AgentUiPermission.NAVIGATE){option.setSelected(true);option.setEnabled(false);}
+            permissions.put(permission,option);choices.add(option);
+        }
+        choices.add(new JLabel("Project tools retain this Mac's normal process permissions."));
+        body.add(choices,java.awt.BorderLayout.EAST);
         var pane=new JOptionPane(body,JOptionPane.QUESTION_MESSAGE,JOptionPane.YES_NO_OPTION,null,new String[]{"Allow Control","Cancel"},"Cancel");
         approval=pane.createDialog(editor,"Delegate control to "+lease.agent()+"?");approval.setName("agent.approval");
         approval.setModal(false);pane.addPropertyChangeListener(e->{
@@ -75,8 +92,10 @@ final class AgentDelegationController implements AutoCloseable {
             if(!allow){lease.revoke("rejected");handBack();return;}
             if(!validProject()||!editor.canDelegateWindow()){lease.revoke("rejected");handBack();return;}
             editor.stopAiCompletionRequests();
+            var selected=EnumSet.noneOf(AgentUiPermission.class);permissions.forEach((permission,option)->{if(option.isSelected())selected.add(permission);});uiPermissions=Set.copyOf(selected);
             lease.approve(id);
             ownership=new AgentEditorOwnership(editor.getRootPane(),()->List.copyOf(editor.editorPanes),lease.agent(),this::takeBack,chatSurface);
+            ownership.enableAgentMenus();
             editor.toolWindowHost.watchAgentChanges("session-start",lease.agent());if(chatSurface==null)editor.hideToolWindow();
         });
         approval.addWindowListener(new java.awt.event.WindowAdapter(){public void windowClosing(java.awt.event.WindowEvent e){lease.revoke("rejected");handBack();}});
@@ -104,6 +123,7 @@ final class AgentDelegationController implements AutoCloseable {
         boolean worked=ownership!=null;
         if(ownership!=null){ownership.close();ownership=null;}
         if(handedBack)return;handedBack=true;
+        uiPermissions=Set.of();
         try{onEnd.run();}finally{onActive=()->{};onEnd=()->{};launchDescription="External CLI; Shed does not own its process.";}
         editor.clearAgentActivity();
         if(worked&&!closed){editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());}

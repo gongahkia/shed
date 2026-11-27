@@ -60,6 +60,8 @@ final class InlineFindBar extends JPanel {
     InlineFindBar(Texteditor editor) {
         super(new BorderLayout(0, 3));
         this.editor = editor;
+        setName("find");query.setName("find.query");replacement.setName("find.replacement");
+        AgentUiTargets.action(replaceOne,AgentUiPermission.EDIT,this::replaceOne);AgentUiTargets.action(replaceAll,AgentUiPermission.EDIT,this::replaceAll);
         setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getStatusBarBackground()),
             BorderFactory.createEmptyBorder(5, 8, 4, 8)));

@@ -31,8 +31,10 @@ final class OutlinePanel extends JPanel {
         state.setText(buffer==null?"Open a source file to see symbols.":buffer.isLargeFile()?"Outline unavailable in large-file mode.":values.isEmpty()?"No cached symbols. Supported languages update after editing settles.":values.size()>2000?"Showing the first 2,000 symbols.":"Local symbols · "+buffer.getFileType()+" · "+values.size());
     }
     private void filter(){String q=filter.getText().trim().toLowerCase(java.util.Locale.ROOT);model.clear();for(var s:symbols)if(s.getName().toLowerCase(java.util.Locale.ROOT).contains(q))model.addElement(s);}
-    private void reveal(){
-        var symbol=list.getSelectedValue();if(symbol==null||editor.agentOwnsEditor()||buffer!=editor.getCurrentBuffer()||text!=buffer.textSnapshot())return;
+    void revealAgent(){reveal(true);}
+    private void reveal(){reveal(false);}
+    private void reveal(boolean agent){
+        var symbol=list.getSelectedValue();if(symbol==null||!agent&&editor.agentOwnsEditor()||buffer!=editor.getCurrentBuffer()||text!=buffer.textSnapshot())return;
         try{int line=symbol.getLine()-1;if(line<0||line>=editor.writingArea.getLineCount())return;int offset=editor.writingArea.getLineStartOffset(line);editor.recordJumpPosition();editor.writingArea.setCaretPosition(offset);var bounds=editor.writingArea.modelToView2D(offset);if(bounds!=null)editor.writingArea.scrollRectToVisible(bounds.getBounds());editor.requestActivePaneFocus();}catch(javax.swing.text.BadLocationException unavailable){state.setText("Symbol location unavailable. Wait for the outline to refresh.");}
     }
 }

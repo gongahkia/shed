@@ -182,7 +182,11 @@ final class AgentWorkspaceController implements AutoCloseable {
             private AgentWorkbenchUi workbench;
             private String workbenchSession="";
             private java.util.Map<Path,Path> checkedPaths=java.util.Map.of();
-            public java.util.List<Path> workbenchPaths(){return owner().buffers.stream().filter(b->b.getFile()!=null).limit(EditorMetadata.MAX_OPEN_DOCUMENTS+1).map(b->b.getFile().toPath().toAbsolutePath().normalize()).toList();}
+            public java.util.List<Path> workbenchPaths(java.util.Map<String,Object> params){
+                var app=owner();var paths=new java.util.ArrayList<Path>(app.buffers.stream().filter(b->b.getFile()!=null).limit(EditorMetadata.MAX_OPEN_DOCUMENTS+1).map(b->b.getFile().toPath().toAbsolutePath().normalize()).toList());
+                if(app.fileExplorer!=null){var selected=app.fileExplorer.selectedFile();if(selected!=null)paths.add(selected.toPath().toAbsolutePath().normalize());var request=MiniJson.asObject(params.get("request"));var args=request==null?null:MiniJson.asObject(request.get("args"));if(args!=null&&args.get("index") instanceof Long index){var file=app.fileExplorer.agentFileAtRow(index.intValue());if(file!=null)paths.add(file.toPath().toAbsolutePath().normalize());}}
+                return paths;
+            }
             public void checkedWorkbenchPaths(java.util.Map<Path,Path> checked){checkedPaths=checked;}
             private AgentUiPresentation presence(){if(presence==null)presence=owner().agentPresence();return presence;}
             private Texteditor owner() {
@@ -268,7 +272,7 @@ final class AgentWorkspaceController implements AutoCloseable {
             }
             public java.util.concurrent.CompletableFuture<java.util.Map<String,Object>> workbench(String operation,java.util.Map<String,Object> params,java.util.function.BooleanSupplier live,java.util.function.BooleanSupplier connection){
                 String session=owner().agentDelegation().lease.id();
-                if(workbench==null||!workbenchSession.equals(session)){if(workbench!=null)workbench.close();workbench=new AgentWorkbenchUi(owner(),live,presence());workbenchSession=session;}
+                if(workbench==null||workbench.disposed()||!workbenchSession.equals(session)){if(workbench!=null)workbench.close();workbench=new AgentWorkbenchUi(owner(),live,presence());workbenchSession=session;}
                 workbench.checkedPaths(checkedPaths);
                 if(operation.endsWith("state"))return java.util.concurrent.CompletableFuture.completedFuture(workbench.state(((Long)params.get("offset")).intValue()));
                 if(operation.endsWith("inspect"))return java.util.concurrent.CompletableFuture.completedFuture(workbench.inspect((String)params.get("target"),((Long)params.get("offset")).intValue()));

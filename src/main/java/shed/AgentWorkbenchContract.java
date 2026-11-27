@@ -44,7 +44,7 @@ final class AgentWorkbenchContract {
         if(!Set.of("id","stage","agent","operation","target","code").containsAll(m.keySet())||!m.keySet().containsAll(Set.of("id","stage","agent","operation","target")))return false;
         return nonnegative(m.get("id"))&&Set.of("requested","ui-updated","painted","failed").contains(m.get("stage"))&&bounded(m.get("agent"),40)&&AgentUiRequest.KINDS.contains(m.get("operation"))&&bounded(m.get("target"),160)&&(!m.containsKey("code")||bounded(m.get("code"),48));
     }
-    private static boolean viewport(Object raw){var m=MiniJson.asObject(raw);if(m==null||!m.keySet().equals(Set.of("x","y","width","height","contentWidth","contentHeight")))return false;for(var entry:m.entrySet())if(!(entry.getValue() instanceof Long n)||n< -10_000_000||n>10_000_000||!Set.of("x","y").contains(entry.getKey())&&n<0)return false;return true;}
+    private static boolean viewport(Object raw){var m=MiniJson.asObject(raw);if(m==null)return false;var keys=new HashSet<>(m.keySet());keys.remove("units");if(!keys.equals(Set.of("x","y","width","height","contentWidth","contentHeight"))||m.containsKey("units")&&!"scrollbar-model".equals(m.get("units")))return false;for(var entry:m.entrySet())if(!entry.getKey().equals("units"))if(!(entry.getValue() instanceof Long n)||n< -10_000_000||n>10_000_000||!Set.of("x","y").contains(entry.getKey())&&n<0)return false;return true;}
     private static boolean nonnegative(Object value){return value instanceof Long n&&n>=0;}
     private static boolean bounded(Object value,int length){return value instanceof String s&&s.length()<=length;}
 }

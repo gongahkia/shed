@@ -122,7 +122,7 @@ final class ShedMenuBar {
             java.util.Set.of("Save","Save As…","New File","Undo","Redo","Cut","Paste","Replace…","Close Buffer").contains(label)?AgentUiPermission.EDIT:AgentUiPermission.NAVIGATE;
         Runnable agentAction=run;
         if(label.equals("Open File…"))agentAction=()->show(editor.treeGitController.showAgentFileFinder(editor.workspaceController.activeRoot(),editor::agentOwnsEditor));
-        if(label.equals("Open Folder…")||label.equals("Quit Shed")||label.equals("Cut")||label.equals("Paste")||label.equals("Copy"))item.putClientProperty("shed.agent.disabled",true);
+        if(label.equals("Recent Files…")||label.equals("Open Folder…")||label.equals("Quit Shed")||label.equals("Cut")||label.equals("Paste")||label.equals("Copy"))item.putClientProperty("shed.agent.disabled",true);
         AgentUiTargets.action(item,permission,agentAction);
         if (key >= 0 && (nativeMac || editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN || key == KeyEvent.VK_F1)) {
             String custom = editor.configManager.actionKeybinding(editor.modeKey(editor.editorState.mode),

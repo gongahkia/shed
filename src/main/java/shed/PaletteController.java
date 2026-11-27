@@ -203,11 +203,12 @@ final class PaletteController {
 
     public String showCommandPalette() {
         List<String> candidates = commandPaletteCandidates();
+        if(editor.agentOwnsEditor())candidates=candidates.stream().filter(label->AgentWorkbenchUi.paletteAllowed(surfaceActionCommand(label))).toList();
         String selected = showPaletteDialog("Command Palette", candidates,
             this::describeCommandPaletteCandidate, commandPaletteRenderer());
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
         PaletteAction action = surfaceAction(selected);
-        return action == null ? "Command palette selection unavailable" : editor.commandHandler.execute(action.command());
+        return action == null ? "Command palette selection unavailable" : editor.agentOwnsEditor()?AgentWorkbenchUi.paletteCommand(editor,action.command()):editor.commandHandler.execute(action.command());
     }
 
     static List<String> surfaceActionNames() {

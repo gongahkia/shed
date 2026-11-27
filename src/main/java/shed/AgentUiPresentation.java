@@ -14,6 +14,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     private static final double[][] POINTER = {{0,0},{20,7},{21,9},{14,12},{12,14},{10,22},{8,23},{6,20},{0,3},{-1,1},{0,0},{0,0}};
     private static final double[][] BEAM = {{2,-10},{14,-10},{14,-8},{10,-8},{10,14},{14,14},{14,16},{2,16},{2,14},{6,14},{6,-8},{2,-8}};
     private JLayeredPane layer;
+    private WeakReference<JRootPane> home=new WeakReference<>(null);
     private WeakReference<Component> target = new WeakReference<>(null);
     private String agent = "Agent";
     private Icon logo;
@@ -27,7 +28,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     private boolean following;
 
     AgentUiPresentation() { setOpaque(false); setFocusable(false); }
-    void attach(JRootPane root) { requireEdt(); root.putClientProperty(KEY,this); }
+    void attach(JRootPane root) { requireEdt(); root.putClientProperty(KEY,this);home=new WeakReference<>(root); }
     static AgentUiPresentation find(Component component) { var root=SwingUtilities.getRootPane(component); return root!=null&&root.getClientProperty(KEY) instanceof AgentUiPresentation value?value:null; }
     long beginFollow(Component component,Point anchor,String agent,boolean motion) {
         showAt(component,anchor,agent,motion);following=true;followStarted=System.nanoTime();return generation;
@@ -156,7 +157,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     }
 
     /** Keep the last location between requests without retaining a control or running a timer. */
-    void settle() { requireEdt(); Rectangle old=drawingBounds(); settled = true; following=false; typing = false; activity=""; target.clear(); repaint(old.union(drawingBounds())); }
+    void settle() { requireEdt();var destination=home.get();if(layer!=null&&!layer.isShowing()&&destination!=null&&destination.isShowing()&&layer!=destination.getLayeredPane())show(destination,agent,motion);Rectangle old=drawingBounds(); settled = true; following=false; typing = false; activity=""; target.clear(); repaint(old.union(drawingBounds())); }
     boolean installed() { return layer != null; }
     Point2D pointerPosition() { return new Point2D.Double(point.x,point.y); }
     float morph() { return morph; }

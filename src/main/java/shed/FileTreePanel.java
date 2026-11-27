@@ -146,6 +146,7 @@ final class FileTreePanel extends JPanel {
         tree.requestFocusInWindow();
     }
 
+    java.io.File agentFileAtRow(int row){var path=tree.getPathForRow(row);return path!=null&&path.getLastPathComponent() instanceof FileTreeModel.Node node?node.file():null;}
     java.io.File selectedFile() {
         TreePath selected = tree.getSelectionPath();
         if (selected == null || !(selected.getLastPathComponent() instanceof FileTreeModel.Node node)) return null;

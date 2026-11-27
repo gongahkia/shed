@@ -14,6 +14,9 @@ class AgentWorkbenchTransportTest {
     @TempDir Path temporary;
     static class Fixture extends EditorControlTest.Fixture {
         final AgentWorkbenchCoreTest.Fixture ui;
+        List<Path> paths=List.of();Map<Path,Path> checked=Map.of();
+        public List<Path> workbenchPaths(Map<String,Object> params){assertTrue(javax.swing.SwingUtilities.isEventDispatchThread());return paths;}
+        public void checkedWorkbenchPaths(Map<Path,Path> value){assertTrue(javax.swing.SwingUtilities.isEventDispatchThread());checked=value;}
         Fixture(Path parent)throws Exception{super(parent);ui=edt(AgentWorkbenchCoreTest.Fixture::new);}
         public EditorControl.WatchRoot watchRoot(){return new EditorControl.WatchRoot(roots.active(),roots.generation());}
         public CompletableFuture<Map<String,Object>> workbench(String method,Map<String,Object> params,BooleanSupplier live,BooleanSupplier connection){
@@ -28,6 +31,12 @@ class AgentWorkbenchTransportTest {
     static Map<String,Object> state(Fixture f,WorkspaceBridgeClient c)throws Exception{var p=params(f);p.put("offset",0L);return result(exchange(c,"editor/ui/workbench-state",p));}
     static Map<String,Object> perform(Fixture f,WorkspaceBridgeClient c,String kind,String target,Map<String,Object> args)throws Exception{
         var before=observation(state(f,c));var p=params(f);p.put("request",Map.of("schemaVersion",2,"kind",kind,"target",target,"agent","Codex","expectedUiRevision",before.get("revision"),"args",args));return exchange(c,"editor/ui/workbench-perform",p);
+    }
+    @Test void filesystemAuthorizationRejectsSymlinkEscapeAndSensitiveFiles()throws Exception{
+        try(var f=new Fixture(temporary);var c=WorkspaceBridgeClient.control(f.server.descriptor(),f.server.credential())){
+            Path ordinary=f.root.resolve("Ordinary.txt"),secret=f.root.resolve(".env"),outside=temporary.resolve("outside.txt"),link=f.root.resolve("Link.txt");Files.writeString(ordinary,"safe");Files.writeString(secret,"synthetic secret");Files.writeString(outside,"external sentinel");Files.createSymbolicLink(link,outside);
+            f.paths=List.of(ordinary,secret,link);result(stateReply(f,c));assertEquals(Map.of(ordinary,ordinary),f.checked);assertEquals("external sentinel",Files.readString(outside));
+        }
     }
     @Test void authenticatedScrollAndPrivateTextWorkWithoutAnActiveSourceContext()throws Exception{
         try(var f=new Fixture(temporary);var c=WorkspaceBridgeClient.control(f.server.descriptor(),f.server.credential())){

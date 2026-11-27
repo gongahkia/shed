@@ -10,6 +10,16 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
 class AgentWorkbenchInteractionTest {
+    @Test void standaloneTerminalScrollbarUsesItsExistingModelAndExplicitUnits()throws Exception{
+        edt(()->{var bar=new JScrollBar(JScrollBar.VERTICAL,-100,24,-200,24);bar.setUnitIncrement(1);bar.setBlockIncrement(24);var motion=new AgentUiScroll(bar,AgentUiScroll.Unit.PAGES,2);motion.frame(.5);assertTrue(bar.getValue()>-100);motion.frame(1);assertEquals(-52,bar.getValue());assertEquals("scrollbar-model",motion.state().get("units"));assertEquals(-52,motion.state().get("y"));return null;});
+    }
+    @Test void pickerEnterInvokesTheActualFieldListenerWithoutSystemFocus()throws Exception{
+        var f=edt(Fixture::new);int[] accepted={0};try{edt(()->{f.query.addActionListener(e->accepted[0]++);return null;});run(f,"key","query",Map.of("key","ENTER"));assertEquals(1,accepted[0]);}finally{edt(()->{f.close();return null;});}
+    }
+    @Test void agentPaletteExcludesOsDialogsQuitAndUserConfigurationFiles(){
+        for(String command:List.of("open folder","qa!","settings file","snippet edit","agent api start control","wall"))assertFalse(AgentWorkbenchUi.paletteAllowed(command));
+        for(String command:List.of("files","buffers","write","density compact","focus toggle"))assertTrue(AgentWorkbenchUi.paletteAllowed(command));
+    }
     @Test void ambiguousAndPasswordTargetsAreNeverAdvertised()throws Exception{
         edt(()->{var root=new JPanel();root.add(new JTextField());root.add(new JTextField());var secret=new JPasswordField("private");secret.setName("password");root.add(secret);var button=new JButton("Refresh");button.setName("refresh");root.add(button);var targets=new ArrayList<AgentUiTarget>();AgentUiTargets.collect(root,"tool",AgentUiPermission.NAVIGATE,targets);assertEquals(List.of("tool/refresh"),targets.stream().map(AgentUiTarget::id).toList());return null;});
     }

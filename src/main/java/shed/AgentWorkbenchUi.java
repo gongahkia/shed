@@ -12,13 +12,28 @@ import javax.swing.text.*;
 
 /** Adapts existing workbench owners to the semantic interaction engine. */
 final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
+    private static final String OWNER="shed.agent.workbench";
+    private static final Map<String,String> PALETTE=Map.ofEntries(
+        Map.entry("open file","files.open"),Map.entry("files","files.open"),Map.entry("buffers","buffers.open"),Map.entry("tree toggle","explorer.toggle"),Map.entry("outline-sidebar","outline.toggle"),
+        Map.entry("bn","tabs.next"),Map.entry("bp","tabs.previous"),Map.entry("back","navigation.back"),Map.entry("forward","navigation.forward"),Map.entry("write","source.save"),Map.entry("bdelete","tabs.close"),
+        Map.entry("s","pane.split.horizontal"),Map.entry("vs","pane.split.vertical"),Map.entry("settings","settings.open"),Map.entry("theme list","themes.open"),Map.entry("focus toggle","focus.toggle"),
+        Map.entry("problems","panel.problems"),Map.entry("terminal open","terminal.new"),Map.entry("density compact","density.compact"),Map.entry("density default","density.default"),Map.entry("density comfortable","density.comfortable"));
+    static boolean paletteAllowed(String command){return PALETTE.containsKey(command);}
+    static String paletteCommand(Texteditor editor,String command){
+        if(!(editor.getRootPane().getClientProperty(OWNER) instanceof AgentWorkbenchUi ui)||!ui.current()||!PALETTE.containsKey(command))throw fail(WorkspaceApiException.Code.UNSUPPORTED);
+        var target=ui.targets().stream().filter(t->t.id().equals("action/"+PALETTE.get(command))).findFirst().orElseThrow(()->fail(WorkspaceApiException.Code.UNSUPPORTED));
+        if(!ui.permitted(target.permission()))throw fail(WorkspaceApiException.Code.PERMISSION_DENIED);ui.check(target,"action");ui.invoke(target,"");return "Agent workbench action requested";
+    }
     private final Texteditor editor;
     private final Path root;
     private final long generation;
     private final BooleanSupplier live;
     private final AgentUiSession session;
     private final AgentUiPresentation presence;
-    private AgentUiPermission dialogPermission=AgentUiPermission.NAVIGATE;
+    private AgentUiPermission dialogPermission=AgentUiPermission.TOOLS;
+    private final Map<JDialog,AgentUiPermission> dialogPermissions=new WeakHashMap<>();
+    static void retire(Texteditor editor){if(editor.getRootPane().getClientProperty(OWNER) instanceof AgentWorkbenchUi ui)ui.close();}
+    boolean disposed(){return closed;}
     private boolean closed;
     private AgentChangeTour tour;
     private String activeAgent="Agent";
@@ -28,7 +43,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
     private final AgentPolicy sourcePolicy=projectPolicy();
     static AgentPolicy projectPolicy(){return new AgentPolicy(Set.of(AgentPolicy.Capability.READ,AgentPolicy.Capability.PROPOSE,AgentPolicy.Capability.APPLY),List.of("README.md","**/README.md"),List.of(".env","**/*.env","**/*.env.*","**/.ssh/**"),true);}
 
-    AgentWorkbenchUi(Texteditor editor,BooleanSupplier live,AgentUiPresentation presence){this.editor=editor;this.live=live;this.presence=presence;root=editor.workspaceController.activeRoot();generation=editor.workspaceRoots.generation();session=new AgentUiSession(this,presence);}
+    AgentWorkbenchUi(Texteditor editor,BooleanSupplier live,AgentUiPresentation presence){this.editor=editor;this.live=live;this.presence=presence;root=editor.workspaceController.activeRoot();generation=editor.workspaceRoots.generation();session=new AgentUiSession(this,presence);editor.getRootPane().putClientProperty(OWNER,this);}
     Map<String,Object> state(int offset){return session.state(offset);}
     Map<String,Object> inspect(String id,int offset){return session.inspect(id,offset);}
     CompletableFuture<Map<String,Object>> execute(AgentUiRequest request,BooleanSupplier connected){return session.execute(request,connected);}
@@ -37,7 +52,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
     public boolean permitted(AgentUiPermission permission){return editor.agentDelegation().uiAllowed(permission);}
     public boolean motion(){return !Boolean.FALSE.equals(editor.writingArea.getClientProperty("shed.caretAnimation"))&&!"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"));}
     public JRootPane root(){return editor.getRootPane();}
-    public String contextKey(){var key=new StringBuilder().append(generation);for(var pane:editor.editorPanes)if(!pane.isDisposed()&&pane.getBuffer()!=null)key.append(pane.observationId()).append(':').append(pane.getBuffer().documentRevision());return key.toString();}
+    public String contextKey(){var key=new StringBuilder().append(generation).append(':').append(editor.getActivePane()==null?"none":editor.getActivePane().observationId());for(var pane:editor.editorPanes)if(!pane.isDisposed()&&pane.getBuffer()!=null)key.append(pane.observationId()).append(':').append(pane.getBuffer().documentRevision());return key.toString();}
     private boolean allowed(FileBuffer buffer){
         if(buffer==null)return false;if(buffer.getFile()==null)return created.contains(buffer)||buffer.getContent().isEmpty();
         Path original=buffer.getFile().toPath().toAbsolutePath().normalize();Path path=checkedPaths.get(original);if(root==null||path==null||!path.startsWith(root))return false;
@@ -45,6 +60,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
     }
     private EditorPane pane(JComponent component){for(var pane:editor.editorPanes)if(!pane.isDisposed()&&pane.getTextArea()==component)return pane;return null;}
     public void check(AgentUiTarget target,String kind){
+        if(Set.of("action/tabs.next","action/tabs.previous","action/navigation.back","action/navigation.forward").contains(target.id())&&!editor.buffers.stream().allMatch(this::allowed))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
         if(target.id().startsWith("action/")&&Set.of("find.open","find.next","find.previous","replace.open","line.open","symbols.open","source.undo","source.redo","preview.open").contains(target.id().substring(7)))checkActiveSource(false);
         if(target.component() instanceof JMenuItem item&&Set.of("Find…","Replace…","Undo","Redo","Save","Save As…").contains(item.getText()))checkActiveSource(false);
         var pane=pane(target.component());if(pane!=null){if(!allowed(pane.getBuffer())||pane.getBuffer().isLargeFile()||pane.getTerminalPane()!=null)throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
@@ -54,8 +70,8 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
     public void validate(AgentUiTarget target,AgentUiRequest request){
         activeAgent=request.agent();
         var c=target.component();int index=request.args().containsKey("index")?(int)AgentUiRequest.integer(request.args(),"index"):-1;
-        if(c instanceof JTree tree&&index>=0&&index<tree.getRowCount()){
-            Object selected=tree.getPathForRow(index).getLastPathComponent();if(selected instanceof FileTreeModel.Node node){Path path=node.file().toPath().toAbsolutePath().normalize();if(!path.startsWith(root))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);sourcePolicy.checkPath(root.relativize(path),AgentPolicy.Capability.READ);}
+        if(c instanceof JTree tree){int row=index>=0?index:tree.getMinSelectionRow();
+            Object selected=row>=0&&row<tree.getRowCount()?tree.getPathForRow(row).getLastPathComponent():null;if(selected instanceof FileTreeModel.Node node){Path path=node.file().toPath().toAbsolutePath().normalize();Path checked=checkedPaths.get(path);if(checked==null||!checked.startsWith(root))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);sourcePolicy.checkPath(root.relativize(checked),AgentPolicy.Capability.READ);}
         }
         if(c instanceof JComboBox<?> combo&&index>=0&&index<combo.getItemCount()){
             String value=String.valueOf(combo.getItemAt(index));if(value.startsWith("/")||value.matches("[A-Za-z]:.*")){Path path=Path.of(value).toAbsolutePath().normalize();if(!path.startsWith(root))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);}
@@ -81,7 +97,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
             long revision=buffer.documentRevision();
             tour=new AgentChangeTour(area,pane.agentPresentation(),List.of(range),after,activeAgent,
                 ()->current()&&!pane.isDisposed()&&pane.getBuffer()==buffer&&buffer.documentRevision()==revision,
-                ()->{},()->tour=null,List.of(new AgentChangePlayback.Edit(range,before.substring(start,end)))).exclusive();tour.start();
+                ()->{},()->{tour=null;if(!pane.isDisposed()&&pane.getBuffer()==buffer&&buffer.documentRevision()==revision){var finalPosition=viewport.getViewPosition();area.setCaretPosition(start+text.length());viewport.setViewPosition(finalPosition);}},List.of(new AgentChangePlayback.Edit(range,before.substring(start,end)))).exclusive();tour.start();
         }else {pane.agentPresentation().showApplied(start,start+text.length());pane.agentPresentation().setAgentName(activeAgent);}
     }
     public boolean presenting(AgentUiTarget target) {return tour!=null&&tour.running();
@@ -94,6 +110,9 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
     public void invoke(AgentUiTarget target,String value){
         dialogPermission=target.permission();
         if(target.component() instanceof JMenuItem item){
+            if(item.getText().equals("Command Palette…")){for(var cap:List.of(AgentUiPermission.TOOLS,AgentUiPermission.EDIT,AgentUiPermission.FILES,AgentUiPermission.VCS,AgentUiPermission.APPEARANCE))if(!permitted(cap))throw fail(WorkspaceApiException.Code.PERMISSION_DENIED);}
+            if(Set.of("Find File…","Open File…").contains(item.getText())){editor.showMessage(editor.treeGitController.showAgentFileFinder(root,this::current));return;}
+            if(Set.of("Switch Buffer…","Next Buffer","Previous Buffer","Go Back","Go Forward").contains(item.getText())&&!editor.buffers.stream().allMatch(this::allowed))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);
             if(item.getParent() instanceof JPopupMenu popup&&popup.getInvoker() instanceof JTextComponent field&&pane(field)!=null&&Set.of("Copy","Cut","Paste").contains(item.getText())){
                 session.clipboard(new AgentUiTarget("editor.context", "Editor",field,AgentUiPermission.NAVIGATE,null),item.getText().toLowerCase(Locale.ROOT));MenuSelectionManager.defaultManager().clearSelectedPath();return;
             }
@@ -108,7 +127,8 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
         // only windows owned by this workbench; consent and OS file choosers are never agent targets
         for(Window window:Window.getWindows())if(window instanceof JDialog dialog&&dialog.isShowing()&&owned(dialog)&&!Objects.toString(dialog.getName(),"").startsWith("agent.approval")){
             if(containsFileChooser(dialog))continue;
-            AgentUiTargets.collect(dialog.getRootPane(),"dialog."+AgentUiTargets.slug(dialog.getName()==null?dialog.getTitle():dialog.getName()),dialogPermission,targets);
+            AgentUiPermission permission=dialogPermissions.computeIfAbsent(dialog,d->d instanceof SettingsInspectorDialog||d instanceof KeymapInspectorDialog||d.getTitle().toLowerCase(Locale.ROOT).contains("theme")?AgentUiPermission.APPEARANCE:dialogPermission);
+            AgentUiTargets.collect(dialog.getRootPane(),"dialog."+AgentUiTargets.slug(dialog.getName()==null?dialog.getTitle():dialog.getName()),permission,targets);
             targets.add(new AgentUiTarget("dialog.dismiss","Dismiss dialog",dialog.getRootPane(),AgentUiPermission.NAVIGATE,value->dialog.dispatchEvent(new WindowEvent(dialog,WindowEvent.WINDOW_CLOSING))));
             if(dialog.isModal())return unique(targets);
         }
@@ -119,7 +139,8 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
         if(editor.outlinePanel!=null){AgentUiTargets.collect(editor.outlinePanel,"outline",AgentUiPermission.NAVIGATE,targets);add(targets,"outline.reveal","Reveal outline symbol",AgentUiPermission.NAVIGATE,v->editor.outlinePanel.revealAgent());}
         if(editor.buffers.stream().allMatch(this::allowed))AgentUiTargets.collect(editor.openEditorsBar,"tabs",AgentUiPermission.NAVIGATE,targets);
         for(int i=0;i<editor.editorPanes.size();i++){
-            var pane=editor.editorPanes.get(i);if(pane.isDisposed()||!allowed(pane.getBuffer()))continue;
+            var pane=editor.editorPanes.get(i);if(pane.isDisposed())continue;
+            if(pane.getTerminalPane()!=null){if(!permitted(AgentUiPermission.TOOLS)||!pane.getTerminalPane().getWorkingDirectory().toPath().toAbsolutePath().normalize().startsWith(root))continue;}else if(!allowed(pane.getBuffer()))continue;
             String id="pane/"+pane.observationId();
             if(pane.getTerminalPane()==null){var area=pane.getTextArea();area.putClientProperty("shed.agent.source",true);targets.add(new AgentUiTarget(id,"Source editor",area,AgentUiPermission.NAVIGATE,null));
                 if(pane==editor.getActivePane())targets.add(new AgentUiTarget("editor.active","Active editor",area,AgentUiPermission.NAVIGATE,null));
@@ -175,6 +196,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
         add(targets,"settings.open","Settings",AgentUiPermission.APPEARANCE,v->editor.showMessage(editor.showSettingsInspector()));
         add(targets,"themes.open","Theme gallery",AgentUiPermission.APPEARANCE,v->editor.showMessage(editor.showThemes()));
         add(targets,"focus.toggle","Focus mode",AgentUiPermission.NAVIGATE,v->editor.showMessage(editor.focusModeController.handleFocusCommand("toggle")));
+        for(String density:List.of("compact","default","comfortable"))add(targets,"density."+density,"Set "+density+" density",AgentUiPermission.APPEARANCE,v->editor.showMessage(editor.commandHandler.execute("density "+density)));
         add(targets,"files.save-as","Save to a project path",AgentUiPermission.FILES,v->save(v,true));
         add(targets,"files.change","Checked project file changes",AgentUiPermission.FILES,this::fileChanges);
     }
@@ -202,7 +224,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
             case SAVE_AS->{save("",true);return true;}
             case QUIT,OPEN_FOLDER->throw fail(WorkspaceApiException.Code.UNSUPPORTED);
             case COMMANDS->{for(var cap:List.of(AgentUiPermission.TOOLS,AgentUiPermission.EDIT,AgentUiPermission.FILES,AgentUiPermission.VCS,AgentUiPermission.APPEARANCE))if(!permitted(cap))throw fail(WorkspaceApiException.Code.PERMISSION_DENIED);}
-            case NEXT_BUFFER,PREVIOUS_BUFFER->{if(!editor.buffers.stream().allMatch(this::allowed))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);}
+            case NEXT_BUFFER,PREVIOUS_BUFFER,NAVIGATE_BACK,NAVIGATE_FORWARD->{if(!editor.buffers.stream().allMatch(this::allowed))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);}
             case UNDO,REDO,NEW,CLOSE,REPLACE->{if(!permitted(AgentUiPermission.EDIT))throw fail(WorkspaceApiException.Code.PERMISSION_DENIED);}
             default->{}
         }
@@ -221,7 +243,7 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
     private void checkActiveSource(boolean write){var buffer=editor.getCurrentBuffer();if(!allowed(buffer))throw fail(WorkspaceApiException.Code.PROJECT_UNAUTHORIZED);if(write&&buffer.getFile()!=null)sourcePolicy.checkPath(root.relativize(buffer.getFile().toPath().toAbsolutePath().normalize()),AgentPolicy.Capability.APPLY);}
     private void fileChanges(String value){
         var inputs=EditorProjectChanges.parse(MiniJson.parseStrict(value));
-        for(var input:inputs){sourcePolicy.checkPath(Path.of(input.document()),AgentPolicy.Capability.APPLY);if(input.destination()!=null)sourcePolicy.checkPath(Path.of(input.destination()),AgentPolicy.Capability.APPLY);}
+        for(var input:inputs){if(input.kind()==WorkspaceProposalService.Kind.TEXT&&!permitted(AgentUiPermission.EDIT))throw fail(WorkspaceApiException.Code.PERMISSION_DENIED);sourcePolicy.checkPath(Path.of(input.document()),AgentPolicy.Capability.APPLY);if(input.destination()!=null)sourcePolicy.checkPath(Path.of(input.destination()),AgentPolicy.Capability.APPLY);}
         var documents=editor.workspaceDocuments();var config=editor.configManager;
         editor.asyncJobService.submit("agent project files",token->{
             if(!currentPermission(AgentUiPermission.FILES))throw fail(WorkspaceApiException.Code.AUTHORIZATION_REVOKED);
@@ -233,6 +255,6 @@ final class AgentWorkbenchUi implements AgentUiSession.Host,AutoCloseable {
         },(job,result,error)->{if(!current())return;editor.showMessage(error==null?"Agent project files: "+result:"Agent project file operation failed");if(editor.fileExplorer!=null)editor.treeGitController.showFileTree(root.toString());});
     }
     private boolean currentPermission(AgentUiPermission permission){try{var task=new java.util.concurrent.FutureTask<Boolean>(() -> current()&&permitted(permission));SwingUtilities.invokeLater(task);return task.get(1,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception unavailable){return false;}}
-    @Override public void close(){closed=true;if(tour!=null){tour.close();tour=null;}session.close();created.clear();}
+    @Override public void close(){closed=true;if(editor.getRootPane().getClientProperty(OWNER)==this)editor.getRootPane().putClientProperty(OWNER,null);if(tour!=null){tour.close();tour=null;}session.close();created.clear();dialogPermissions.clear();}
     private static WorkspaceApiException fail(WorkspaceApiException.Code code){return new WorkspaceApiException(code,"Project UI interaction unavailable: "+code);}
 }

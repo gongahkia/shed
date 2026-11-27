@@ -181,7 +181,10 @@ final class AgentWorkspaceController implements AutoCloseable {
             private AgentUiPresentation presence;
             private AgentWorkbenchUi workbench;
             private String workbenchSession="";
-            private AgentUiPresentation presence(){if(presence==null)presence=new AgentUiPresentation();return presence;}
+            private java.util.Map<Path,Path> checkedPaths=java.util.Map.of();
+            public java.util.List<Path> workbenchPaths(){return owner().buffers.stream().filter(b->b.getFile()!=null).limit(EditorMetadata.MAX_OPEN_DOCUMENTS+1).map(b->b.getFile().toPath().toAbsolutePath().normalize()).toList();}
+            public void checkedWorkbenchPaths(java.util.Map<Path,Path> checked){checkedPaths=checked;}
+            private AgentUiPresentation presence(){if(presence==null)presence=owner().agentPresence();return presence;}
             private Texteditor owner() {
                 var live = editorOwner.get();
                 if (live == null) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
@@ -214,22 +217,19 @@ final class AgentWorkspaceController implements AutoCloseable {
                 presentation.showPending(start, end);
             }
             public void reading(int start,int end,String agent) {
-                var pane=owner().getActivePane();var presentation=pane.agentPresentation();
+                owner().agentPresence();var pane=owner().getActivePane();var presentation=pane.agentPresentation();
                 if(!presentation.available())throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
                 try{
                     var bounds=pane.getTextArea().modelToView2D(start);
                     if(bounds==null)throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
                     presentation.showReading(start,end,agent);
-                    var reveal=bounds.getBounds();var viewport=pane.getScrollPane().getViewport();
-                    reveal.y=Math.max(0,reveal.y-viewport.getExtentSize().height/3);reveal.height=viewport.getExtentSize().height;
-                    pane.getTextArea().scrollRectToVisible(reveal);
                     owner().showMessage(agent+" · reading "+pane.getBuffer().getDisplayName());
                 }catch(javax.swing.text.BadLocationException unavailable){throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);}
             }
             public void intent(AgentBufferIntent intent){
                 var app=owner();var presentation=app.getActivePane().agentPresentation();
                 if(!presentation.available())throw EditorMetadata.failure(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
-                app.toolWindowHost.retireAgentPresentation();presentation.showIntent(intent);
+                app.agentPresence();app.toolWindowHost.retireAgentPresentation();presentation.showIntent(intent);
                 app.showMessage(intent.label(intent.focus()));
             }
             public void progress(AgentActivityState.State state, int start, int end) {
@@ -269,6 +269,7 @@ final class AgentWorkspaceController implements AutoCloseable {
             public java.util.concurrent.CompletableFuture<java.util.Map<String,Object>> workbench(String operation,java.util.Map<String,Object> params,java.util.function.BooleanSupplier live,java.util.function.BooleanSupplier connection){
                 String session=owner().agentDelegation().lease.id();
                 if(workbench==null||!workbenchSession.equals(session)){if(workbench!=null)workbench.close();workbench=new AgentWorkbenchUi(owner(),live,presence());workbenchSession=session;}
+                workbench.checkedPaths(checkedPaths);
                 if(operation.endsWith("state"))return java.util.concurrent.CompletableFuture.completedFuture(workbench.state(((Long)params.get("offset")).intValue()));
                 if(operation.endsWith("inspect"))return java.util.concurrent.CompletableFuture.completedFuture(workbench.inspect((String)params.get("target"),((Long)params.get("offset")).intValue()));
                 var request=AgentUiRequest.parse(params.get("request"));

@@ -9,6 +9,7 @@ import javax.swing.text.JTextComponent;
 
 /** Click-through, window-owned feedback; never moves the system pointer. */
 final class AgentUiPresentation extends JComponent implements AutoCloseable {
+    private static final String KEY="shed.agentUiPresence";
     private static final Color COLOR = new Color(20, 115, 82);
     private static final double[][] POINTER = {{0,0},{20,7},{21,9},{14,12},{12,14},{10,22},{8,23},{6,20},{0,3},{-1,1},{0,0},{0,0}};
     private static final double[][] BEAM = {{2,-10},{14,-10},{14,-8},{10,-8},{10,14},{14,14},{14,16},{2,16},{2,14},{6,14},{6,-8},{2,-8}};
@@ -19,24 +20,42 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     private Point2D.Double point = new Point2D.Double(), origin = new Point2D.Double();
     private float progress, morph;
     private boolean typing, motion, settled;
-    private Point explicitPoint;
+    private Point explicitPoint,lastScreen;
     private String activity = "";
     private double activityPhase;
+    private long generation, followStarted;
+    private boolean following;
 
     AgentUiPresentation() { setOpaque(false); setFocusable(false); }
+    void attach(JRootPane root) { requireEdt(); root.putClientProperty(KEY,this); }
+    static AgentUiPresentation find(Component component) { var root=SwingUtilities.getRootPane(component); return root!=null&&root.getClientProperty(KEY) instanceof AgentUiPresentation value?value:null; }
+    long beginFollow(Component component,Point anchor,String agent,boolean motion) {
+        showAt(component,anchor,agent,motion);following=true;followStarted=System.nanoTime();return generation;
+    }
+    boolean follows(long token) { return following&&generation==token&&layer!=null; }
+    void follow(long token,Point anchor,boolean typing,String activity) {
+        if(!follows(token))return;this.explicitPoint=new Point(anchor);this.activity=activity;
+        frame(Math.min(1,(System.nanoTime()-followStarted)/300_000_000f),typing);
+    }
+    void endFollow(long token) { if(follows(token))settle(); }
+
     @Override public boolean contains(int x, int y) { return false; }
 
     void show(Component control, String agent, boolean motion) {
-        requireEdt();
+        requireEdt();generation++;following=false;
         JRootPane root = SwingUtilities.getRootPane(control);
         if (root == null) { close(); return; }
         JLayeredPane destination = root.getLayeredPane();
         if (layer != destination) {
-            close(); layer = destination;
+            Point screen=lastScreen==null?null:new Point(lastScreen);
+            if(layer!=null&&layer.isShowing()&&destination.isShowing()) {screen=new Point((int)point.x,(int)point.y);SwingUtilities.convertPointToScreen(screen,this);}
+            if(layer!=null){var old=layer;old.remove(this);old.repaint(drawingBounds());}
+            layer = destination;
             setBounds(0, 0, layer.getWidth(), layer.getHeight());
             layer.add(this, JLayeredPane.DRAG_LAYER);
             Point initial = SwingUtilities.convertPoint(control, new Point(0, control.getHeight()), this);
-            point = new Point2D.Double(initial.x - 35, initial.y + 25);
+            if(screen!=null){SwingUtilities.convertPointFromScreen(screen,this);point=new Point2D.Double(screen.x,screen.y);}
+            else point = new Point2D.Double(initial.x - 35, initial.y + 25);
         }
         this.target = new WeakReference<>(control); this.agent = agent; this.motion = motion;
         explicitPoint = null; activity = "";
@@ -59,7 +78,7 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
         requireEdt();
         Rectangle old = drawingBounds();
         this.progress = Math.clamp(progress, 0, 1); this.typing = typing;
-        if(typing)explicitPoint=null;
+        if(typing&&!following)explicitPoint=null;
         morph = motion ? Math.clamp(morph + (typing ? .16f : -.16f), 0, 1) : typing ? 1 : 0;
         Component control = target.get();
         if (layer != null && control != null) {
@@ -67,12 +86,14 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
             Point anchor = anchor(control);
             double blend = motion ? 1 - Math.pow(1 - Math.min(1, this.progress / .55), 3) : 1;
             if (typing) {
-                point.x += (anchor.x - point.x) * (motion ? .65 : 1);
-                point.y += (anchor.y - point.y) * (motion ? .65 : 1);
+                double followBlend=motion?Math.max(.15,blend):1;
+                point.x += (anchor.x - point.x) * followBlend;
+                point.y += (anchor.y - point.y) * followBlend;
             } else if (morph == 0 && !settled) {
                 point.x = origin.x + (anchor.x - origin.x) * blend;
                 point.y = origin.y + (anchor.y - origin.y) * blend;
             }
+            if(isShowing()){lastScreen=new Point((int)point.x,(int)point.y);SwingUtilities.convertPointToScreen(lastScreen,this);}
             repaint(old.union(drawingBounds()));
         }
     }
@@ -135,14 +156,14 @@ final class AgentUiPresentation extends JComponent implements AutoCloseable {
     }
 
     /** Keep the last location between requests without retaining a control or running a timer. */
-    void settle() { requireEdt(); Rectangle old=drawingBounds(); settled = true; morph = 0; typing = false; activity=""; target.clear(); repaint(old.union(drawingBounds())); }
+    void settle() { requireEdt(); Rectangle old=drawingBounds(); settled = true; following=false; typing = false; activity=""; target.clear(); repaint(old.union(drawingBounds())); }
     boolean installed() { return layer != null; }
     Point2D pointerPosition() { return new Point2D.Double(point.x,point.y); }
     float morph() { return morph; }
     @Override public void close() {
         requireEdt();
         if (layer != null) { JLayeredPane old = layer; Rectangle bounds = drawingBounds(); old.remove(this); old.repaint(bounds); }
-        layer = null; target.clear(); logo = null; typing = false; progress = 0; morph = 0;
+        generation++;following=false;lastScreen=null;layer = null; target.clear(); logo = null; typing = false; progress = 0; morph = 0;
     }
     private static void requireEdt() {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("UI presentation belongs on the EDT");

@@ -62,7 +62,7 @@ final class TerminalController {
                 lastAgentTerminal=editor.getActivePane();
             }
             var terminal=editor.getActivePane().getTerminalPane();pane.set(terminal);
-            return terminal.typeAgentCommand(command.argv(),agent,command.timeoutSeconds());
+            editor.agentPresence();return terminal.typeAgentCommand(command.argv(),agent,command.timeoutSeconds());
         });
         SwingUtilities.invokeLater(begin);
         token.onCancel(()->SwingUtilities.invokeLater(()->{var terminal=pane.get();if(terminal!=null)terminal.cancelAgentCommand();}));

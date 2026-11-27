@@ -610,20 +610,21 @@ final class EditorUiController {
                 EditorPane pane = editor.editorPanes.stream().filter(candidate -> candidate.getTextArea() == textArea)
                     .findFirst().orElse(null);
                 if (pane != null) activateEditorPane(pane);
-                boolean editable = textArea.isEditable();
+                boolean agent=Boolean.TRUE.equals(textArea.getClientProperty("shed.agent.context"))&&editor.agentOwnsEditor();
+                boolean editable = agent?editor.agentDelegation().uiAllowed(AgentUiPermission.EDIT):textArea.isEditable();
                 boolean selected = textArea.getSelectionStart() != textArea.getSelectionEnd()
                     || editor.extraSelections.stream().anyMatch(selection -> !selection.collapsed());
                 undo.setEnabled(editable && editor.undoManager.canUndo());
                 redo.setEnabled(editable && editor.undoManager.canRedo());
                 cut.setEnabled(editable && selected);
                 copy.setEnabled(selected);
-                paste.setEnabled(editable && clipboardContainsText());
+                paste.setEnabled(editable && (agent||clipboardContainsText()));
                 selectAll.setEnabled(textArea.getDocument().getLength() > 0);
                 chatSelection.setEnabled(pane!=null&&!pane.isDisposed()&&pane.getBuffer()!=null&&!pane.getBuffer().isLargeFile()&&textArea.getSelectionEnd()>textArea.getSelectionStart()&&textArea.getSelectionEnd()-textArea.getSelectionStart()<=8192&&!editor.agentOwnsEditor());
                 applyUiTheme(menu);
             }
-            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { }
-            @Override public void popupMenuCanceled(PopupMenuEvent event) { }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { textArea.putClientProperty("shed.agent.context",null); }
+            @Override public void popupMenuCanceled(PopupMenuEvent event) { textArea.putClientProperty("shed.agent.context",null); }
         });
         textArea.setComponentPopupMenu(menu);
     }

@@ -38,6 +38,8 @@ final class EditorControl implements AutoCloseable {
         default void revokeTerminals(){}
         default CompletableFuture<Map<String,Object>> uiAction(String operation, Map<String,Object> params, BooleanSupplier authorized) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
         default void revokeUiActions(){}
+        default List<Path> workbenchPaths(){return List.of();}
+        default void checkedWorkbenchPaths(Map<Path,Path> checked){}
         default CompletableFuture<Map<String,Object>> workbench(String operation,Map<String,Object> params,BooleanSupplier live,BooleanSupplier connection){throw fail(WorkspaceApiException.Code.UNSUPPORTED);}
         default Map<String,Object> delegation(String action,String id,String agent,String task) { throw fail(WorkspaceApiException.Code.UNSUPPORTED); }
         default boolean delegationAllowed(String id) { return true; }
@@ -249,6 +251,9 @@ final class EditorControl implements AutoCloseable {
         var lease=new Lease(connection);if(!active.compareAndSet(null,lease))throw fail(WorkspaceApiException.Code.BUSY);
         try(lease){
             var project=ui(lease,()->owner().watchRoot());grant.authorizeProject(project.root(),project.generation());
+            var paths=ui(lease,()->owner().workbenchPaths());if(paths.size()>EditorMetadata.MAX_OPEN_DOCUMENTS+256)throw fail(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+            var checked=new java.util.LinkedHashMap<Path,Path>();for(Path path:paths){lease.require();try{Path resolved=WorkspacePaths.resolve(root.path(),path.toString());AgentWorkbenchUi.projectPolicy().checkPath(root.path().relativize(resolved),AgentPolicy.Capability.READ);checked.put(path,resolved);}catch(WorkspaceApiException denied){ }}
+            ui(lease,()->{owner().checkedWorkbenchPaths(Map.copyOf(checked));return null;});
             BooleanSupplier live=()->{try{grant.requireLive();return host.get()!=null;}catch(RuntimeException revoked){return false;}};
             var completed=ui(lease,()->owner().workbench(method,params,live,lease::current));
             Map<String,Object> observation;

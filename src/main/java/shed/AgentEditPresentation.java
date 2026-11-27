@@ -30,6 +30,9 @@ final class AgentEditPresentation implements AutoCloseable {
     private String agentName = "Agent", agentProvider = "Agent";
     private final BusyPainter spinner = new BusyPainter(20);
     private AgentBufferIntent intent;
+    private AgentUiPresentation presence;
+    private long presenceToken;
+    private boolean presenceAttempted,clearing;
     private JViewport intentViewport;
     private JScrollPane intentScroll;
     private int intentFromY,intentTargetY;
@@ -37,7 +40,7 @@ final class AgentEditPresentation implements AutoCloseable {
     private final MouseAdapter intentMouse=new MouseAdapter(){@Override public void mousePressed(MouseEvent e){clear();}@Override public void mouseWheelMoved(MouseWheelEvent e){clear();}};
     private final FocusAdapter intentFocus=new FocusAdapter(){@Override public void focusLost(FocusEvent e){if(e.getOppositeComponent()!=null)clear();}};
     void setAgentName(String name) { setAgentName(name,name); }
-    void setAgentName(String label,String provider) { checkEdt(); agentName = label; agentProvider = provider; repaintRanges(); }
+    void setAgentName(String label,String provider) { checkEdt(); agentName = label; if(!agentProvider.equals(provider)&&presence!=null) {presence.endFollow(presenceToken);presenceAttempted=false;}agentProvider = provider; repaintRanges(); }
     private final DocumentListener edits = new DocumentListener() {
         public void insertUpdate(DocumentEvent event) { clear(); }
         public void removeUpdate(DocumentEvent event) { clear(); }
@@ -79,6 +82,7 @@ final class AgentEditPresentation implements AutoCloseable {
     void showReading(int start,int end,String name) {
         show(List.of(new Range(start,end)),true);if(ranges.isEmpty())return;
         reading=true;markerOffset=start;maximumTicks=120;setAgentName(name+" reading",name);
+        if(area.isShowing())try{var bounds=area.modelToView2D(start);intentViewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);if(bounds!=null&&intentViewport!=null){intentFromY=intentViewport.getViewPosition().y;intentTargetY=Math.max(0,Math.min(Math.max(0,area.getHeight()-intentViewport.getExtentSize().height),(int)bounds.getY()-intentViewport.getExtentSize().height/3));if(!animated())scrollIntent(1);}}catch(BadLocationException unavailable){clear();}
         area.putClientProperty("shed.agentDirection","top-to-bottom");
         if(!ranges.isEmpty())area.putClientProperty("shed.agentActivity","Agent reading");
     }
@@ -119,7 +123,7 @@ final class AgentEditPresentation implements AutoCloseable {
             || !area.getLineWrap() && !Boolean.TRUE.equals(document.getProperty("i18n"));
     }
     private void advance() {
-        if (!area.isShowing() || !animated() || ++ticks >= maximumTicks) clear(); else {if(intent!=null&&ticks<=6)scrollIntent(ticks/6.0);repaintRanges();}
+        if (!area.isShowing() || !animated() || ++ticks >= maximumTicks) clear(); else {if((intent!=null||reading)&&ticks<=6)scrollIntent(ticks/6.0);repaintRanges();}
     }
     private void visibilityChanged() { if (!area.isShowing()) clear(); }
     private void observe() {
@@ -143,6 +147,7 @@ final class AgentEditPresentation implements AutoCloseable {
     }
     private void repaintRanges() {
         if (!area.isShowing() || !available()) return;
+        if(!clearing)followPresence();
         Rectangle visible = area.getVisibleRect(), dirty = null;
         for (Range range : ranges) {
             try {
@@ -157,8 +162,16 @@ final class AgentEditPresentation implements AutoCloseable {
         }
         if (dirty != null) area.repaint(dirty.x, dirty.y, dirty.width, dirty.height);
     }
+    private void followPresence() {
+        if(ranges.isEmpty())return;
+        try {var caret=area.modelToView2D(markerOffset);if(caret==null)return;
+            var anchor=new Point((int)caret.getX(),(int)caret.getCenterY());
+            if(!presenceAttempted){presenceAttempted=true;presence=AgentUiPresentation.find(area);if(presence!=null)presenceToken=presence.beginFollow(area,anchor,agentProvider,animated());}
+            if(presence!=null)presence.follow(presenceToken,anchor,!reading,reading?"reading":"deleting".equals(area.getClientProperty("shed.agentAnimation"))?"deleting":"writing");
+        }catch(BadLocationException unavailable) { }
+    }
     void clear() {
-        checkEdt(); AgentSourceHandoff.clear(area);version++;timer.stop(); repaintRanges();
+        checkEdt();clearing=true; if(presence!=null)presence.endFollow(presenceToken);presence=null;presenceAttempted=false; AgentSourceHandoff.clear(area);version++;timer.stop(); repaintRanges();
         if(intent!=null){area.removeKeyListener(intentKeys);area.removeMouseListener(intentMouse);area.removeFocusListener(intentFocus);
             if(intentScroll!=null){intentScroll.removeMouseWheelListener(intentMouse);intentScroll.getVerticalScrollBar().removeMouseListener(intentMouse);intentScroll.getHorizontalScrollBar().removeMouseListener(intentMouse);}}
         intent=null;intentViewport=null;intentScroll=null;area.putClientProperty("shed.agentIntent",null);area.putClientProperty("shed.agentIntentStatus",null);
@@ -167,7 +180,7 @@ final class AgentEditPresentation implements AutoCloseable {
         // a UI replacement has already deinstalled the old highlighter before this callback
         if (highlighter != null && highlighter == area.getHighlighter()) for (Object tag : tags) highlighter.removeHighlight(tag);
         tags.clear();touring=false;reading=false; ranges = List.of(); highlighter = null; ticks = 0; agentName = agentProvider = "Agent";
-        area.putClientProperty("shed.agentActivity", null);
+        area.putClientProperty("shed.agentActivity", null);clearing=false;
     }
     @Override public void close() {
         checkEdt(); if (closed) return; clear(); closed = true;
@@ -215,6 +228,7 @@ final class AgentEditPresentation implements AutoCloseable {
         }
     }
     private void paintMarker(Graphics2D graphics) {
+        if(presence!=null)return;
         try{
             Rectangle2D caret=area.modelToView2D(markerOffset);if(caret==null)return;
             Color color=rangeColor(activeRange);graphics.setColor(color);

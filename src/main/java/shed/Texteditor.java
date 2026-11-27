@@ -356,7 +356,9 @@ public class Texteditor extends JFrame implements KeyListener {
             () -> current.getAsBoolean() && allowsMachineNavigation(true), completed);
     }
 
-    void clearAgentActivity() { for (var pane : editorPanes) pane.clearAgentPresentation(); }
+    private AgentUiPresentation agentPresence;
+    AgentUiPresentation agentPresence() { if(agentPresence==null){agentPresence=new AgentUiPresentation();agentPresence.attach(getRootPane());}return agentPresence; }
+    void clearAgentActivity() { for (var pane : editorPanes) pane.clearAgentPresentation();if(agentPresence!=null)agentPresence.close(); }
 
     void agentEditsApplied(WorkspaceProposalService.Preview preview) {
         Object uri = preview.document().get("uri");

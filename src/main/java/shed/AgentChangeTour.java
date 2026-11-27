@@ -24,6 +24,7 @@ final class AgentChangeTour implements AutoCloseable {
     private final List<AgentChangePlayback.Edit> playbackEdits;
     private AgentChangePlayback playback;
     private boolean closed;
+    private boolean exclusive;
     private int index,groupEnd,fromY;
     private long started,version;
     private static final long MOVE=300_000_000L,DWELL=700_000_000L,SETTLE=450_000_000L;
@@ -45,10 +46,11 @@ final class AgentChangeTour implements AutoCloseable {
         this.viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);this.scroll=(JScrollPane)SwingUtilities.getAncestorOfClass(JScrollPane.class,area);
         timer=new Timer(16,event->advance(System.nanoTime()));timer.setCoalesce(true);
     }
+    AgentChangeTour exclusive() { exclusive=true;return this; }
     void start(){
         if(closed||viewport==null||ranges.isEmpty()||!presentation.available()||!current.getAsBoolean()){end(false);return;}
-        area.addKeyListener(key);area.addMouseListener(mouse);area.addFocusListener(focus);document.addDocumentListener(edits);
-        if(scroll!=null){scroll.addMouseWheelListener(mouse);scroll.getVerticalScrollBar().addMouseListener(mouse);scroll.getHorizontalScrollBar().addMouseListener(mouse);}
+        if(!exclusive){area.addKeyListener(key);area.addMouseListener(mouse);area.addFocusListener(focus);}document.addDocumentListener(edits);
+        if(!exclusive&&scroll!=null){scroll.addMouseWheelListener(mouse);scroll.getVerticalScrollBar().addMouseListener(mouse);scroll.getHorizontalScrollBar().addMouseListener(mouse);}
         presentation.showApplied(ranges);presentation.setAgentName(name);version=presentation.version();
         if(!animated()){fromY=viewport.getViewPosition().y;presentation.moveMarker(0,ranges.getFirst().end());reveal(ranges.getFirst().start(),1);end(false);return;}
         begin(System.nanoTime());timer.start();

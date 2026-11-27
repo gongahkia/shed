@@ -74,6 +74,17 @@ final class TreeGitController {
         return "Scanning project files…";
     }
 
+    String showAgentFileFinder(Path root,java.util.function.BooleanSupplier current) {
+        long request=++finderRequest;
+        if(finderJobId>=0)editor.asyncJobService.cancel(finderJobId);
+        finderJobId=editor.asyncJobService.submit("authorized project files",token->{
+            var files=new LinkedHashMap<String,File>();var scan=projectFileScanner.scan(root,root,10000,token::isCancelled);
+            for(String name:scan.files()) {if(token.isCancelled())break;try{Path path=WorkspacePaths.resolve(root,name);AgentWorkbenchUi.projectPolicy().checkPath(root.relativize(path),AgentPolicy.Capability.READ);files.put(name,path.toFile());}catch(WorkspaceApiException excluded){ }}
+            return files;
+        },(job,files,error)->{if(request!=finderRequest||editor.closingDown||!current.getAsBoolean())return;finderJobId=-1;if(error!=null){editor.showMessage("Project file picker unavailable");return;}editor.showMessage(openFinder(files));});
+        return "Scanning authorized project files…";
+    }
+
     private Path inferredProjectRoot() {
         FileBuffer buf = editor.getCurrentBuffer();
         File baseDir = buf != null && buf.getFile() != null ? buf.getFile().getParentFile() : new File(".");

@@ -232,6 +232,7 @@ final class LiveChangesPanel implements ToolWindowHost.ToolSurface {
         var presentation=sourcePane.agentPresentation();var area=sourcePane.getTextArea();
         if(automatic){
             long sourceRevision=buffer.documentRevision();
+            editor.agentPresence();
             tour=new AgentChangeTour(area,presentation,ranges,change.after(),watcherName,
                 ()->!closed&&expected==generation&&current()&&follow.isSelected()&&sourceContext(sourcePane)&&sourcePane.getBuffer()==buffer&&!buffer.isModified()&&buffer.documentRevision()==sourceRevision,
                 ()->follow.setSelected(false),()->tour=null,edits);tour.start();

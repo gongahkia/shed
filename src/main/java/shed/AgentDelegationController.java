@@ -18,6 +18,9 @@ final class AgentDelegationController implements AutoCloseable {
     private volatile JComponent chatSurface;
     private String launchDescription="External CLI; Shed does not own its process.";
     private Set<AgentUiPermission> uiPermissions=Set.of();
+    private final Map<String,Integer> uiActivity=new LinkedHashMap<>();
+    void uiCompleted(String operation){if(ownsEditor()&&uiActivity.size()<24)uiActivity.merge(operation,1,Integer::sum);}
+    String uiSummary(){if(uiActivity.isEmpty())return "";return "Shed UI interactions: "+uiActivity.entrySet().stream().map(e->e.getKey()+" "+e.getValue()).collect(java.util.stream.Collectors.joining(", "));}
     boolean uiAllowed(AgentUiPermission permission){
         if(!lease.approvalRequired())return permission==AgentUiPermission.NAVIGATE;
         return ownership!=null&&validProject()&&lease.allowed(lease.id())&&uiPermissions.contains(permission);
@@ -35,7 +38,7 @@ final class AgentDelegationController implements AutoCloseable {
         switch(action) {
             case "request" -> {
                 if(lease.request(id,agent,task)) {
-                    root=editor.workspaceController.activeRoot();generation=editor.workspaceRoots.generation();handedBack=false;
+                    root=editor.workspaceController.activeRoot();generation=editor.workspaceRoots.generation();handedBack=false;uiActivity.clear();
                     timer.start();SwingUtilities.invokeLater(()->ask(id));
                 }
             }
@@ -81,7 +84,7 @@ final class AgentDelegationController implements AutoCloseable {
             if(permission==AgentUiPermission.NAVIGATE){option.setSelected(true);option.setEnabled(false);}
             permissions.put(permission,option);choices.add(option);
         }
-        choices.add(new JLabel("Project tools retain this Mac's normal process permissions."));
+        choices.add(new JLabel("Project tools retain the operating system's normal process permissions."));
         body.add(choices,java.awt.BorderLayout.EAST);
         var pane=new JOptionPane(body,JOptionPane.QUESTION_MESSAGE,JOptionPane.YES_NO_OPTION,null,new String[]{"Allow Control","Cancel"},"Cancel");
         approval=pane.createDialog(editor,"Delegate control to "+lease.agent()+"?");approval.setName("agent.approval");
@@ -128,7 +131,7 @@ final class AgentDelegationController implements AutoCloseable {
         editor.clearAgentActivity();
         if(worked&&!closed){editor.toolWindowHost.watchAgentChanges("pause",lease.agent());editor.toolWindowHost.watchAgentChanges("refresh",lease.agent());}
         if(worked&&!closed&&!chat){editor.toolWindowHost.showAgentChanges();editor.showMessage(lease.agent()+" · "+lease.state()+" · control returned to you. Changes are available for review.");
-            var status=lease.status(lease.id());if(status.get("summary") instanceof String summary&&!summary.isBlank()){var text=new JTextArea(summary,8,52);text.setEditable(false);text.setLineWrap(true);text.setWrapStyleWord(true);text.setCaretPosition(0);SwingUtilities.invokeLater(()->{if(!closed)JOptionPane.showMessageDialog(editor,new JScrollPane(text),"Agent-reported session summary",JOptionPane.INFORMATION_MESSAGE);});}}
+            var status=lease.status(lease.id());if(status.get("summary") instanceof String summary&&!summary.isBlank()){var text=new JTextArea(summary+(uiSummary().isEmpty()?"":"\n\n"+uiSummary()),8,52);text.setEditable(false);text.setLineWrap(true);text.setWrapStyleWord(true);text.setCaretPosition(0);SwingUtilities.invokeLater(()->{if(!closed)JOptionPane.showMessageDialog(editor,new JScrollPane(text),"Agent-reported session summary",JOptionPane.INFORMATION_MESSAGE);});}}
     }
     @Override public void close(){closed=true;lease.revoke("cancelled");handBack();}
 }

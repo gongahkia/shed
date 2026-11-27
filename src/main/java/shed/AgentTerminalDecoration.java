@@ -16,6 +16,9 @@ final class AgentTerminalDecoration implements AutoCloseable {
     private String phase="waiting for prompt";
     private Rectangle painted=new Rectangle();
     private boolean closed;
+    private AgentUiPresentation presence;
+    private long presenceToken;
+    private boolean presenceAttempted;
 
     AgentTerminalDecoration(JComponent terminal,JComponent input,String agent){
         this.terminal=terminal;this.input=input;this.agent=agent;
@@ -44,7 +47,7 @@ final class AgentTerminalDecoration implements AutoCloseable {
     static Color cursorColor(JComponent input){return input.getClientProperty(BADGE) instanceof AgentTerminalDecoration decoration&&!decoration.closed?decoration.color():null;}
     static boolean active(JComponent input){return input.getClientProperty(BADGE) instanceof AgentTerminalDecoration decoration&&!decoration.closed;}
     private void paintBadge(Graphics graphics,Rectangle cursor,Font font,int available){
-        if(cursor.isEmpty()||available<=0)return;
+        if(cursor.isEmpty()||available<=0||presence!=null)return;
         var metrics=input.getFontMetrics(font);int size=cursor.height,gap=6,spinnerSize=Math.max(12,metrics.getAscent());
         Icon logo=ProviderIcons.forValue(agent,input.getBackground());String label=AgentTerminalCommand.activityLabel(agent,phase);
         int mark=logo==null?0:size+gap,width=mark+metrics.stringWidth(label)+gap+spinnerSize;
@@ -75,7 +78,13 @@ final class AgentTerminalDecoration implements AutoCloseable {
         int w=terminal.getWidth(),h=terminal.getHeight();terminal.repaint(0,0,w,3);terminal.repaint(0,h-3,w,3);terminal.repaint(0,0,3,h);terminal.repaint(w-3,0,3,h);
         Rectangle dirty=new Rectangle(painted);
         if(input instanceof AnimatedTerminalPanel panel){
-            var cursor=panel.agentCursorBounds();var metrics=input.getFontMetrics(panel.agentFont());
+            var cursor=panel.agentCursorBounds();
+            if(!cursor.isEmpty()&&input.isShowing()){
+                var anchor=new Point(cursor.x,cursor.y+cursor.height/2);
+                if(!presenceAttempted){presenceAttempted=true;presence=AgentUiPresentation.find(input);if(presence!=null)presenceToken=presence.beginFollow(input,anchor,agent,animated());}
+                if(presence!=null)presence.follow(presenceToken,anchor,phase.equals("typing"),phase.equals("typing")?"writing":phase);
+            }
+            var metrics=input.getFontMetrics(panel.agentFont());
             if(!cursor.isEmpty()){
                 var current=new Rectangle(cursor.x+cursor.width+6,cursor.y,cursor.height*2+18+metrics.stringWidth(AgentTerminalCommand.activityLabel(agent,phase)),cursor.height);
                 current=current.union(cursor);dirty=dirty.isEmpty()?current:dirty.union(current);
@@ -84,7 +93,7 @@ final class AgentTerminalDecoration implements AutoCloseable {
         if(!dirty.isEmpty())input.repaint(dirty);
     }
     public void close(){
-        if(closed)return;closed=true;
+        if(closed)return;closed=true;if(presence!=null)presence.endFollow(presenceToken);presence=null;
         if(input.getClientProperty(BADGE)==this){
             Object badge=previousBadge,control=previousControl;
             while(badge instanceof AgentTerminalDecoration prior&&prior.closed){control=prior.previousControl;badge=prior.previousBadge;}

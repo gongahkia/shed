@@ -294,6 +294,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'AgentUiActionsTest',
             'AgentWorkbenchCoreTest',
             'AgentWorkbenchTransportTest',
+            'AgentWorkbenchInteractionTest',
             'AgentUiControlTest',
             'EditorFreshnessTest',
             'AgentDelegationTest',

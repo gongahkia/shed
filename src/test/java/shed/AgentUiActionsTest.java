@@ -62,7 +62,7 @@ class AgentUiActionsTest {
         try {
             var result=start(ui,s,"find.query","hello 👩‍💻",()->true).get(2,TimeUnit.SECONDS);
             assertEquals("hello 👩‍💻",result.get("query"));
-            edt(()->{assertFalse(ui.active());assertEquals(0,s.root.getLayeredPane().getComponentsInLayer(JLayeredPane.DRAG_LAYER).length);return null;});
+            edt(()->{assertFalse(ui.active());assertEquals(1,s.root.getLayeredPane().getComponentsInLayer(JLayeredPane.DRAG_LAYER).length);return null;});
         } finally {edt(()->{ui.close();return null;});}
     }
     @Test void animatedTypingPreservesGraphemeBoundaries() throws Exception {
@@ -123,8 +123,45 @@ class AgentUiActionsTest {
             p.show(s.field,"Agent",true);assertTrue(p.installed());assertFalse(p.contains(25,25));
             var image=new java.awt.image.BufferedImage(640,200,java.awt.image.BufferedImage.TYPE_INT_ARGB);
             var g=image.createGraphics();p.frame(.7f,false);p.paint(g);g.dispose();
-            assertNotEquals(0,image.getRGB(140,35));image.flush();
+            boolean painted=false;for(int y=0;y<200;y++)for(int x=0;x<640;x++)painted|=image.getRGB(x,y)!=0;
+            assertTrue(painted);image.flush();
             p.close();assertFalse(p.installed());
         }return null;});
     }
+    @Test void pointerRetainsLocationAndMorphsWithoutCapturingMouse() throws Exception {
+        edt(()->{var s=new Surface();try(var p=new AgentUiPresentation()){
+            p.show(s.button,"Codex",true);p.frame(1,false);var last=p.pointerPosition();p.settle();
+            p.show(s.field,"Claude Code",true);assertEquals(last,p.pointerPosition());
+            p.frame(.1f,false);assertNotEquals(last,p.pointerPosition());
+            p.frame(1,true);assertTrue(p.morph()>0&&p.morph()<1);
+            for(int i=0;i<8;i++)p.frame(1,true);assertEquals(1,p.morph());
+            for(int i=0;i<8;i++)p.frame(1,false);assertEquals(0,p.morph());
+            assertFalse(p.contains(0,0));
+        }return null;});
+    }
+    @Test void reducedMotionMovesDirectlyWithoutMorphFrames() throws Exception {
+        edt(()->{var s=new Surface();try(var p=new AgentUiPresentation()){
+            p.show(s.field,"Codex",false);p.frame(1,true);assertEquals(1,p.morph());p.frame(1,false);assertEquals(0,p.morph());
+        }return null;});
+    }
+    @Test void cancelledClientFutureStopsWorkAndReleasesInputListener() throws Exception {
+        var s=edt(Surface::new);s.motion=true;var ui=edt(()->new AgentUiActions(s));
+        int listeners=edt(()->java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners().length);
+        try {
+            var done=start(ui,s,"find.query","should not type",()->true);done.cancel(false);
+            var barrier=new CompletableFuture<Void>();
+            edt(()->{var timer=new javax.swing.Timer(50,e->barrier.complete(null));timer.setRepeats(false);timer.start();return null;});barrier.get(2,TimeUnit.SECONDS);
+            edt(()->{assertFalse(ui.active());assertEquals("",s.field.getText());assertEquals(listeners,java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners().length);return null;});
+        }finally{edt(()->{ui.close();return null;});}
+    }
+    @Test void sequentialActionsRetainOnePointerAndNoInputListeners() throws Exception {
+        var s=edt(Surface::new);var ui=edt(()->new AgentUiActions(s));
+        int listeners=edt(()->java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners().length);
+        try {
+            for(int i=0;i<8;i++)start(ui,s,"find.query","query"+i,()->true).get(2,TimeUnit.SECONDS);
+            edt(()->{assertFalse(ui.active());assertEquals(1,s.root.getLayeredPane().getComponentsInLayer(JLayeredPane.DRAG_LAYER).length);
+                assertEquals(listeners,java.awt.Toolkit.getDefaultToolkit().getAWTEventListeners().length);return null;});
+        }finally{edt(()->{ui.close();assertEquals(0,s.root.getLayeredPane().getComponentsInLayer(JLayeredPane.DRAG_LAYER).length);return null;});}
+    }
+
 }

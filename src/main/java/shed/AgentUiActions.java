@@ -72,6 +72,7 @@ final class AgentUiActions implements AutoCloseable {
         long[] revision = { ((Number)surface.state().get("revision")).longValue() };
         boolean incremental = command.text().chars().allMatch(c -> c < 128);
         int[] written = {-1}; boolean[] applied = {false};
+        long[] finishing = {-1};
         var window = SwingUtilities.getWindowAncestor(target);
         input = event -> {
             if (event instanceof KeyEvent key && key.getID() == KeyEvent.KEY_PRESSED
@@ -89,9 +90,13 @@ final class AgentUiActions implements AutoCloseable {
                     || !Objects.equals(surface.state().get("revision"), revision[0])) throw failure(WorkspaceApiException.Code.CONTEXT_CHANGED);
                 long elapsed = (System.nanoTime() - started) / 1_000_000;
                 if (elapsed > 3000) throw failure(WorkspaceApiException.Code.TIMEOUT);
+                if (finishing[0] >= 0) {
+                    presentation.frame(1f,false);
+                    if (elapsed - finishing[0] >= 140) finish(surface.state(),null);
+                    return;
+                }
                 int clickMillis = surface.motion() ? 300 : 32;
-                presentation.frame(Math.min(1f, (float)elapsed / clickMillis), false);
-                if (elapsed < clickMillis) return;
+                if (elapsed < clickMillis) { presentation.frame((float)elapsed / clickMillis,false); return; }
                 if (command.action().equals("find.query")) {
                     JTextComponent field = (JTextComponent)target;
                     if (written[0] < 0) { field.requestFocusInWindow(); field.setText(""); written[0] = 0; }
@@ -105,12 +110,16 @@ final class AgentUiActions implements AutoCloseable {
                     presentation.frame(1f, true);
                     applied[0] = end == command.text().length();
                 } else if (!applied[0]) {
+                    presentation.frame(1f,false);
                     if (!command.action().equals("find.open")) surface.invoke(command.action());
                     else target.requestFocusInWindow();
                     applied[0] = true;
                 }
                 var state = surface.state(); revision[0] = ((Number)state.get("revision")).longValue();
-                if (applied[0] && !"searching".equals(state.get("phase"))) finish(state, null);
+                if (applied[0] && !"searching".equals(state.get("phase"))) {
+                    if (command.action().equals("find.query") && surface.motion()) finishing[0] = elapsed;
+                    else finish(state,null);
+                }
             } catch (WorkspaceApiException rejected) { finish(null, rejected); }
             catch (Exception invalid) { cancel(WorkspaceApiException.Code.INVALID_CONTEXT); }
         });
@@ -122,12 +131,12 @@ final class AgentUiActions implements AutoCloseable {
     private void finish(Map<String,Object> state, RuntimeException error) {
         if (timer != null) timer.stop(); timer = null;
         if (input != null) Toolkit.getDefaultToolkit().removeAWTEventListener(input); input = null;
-        presentation.close();
+        presentation.settle();
         var done = pending; pending = null;
         if (done != null) { if (error == null) done.complete(state); else done.completeExceptionally(error); }
     }
     boolean active() { return pending != null; }
-    @Override public void close() { requireEdt(); closed = true; cancel(WorkspaceApiException.Code.CANCELLED); }
+    @Override public void close() { requireEdt(); closed = true; cancel(WorkspaceApiException.Code.CANCELLED); presentation.close(); }
     static boolean validUtf16(String text) {
         for (int i=0;i<text.length();i++) {
             char c=text.charAt(i);

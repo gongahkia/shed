@@ -122,10 +122,10 @@ public final class AgentWorkflowDesktopProbe {
     }
     private static void qualifyEditorFirst(Path project)throws Exception {
         edt(()->{
-            editor.setSize(1400,900);check(!editor.toolWindowHost.isVisible(),"Agent tools visible at startup");
-            editor.toolWindowHost.restoreWorkbench(Map.of("selected","AGENT","visible",true,"ratio",.5));check(!editor.toolWindowHost.isVisible(),"Saved agent panel reopened without a request");
+            editor.setSize(1400,900);check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Agent tools visible at startup");
+            editor.toolWindowHost.restoreWorkbench(Map.of("selected","AGENT","visible",true,"ratio",.5));check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Saved agent panel reopened without a request");
             var tabs=find(editor.getRootPane(),JTabbedPane.class,"workbench.tools");for(int i=0;i<tabs.getTabCount();i++)check(!tabs.getTitleAt(i).equals("Agents"),"Agent tab exposed before a request");
-            editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("watch");check(!editor.toolWindowHost.isVisible(),"Watch opened management tools");return null;
+            editor.workspaceController.addFolder(project,true);editor.handleAgentCommand("watch");check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Watch opened management tools");return null;
         });
         await(()->Boolean.TRUE.equals(editor.toolWindowHost.watchAgentChanges("state","Agent").get("ready")),20);
         edt(()->{
@@ -137,7 +137,7 @@ public final class AgentWorkflowDesktopProbe {
         });
         String source="class EditorFirst {\n"+"// agent-created source block\n".repeat(240)+"}\n";Files.writeString(project.resolve("EditorFirst.java"),source);
         await(()->editor.getCurrentBuffer().getFile()!=null&&editor.getCurrentBuffer().getFile().getName().equals("EditorFirst.java")&&editor.writingArea.getClientProperty("shed.agentTour")!=null,15);
-        edt(()->{check(!editor.toolWindowHost.isVisible(),"Observed edit opened management tools");return null;});capture("00-editor-first-agent-change");
+        edt(()->{check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Observed edit opened management tools");return null;});capture("00-editor-first-agent-change");
         var area=edt(()->editor.writingArea);String before=edt(area::getText);int dot=edt(()->area.getCaret().getDot()),mark=edt(()->area.getCaret().getMark());long revision=edt(()->editor.getCurrentBuffer().documentRevision());
         edt(()->{
             var scroll=editor.getActivePane().getScrollPane();check(scroll.getUI() instanceof SmoothScrollPaneUI,"Source missing shared smooth scroll UI");
@@ -145,10 +145,10 @@ public final class AgentWorkflowDesktopProbe {
             check(Boolean.TRUE.equals(scroll.getClientProperty("shed.smoothScrollActive")),"Native scroll did not animate");return null;
         });
         await(()->editor.getActivePane().getScrollPane().getClientProperty("shed.smoothScrollActive")==null,3);
-        edt(()->{check(editor.getActivePane().getScrollPane().getVerticalScrollBar().getValue()>200,"Smooth scroll did not settle");check(area.getText().equals(before)&&area.getCaret().getDot()==dot&&area.getCaret().getMark()==mark&&editor.getCurrentBuffer().documentRevision()==revision,"Scroll altered source or human selection");check(!editor.toolWindowHost.isVisible(),"Manual input exposed agent tools");editor.toolWindowHost.watchAgentChanges("stop","Agent");editor.toolWindowHost.watchAgentChanges("follow","Agent");return null;});
+        edt(()->{check(editor.getActivePane().getScrollPane().getVerticalScrollBar().getValue()>200,"Smooth scroll did not settle");check(area.getText().equals(before)&&area.getCaret().getDot()==dot&&area.getCaret().getMark()==mark&&editor.getCurrentBuffer().documentRevision()==revision,"Scroll altered source or human selection");check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Manual input exposed agent tools");editor.toolWindowHost.watchAgentChanges("stop","Agent");editor.toolWindowHost.watchAgentChanges("follow","Agent");return null;});
         capture("00-editor-first-smooth-scroll");
         edt(()->{
-            editor.handleAgentCommand("changes");check(editor.toolWindowHost.isVisible(),"Explicit change controls did not open");
+            editor.handleAgentCommand("changes");check(editor.toolWindowHost.isSelected(ToolWindowHost.Tab.AGENT),"Explicit change controls did not open in the right sidebar");
             editor.configManager.set("agent.fixture_acp.command","fixture-acp-not-executed");editor.toolWindowHost.showAgentAction(AgentAction.ASK);editor.toolWindowHost.refreshActive();
             var providers=find(editor.getRootPane(),JComboBox.class,"agent.session.provider");check(providers!=null,"ACP selector missing after explicit request");var names=new ArrayList<String>();for(int i=0;i<providers.getItemCount();i++)names.add(String.valueOf(providers.getItemAt(i)));
             check(names.contains("opencode")&&names.contains("fixture_acp"),"Configured ACP provider not listed");editor.configManager.set("agent.fixture_acp.command","");editor.toolWindowHost.showAgentChanges();return null;
@@ -208,7 +208,8 @@ public final class AgentWorkflowDesktopProbe {
         edt(()->{
             editor.hideToolWindow();editor.activateEditorPane(editor.resolveTreeContentPaneForOpen());editor.openEmptyBuffer();
             editor.treeGitController.showFileTree(project.toString());editor.setMode(EditorMode.INSERT);
-            check(editor.isTreePaneActive(),"Reading fixture must start with the tree active");return null;
+            check(editor.explorerSidebar.showingExplorer()&&!editor.isTreePaneActive(),"Reading fixture must retain Explorer beside the source pane");
+            check(editor.buffers.stream().noneMatch(b->b.getDisplayName().startsWith("[tree ")),"Explorer became a document before reading");return null;
         });
         int offset=source.indexOf("// reading checkpoint 220\n");
         long started=System.nanoTime();var reply=externalRead(project,"ReadFirst.java",offset,100);double first=(System.nanoTime()-started)/1e6;
@@ -218,16 +219,16 @@ public final class AgentWorkflowDesktopProbe {
             check(buffer.getFile().getName().equals("ReadFirst.java")&&buffer.getContent().equals(source)&&!buffer.isModified()&&!buffer.getUndoManager().canUndo(),"Reading did not open the exact clean authoritative file");
             check(area.getCaretPosition()==0&&area.getSelectionStart()==0&&area.getSelectionEnd()==0,"Reading moved the human caret");
             check("Agent reading".equals(area.getClientProperty("shed.agentActivity")),"Reading presentation missing");
-            var tags=area.getHighlighter().getHighlights();check(tags.length==1&&tags[0].getStartOffset()==offset&&tags[0].getEndOffset()==offset+100,"Wrong reading range highlighted");
+            var tags=java.util.Arrays.stream(area.getHighlighter().getHighlights()).filter(tag->tag.getPainter().getClass().getEnclosingClass()==AgentEditPresentation.class).toList();check(tags.size()==1&&tags.getFirst().getStartOffset()==offset&&tags.getFirst().getEndOffset()==offset+100,"Wrong reading range highlighted: expected="+offset+":"+(offset+100)+" actual="+tags.stream().map(tag->tag.getStartOffset()+":"+tag.getEndOffset()+":"+tag.getPainter().getClass().getName()).toList());
             var position=area.modelToView2D(offset);check(position!=null&&area.getVisibleRect().intersects(position),"Reading range not revealed");
             var end=area.modelToView2D(offset+100);check(end!=null&&area.getVisibleRect().intersects(end),"Reading chunk is clipped below the viewport");
-            check(!editor.toolWindowHost.isVisible(),"Reading exposed agent management panels");return null;
+            check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Reading exposed agent management panels");return null;
         });capture("22-agent-reading-first-file");
         started=System.nanoTime();var second=externalRead(project,"ReadSecond.java",0,100);double next=(System.nanoTime()-started)/1e6;
         check("class ReadSecond {}\n".equals(second.get("content")),"Second read mismatch");
         edt(()->{check(editor.getCurrentBuffer().getFile().getName().equals("ReadSecond.java"),"Reading failed to switch files");check(buffer.getContent().equals(source)&&buffer.documentRevision()==revision&&!buffer.isModified(),"Reading another file changed previous source");return null;});capture("23-agent-reading-second-file");
         await(()->area.getClientProperty("shed.agentActivity")==null,8);
-        edt(()->{check(area.getHighlighter().getHighlights().length==0,"Reading decoration did not expire");return null;});
+        edt(()->{check(java.util.Arrays.stream(area.getHighlighter().getHighlights()).noneMatch(tag->tag.getPainter().getClass().getEnclosingClass()==AgentEditPresentation.class),"Reading decoration did not expire");return null;});
         events.add(Map.of("phase","external_cli_visible_read_two_files","exact",true,"first_client_ms",first,"second_client_ms",next,"source_and_caret_preserved",true,"expired",true));
     }
     private static void qualifyEofAppend(Path project)throws Exception {
@@ -253,7 +254,7 @@ public final class AgentWorkflowDesktopProbe {
             check(eof!=null&&visible.contains(eof.getX(),eof.getY()),"Appended EOF is outside the source viewport");
             check(viewport.getViewPosition().y>1000,"Append did not scroll down");
             check(editor.getCurrentBuffer()==buffer&&buffer.getContent().equals(expected)&&buffer.documentRevision()==revision&&!buffer.isModified()&&buffer.getUndoManager().canUndo()==undo&&area.getCaretPosition()==dot&&area.getCaret().getMark()==mark,"Append tour changed installed source, history or human caret/selection");
-            check(!editor.toolWindowHost.isVisible(),"Append reopened management tools");return viewport.getViewPosition().y;
+            check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Append reopened management tools");return viewport.getViewPosition().y;
         });
         capture("21-appended-eof-visible");
         // check subsequent event-loop turns too, so a late caret restoration cannot pass unnoticed
@@ -265,7 +266,7 @@ public final class AgentWorkflowDesktopProbe {
     }
     private static void qualifyModelTour(Path project)throws Exception {
         var area=edt(()->editor.writingArea);var viewport=(JViewport)SwingUtilities.getAncestorOfClass(JViewport.class,area);
-        try{await(()->Integer.valueOf(1).equals(area.getClientProperty("shed.agentTour")),100);}catch(Exception failure){System.out.println(edt(()->editor.toolWindowHost.watchAgentChanges("state","Codex")+" active="+editor.getCurrentBuffer().getFile()+" loaded="+area.getText().contains("AFTER_GAMMA")+" activity="+area.getClientProperty("shed.agentActivity")));throw failure;}check(edt(()->!editor.toolWindowHost.isVisible()),"Model edits reopened management tools");String expected=edt(area::getText);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);boolean dirty=edt(buffer::isModified),undo=edt(()->buffer.getUndoManager().canUndo());int caret=edt(area::getCaretPosition),selection=edt(area::getSelectionStart);await(()->tourSettled(area,"AFTER_ALPHA"),2);int first=edt(()->viewport.getViewPosition().y);capture("18-model-tour-first-block");
+        try{await(()->Integer.valueOf(1).equals(area.getClientProperty("shed.agentTour")),100);}catch(Exception failure){System.out.println(edt(()->editor.toolWindowHost.watchAgentChanges("state","Codex")+" active="+editor.getCurrentBuffer().getFile()+" loaded="+area.getText().contains("AFTER_GAMMA")+" activity="+area.getClientProperty("shed.agentActivity")));throw failure;}check(edt(()->(!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible())),"Model edits reopened management tools");String expected=edt(area::getText);var buffer=edt(editor::getCurrentBuffer);long revision=edt(buffer::documentRevision);boolean dirty=edt(buffer::isModified),undo=edt(()->buffer.getUndoManager().canUndo());int caret=edt(area::getCaretPosition),selection=edt(area::getSelectionStart);await(()->tourSettled(area,"AFTER_ALPHA"),2);int first=edt(()->viewport.getViewPosition().y);capture("18-model-tour-first-block");
         await(()->Integer.valueOf(2).equals(area.getClientProperty("shed.agentTour")),5);await(()->tourSettled(area,"AFTER_BETA"),2);int middle=edt(()->viewport.getViewPosition().y);check(middle>first+200,"Tour did not scroll to middle block");capture("19-model-tour-middle-block");
         await(()->Integer.valueOf(3).equals(area.getClientProperty("shed.agentTour")),5);await(()->tourSettled(area,"AFTER_GAMMA"),2);int last=edt(()->viewport.getViewPosition().y);check(last>middle+200,"Tour did not scroll to final block");capture("20-model-tour-last-block");await(()->area.getClientProperty("shed.agentTour")==null,5);
         edt(()->{check(editor.getCurrentBuffer()==buffer&&buffer.documentRevision()==revision&&buffer.isModified()==dirty&&buffer.getUndoManager().canUndo()==undo&&area.getText().equals(expected)&&area.getCaretPosition()==caret&&area.getSelectionStart()==selection,"Tour changed source, revision, history or human caret");return null;});
@@ -498,7 +499,7 @@ Files.writeString(folder.resolve("opened-captured"),"ok");
             check(!human.equals(agent),"Agent marker matches human caret color");
             for(int i=0;i<8;i++){capture("02-pending-"+i);Thread.sleep(100);}
             await(()->{JButton apply=find(editor.getContentPane(),JButton.class,"agent.apply");return apply!=null&&apply.isEnabled();},30);
-            edt(()->{check(!editor.toolWindowHost.isVisible(),"Incoming proposal opened review without a request");editor.handleAgentCommand("proposals");check(editor.toolWindowHost.isVisible(),"Explicit proposal review did not open");return null;});
+            edt(()->{check((!editor.toolWindowHost.isVisible()&&!editor.toolWindowHost.rightVisible()),"Incoming proposal opened review without a request");editor.handleAgentCommand("proposals");check(editor.toolWindowHost.isSelected(ToolWindowHost.Tab.AGENT),"Explicit proposal review did not open in the right sidebar");return null;});
             JTextArea proposed=edt(()->find(editor.getContentPane(),JTextArea.class,"agent.proposed"));
             check(proposed!=null,"No actual review view");capture("03-review");
             Path expectedFile=folder.resolve("expected.txt");check(Files.isRegularFile(expectedFile),"Missing expected agent result");

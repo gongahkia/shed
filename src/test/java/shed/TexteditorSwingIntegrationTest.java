@@ -5752,12 +5752,13 @@ public class TexteditorSwingIntegrationTest {
                 Rectangle visible = new Rectangle(editor.workbenchHeader.getSize());
                 for (var button : descendants(editor.workbenchHeader, javax.swing.JButton.class)) {
                     Rectangle bounds = SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), editor.workbenchHeader);
-                    assertTrue(visible.contains(bounds), button.getAccessibleContext().getAccessibleName() + " must remain in the navigation row: " + bounds);
-                    assertTrue(bounds.height >= 60, "Controls must scale with UI zoom");
+                    assertTrue(visible.contains(bounds), button.getAccessibleContext().getAccessibleName() + " must remain in the menu bar: " + bounds);
+                    assertTrue(bounds.height >= 30, "Compact menu controls must scale with UI zoom");
                 }
-                var location = descendants(editor.workbenchHeader, javax.swing.JLabel.class).stream()
-                    .filter(label -> "workbench.location".equals(label.getName())).findFirst().orElseThrow();
-                assertTrue(location.getText().contains("navigation-a.txt"));
+                assertSame(editor.getJMenuBar(),editor.workbenchHeader.getParent());
+                assertNull(((java.awt.BorderLayout)editor.getContentPane().getLayout()).getLayoutComponent(java.awt.BorderLayout.NORTH));
+                assertTrue(descendants(editor.getJMenuBar(),javax.swing.JMenu.class).stream()
+                    .anyMatch(menu -> "workbench.workspace".equals(menu.getName())));
                 editor.settingsApplication.update("ui.open_editors.visible", "false");
                 assertFalse(editor.openEditorsBar.isVisible());
                 assertTrue(editor.workbenchHeader.isVisible(), "Tab visibility must not remove workspace navigation");

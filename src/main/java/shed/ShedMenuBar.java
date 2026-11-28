@@ -16,7 +16,11 @@ final class ShedMenuBar {
     private final int commandMask;
     private final boolean nativeMac;
 
-    static JMenuBar create(Texteditor editor) { return new ShedMenuBar(editor).bar; }
+    static JMenuBar create(Texteditor editor) {
+        JMenuBar bar = new ShedMenuBar(editor).bar;
+        if (editor.workbenchHeader != null) editor.workbenchHeader.attachTo(bar);
+        return bar;
+    }
 
     private ShedMenuBar(Texteditor editor) {
         this.editor = editor;
@@ -30,6 +34,26 @@ final class ShedMenuBar {
         item(file, "New File", KeyEvent.VK_N, commandMask, () -> action(PlainKeymap.Action.NEW));
         item(file, "Open File…", KeyEvent.VK_O, commandMask, editor::openFileChooser);
         item(file, "Open Folder…", KeyEvent.VK_O, commandMask | InputEvent.SHIFT_DOWN_MASK, () -> show(editor.openFolder()));
+        JMenu workspace = new JMenu("Workspace Folders");
+        workspace.setName("workbench.workspace");
+        workspace.addMenuListener(new javax.swing.event.MenuListener() {
+            public void menuSelected(javax.swing.event.MenuEvent event) {
+                workspace.removeAll();
+                var folders = editor.workspaceController;
+                for (var root : folders.roots()) {
+                    var entry = new javax.swing.JRadioButtonMenuItem(folders.displayRoot(root), root.equals(folders.activeRoot()));
+                    entry.setToolTipText(root.toString());
+                    entry.addActionListener(action -> show(folders.activateFolder(root, true))); workspace.add(entry);
+                }
+                if (workspace.getItemCount() > 0) workspace.addSeparator();
+                var manage = new JMenuItem("Manage workspace folders…");
+                manage.addActionListener(action -> WorkspaceFoldersDialog.showFor(editor, folders)); workspace.add(manage);
+                editor.editorUiController.applyUiTheme(workspace); editor.editorUiController.applyUiFont(workspace);
+            }
+            public void menuDeselected(javax.swing.event.MenuEvent event) { }
+            public void menuCanceled(javax.swing.event.MenuEvent event) { }
+        });
+        file.add(workspace);
         item(file, "Local History…", -1, 0, () -> LocalHistoryDialog.showFor(editor));
         item(file, "Recent Files…", -1, 0, () -> show(editor.showRecentFiles()));
         file.addSeparator();
@@ -77,6 +101,22 @@ final class ShedMenuBar {
         });
         item(view, "Toggle Outline", -1, 0, editor::toggleOutline);
         item(view, "Toggle Minimap", -1, 0, () -> command("minimap toggle"));
+        JMenu panes = new JMenu("Editor Panes");
+        item(panes, "Split side by side", -1, 0, () -> show(editor.documents.split(true)));
+        item(panes, "Split above and below", -1, 0, () -> show(editor.documents.split(false)));
+        item(panes, "Focus next pane", -1, 0, () -> show(editor.cycleWindowFocus()));
+        item(panes, "Balance splits", -1, 0, () -> show(editor.equalizeWindows()));
+        item(panes, "Close current pane", -1, 0, () -> show(editor.documents.closeWindow(false)));
+        view.add(panes);
+        JMenu tools = new JMenu("Tool Windows");
+        for (ToolWindowHost.Tab tab : ToolWindowHost.Tab.values()) {
+            item(tools, ToolWindowHost.title(tab), -1, 0, () -> editor.showToolWindow(tab));
+        }
+        item(tools, "Hide docked tools", -1, 0, () -> { editor.hideToolWindow(); editor.requestActivePaneFocus(); });
+        item(tools, "Return detached tools to dock", -1, 0, () -> {
+            if (editor.toolWindowHost != null) editor.toolWindowHost.reattachAll();
+        });
+        view.add(tools);
         view.addSeparator();
         item(view, "Problems", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS));
         dockToggle(view,"Source Control",ToolWindowHost.Tab.GIT);

@@ -159,7 +159,7 @@ public final class WorkbenchStyle {
         @Override public javax.swing.text.View create(javax.swing.text.Element element) {
             javax.swing.text.View stock = super.create(element);
             return Boolean.TRUE.equals(getComponent().getClientProperty(SourcePlainView.SOURCE_PROPERTY))
-                ? SourcePlainView.adapt(stock) : stock;
+                ? SourcePlainView.adapt(stock, ((JTextArea) getComponent()).getWrapStyleWord()) : stock;
         }
     }
     public static class TextPaneUI extends BasicTextPaneUI {

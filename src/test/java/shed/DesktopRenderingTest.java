@@ -41,6 +41,25 @@ class DesktopRenderingTest {
             }}}finally{UIManager.put("shed.zoom",before);}
         });
     }
+    @Test void workbenchButtonTextUsesTheSameSmoothingAsLabels()throws Exception{
+        SwingUtilities.invokeAndWait(()->{
+            var key=RenderingHints.KEY_TEXT_ANTIALIASING;Object before=UIManager.get(key);
+            try{
+                SwingTextRendering.install(UIManager.getDefaults(),Map.of());
+                for(String text:new String[]{"shed", "Open Diff", "Language Services"}){
+                    var button=new JButton(text);button.setUI(new WorkbenchStyle.ButtonUI());
+                    button.setFont(new Font(Font.DIALOG,Font.PLAIN,20));button.setForeground(Color.BLACK);
+                    button.setBorderPainted(false);button.setContentAreaFilled(false);button.setFocusPainted(false);button.setSize(280,40);
+                    var image=new BufferedImage(280,40,BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();
+                    try{g.setColor(Color.WHITE);g.fillRect(0,0,280,40);button.paint(g);}finally{g.dispose();}
+                    int softened=0;for(int y=0;y<40;y++)for(int x=0;x<280;x++){
+                        int rgb=image.getRGB(x,y)&0xffffff;if(rgb!=0&&rgb!=0xffffff)softened++;
+                    }
+                    assertTrue(softened>20,"Button text bypassed Swing's smoothing: "+text);
+                }
+            }finally{UIManager.put(key,before);}
+        });
+    }
     @Test void treeSelectionSpansTheRowAndFileIconsDoNotDependOnNerdFonts()throws Exception{
         SwingUtilities.invokeAndWait(()->{
             Object before=UIManager.get("Tree.selectionBackground");Color selection=new Color(0xDDE7FF);UIManager.put("Tree.selectionBackground",selection);

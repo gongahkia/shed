@@ -1,14 +1,16 @@
 package shed;
 
-import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.font.TextAttribute;
+import java.awt.font.TextLayout;
+import java.text.AttributedString;
 import java.util.List;
 import java.util.function.Supplier;
 import javax.swing.JTextArea;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Segment;
 import javax.swing.text.TabExpander;
-import javax.swing.text.Utilities;
 
 /** Foreground runs painted by the source view, before any caret or decoration. EDT-owned. */
 final class SourceTextForeground {
@@ -29,38 +31,39 @@ final class SourceTextForeground {
             && area.getClientProperty(PROPERTY) instanceof SourceTextForeground foreground ? foreground : null;
     }
 
-    @SuppressWarnings("deprecation") // retain PlainView's integer layout and tab stops
     int draw(JTextArea area, Graphics graphics, int x, int y, int start, int end, TabExpander tabs)
         throws BadLocationException {
         List<SyntaxSpan> lexical = syntax.get(), meanings = semantic.get();
-        int lex = firstEndingAfter(lexical, start), sem = firstEndingAfter(meanings, start);
         Segment text = new Segment();
-        Color previous = graphics.getColor();
-        try {
-            while (start < end) {
-                while (lex < lexical.size() && lexical.get(lex).end <= start) lex++;
-                while (sem < meanings.size() && meanings.get(sem).end <= start) sem++;
-                int limit = end;
-                Color color = area.getForeground();
-                if (lex < lexical.size()) {
-                    SyntaxSpan span = lexical.get(lex);
-                    limit = Math.min(limit, span.start > start ? span.start : span.end);
-                    if (span.start <= start) color = span.color;
-                }
-                if (sem < meanings.size()) {
-                    SyntaxSpan span = meanings.get(sem);
-                    limit = Math.min(limit, span.start > start ? span.start : span.end);
-                    if (span.start <= start) color = span.color;
-                }
-                // semantic tokens replace lexical colors; neither is drawn over existing glyphs
-                graphics.setColor(color);
-                area.getDocument().getText(start, limit - start, text);
-                x = Utilities.drawTabbedText(text, x, y, graphics, tabs, start);
-                start = limit;
+        area.getDocument().getText(start, end - start, text);
+        var metrics = area.getFontMetrics(area.getFont());
+        int run = text.offset, limit = run + text.count;
+        for (int i = run; i <= limit; i++) {
+            char character = i < limit ? text.array[i] : '\n';
+            if (character != '\t' && character != '\n' && character != '\r') continue;
+            if (i > run) {
+                int offset = start + run - text.offset;
+                AttributedString styled = new AttributedString(new String(text.array, run, i - run));
+                styled.addAttribute(TextAttribute.FONT, area.getFont());
+                styled.addAttribute(TextAttribute.FOREGROUND, area.getForeground());
+                apply(styled, lexical, offset, offset + i - run);
+                apply(styled, meanings, offset, offset + i - run);
+                // shape each tab-delimited run once; color boundaries must not shift glyphs at HiDPI
+                new TextLayout(styled.getIterator(), ((Graphics2D) graphics).getFontRenderContext()).draw((Graphics2D) graphics, x, y);
+                x += metrics.charsWidth(text.array, run, i - run);
             }
-            return x;
-        } finally {
-            graphics.setColor(previous);
+            if (character == '\t') x = (int) tabs.nextTabStop(x, start + i - text.offset);
+            run = i + 1;
+        }
+        return x;
+    }
+
+    private static void apply(AttributedString text, List<SyntaxSpan> spans, int start, int end) {
+        for (int index = firstEndingAfter(spans, start); index < spans.size(); index++) {
+            SyntaxSpan span = spans.get(index);
+            if (span.start >= end) break;
+            int from = Math.max(start, span.start), to = Math.min(end, span.end);
+            if (to > from) text.addAttribute(TextAttribute.FOREGROUND, span.color, from - start, to - start);
         }
     }
 

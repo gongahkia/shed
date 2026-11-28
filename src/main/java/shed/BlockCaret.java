@@ -19,6 +19,8 @@ import java.awt.geom.Rectangle2D;
 
 class BlockCaret extends DefaultCaret {
     private static final long serialVersionUID = 1L;
+    private static final java.util.Set<String> GEOMETRY_PROPERTIES = java.util.Set.of("font", "UI", "border", "margin",
+        "componentOrientation", "lineWrap", "wrapStyleWord", "tabSize", "enabled", "shed.caretAnimation");
 
     private final CaretMotion motion = new CaretMotion();
     private final Timer animation = new Timer(16, event -> tick());
@@ -51,8 +53,8 @@ class BlockCaret extends DefaultCaret {
         public void changedUpdate(DocumentEvent event) { resetMotion(); }
     };
     private final PropertyChangeListener properties = event -> {
-        if ("document".equals(event.getPropertyName())) observeDocument();
-        resetMotion();
+        if ("document".equals(event.getPropertyName())) { observeDocument(); resetMotion(); }
+        else if (event.getPropertyName() != null && GEOMETRY_PROPERTIES.contains(event.getPropertyName())) resetMotion();
     };
     private final HierarchyListener hierarchy = event -> {
         if (getComponent() != null && !getComponent().isShowing()) resetMotion();
@@ -138,11 +140,20 @@ class BlockCaret extends DefaultCaret {
             int caretWidth = Math.max(1, blockWidth(component, getDot()));
             Rectangle target = new Rectangle(bounds.x, bounds.y, caretWidth, bounds.height);
             long now = System.nanoTime();
+            Rectangle viewport = component.getVisibleRect();
+            if (paintedDot >= 0 && paintedDot != getDot() && paintedViewport != null && paintedTarget != null
+                && viewport.width == paintedViewport.width && viewport.height == paintedViewport.height
+                && paintedViewport.contains(paintedTarget)) {
+                // a navigation scroll keeps the departure point at its previous screen position
+                int dx = viewport.x - paintedViewport.x, dy = viewport.y - paintedViewport.y;
+                motion.translate(dx, dy); paintedTarget.translate(dx, dy);
+                paintedViewport = viewport;
+            }
             // Layout changes at the same offset (scroll, resize, font) must never smear.
             if (!animate(component) || paintedDot < 0
                 || (paintedDot == getDot() && !target.equals(paintedTarget))
-                || !component.getVisibleRect().equals(paintedViewport)
-                || (paintedTarget != null && !component.getVisibleRect().contains(paintedTarget))) {
+                || !viewport.equals(paintedViewport)
+                || (paintedTarget != null && !viewport.contains(paintedTarget))) {
                 motion.snap(target);
                 animation.stop();
             } else {
@@ -150,7 +161,7 @@ class BlockCaret extends DefaultCaret {
             }
             paintedDot = getDot();
             paintedTarget = target;
-            paintedViewport = component.getVisibleRect();
+            paintedViewport = viewport;
             motion.advance(now);
             if (motion.moving() && g instanceof Graphics2D graphics) {
                 Graphics2D smear = (Graphics2D) graphics.create();

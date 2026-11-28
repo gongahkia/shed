@@ -508,7 +508,6 @@ public class Texteditor extends JFrame implements KeyListener {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {
                 if (focusModeController != null) focusModeController.close();
-                if (workbenchHeader != null) workbenchHeader.close();
                 if (agentDelegationController != null) agentDelegationController.close();
                 if (toolWindowHost != null) toolWindowHost.close();
                 workspaceDocumentSource.close(); agentWorkspaceController.close(); inlineCompletionController.close();

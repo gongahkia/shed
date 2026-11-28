@@ -11,6 +11,51 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AnimatedBlockCaretTest {
+    @Test void presentationPropertiesDoNotCancelNavigationMotion() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            JTextArea area=area();BlockCaret caret=(BlockCaret)area.getCaret();
+            try {
+                paint(caret);caret.setDot(20);
+                area.putClientProperty("shed.exampleStatus", "updated");
+                area.setBackground(Color.WHITE);
+                assertEquals(Color.BLUE.getRGB(),paint(caret).getRGB(2,2));
+                area.setFont(area.getFont().deriveFont(18f));
+                assertEquals(Color.BLUE.getRGB(),paint(caret).getRGB(cell(area)*20+2,2),"font geometry changes still snap");
+            } finally {area.setCaret(new javax.swing.text.DefaultCaret());}
+        });
+    }
+
+    @Test void lineBoundaryJumpsAnimateWhenTheViewportScrollsInEitherDirection() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            JTextArea area=area();area.setText(" ".repeat(100));area.setSize(1100,100);
+            var viewport=new javax.swing.JViewport();viewport.setView(area);viewport.setSize(240,100);
+            viewport.setExtentSize(new java.awt.Dimension(240,100));
+            BlockCaret caret=(BlockCaret)area.getCaret();
+            try {
+                caret.setDot(0);viewport.setViewPosition(new java.awt.Point(0,0));
+                assertEquals(Color.BLUE.getRGB(),paintInViewport(caret,viewport).getRGB(2,2));
+                caret.setDot(90);viewport.setViewPosition(new java.awt.Point(cell(area)*90-180,0));
+                assertEquals(Color.BLUE.getRGB(),paintInViewport(caret,viewport).getRGB(2,2),"end jump should depart from its previous screen position");
+                area.putClientProperty("shed.caretAnimation",false);paintInViewport(caret,viewport);
+                var endPosition=viewport.getViewPosition();
+                viewport.setViewPosition(new java.awt.Point(endPosition.x+20,0));
+                assertEquals(Color.BLUE.getRGB(),paintInViewport(caret,viewport).getRGB(162,2),"scrolling at a fixed caret position still snaps");
+                viewport.setViewPosition(endPosition);paintInViewport(caret,viewport);
+                area.putClientProperty("shed.caretAnimation",true);paintInViewport(caret,viewport);
+                caret.setDot(0);viewport.setViewPosition(new java.awt.Point(0,0));
+                assertEquals(Color.BLUE.getRGB(),paintInViewport(caret,viewport).getRGB(182,2),"start jump should animate back across the visible line");
+                assertEquals(0,caret.getDot());
+            } finally {area.setCaret(new javax.swing.text.DefaultCaret());}
+        });
+    }
+
+    private static BufferedImage paintInViewport(BlockCaret caret,javax.swing.JViewport viewport) {
+        var image=new BufferedImage(240,100,BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
+        try {var p=viewport.getViewPosition();graphics.translate(-p.x,-p.y);caret.paint(graphics);}
+        finally {graphics.dispose();}
+        return image;
+    }
+
     @Test
     void navigationAnimatesPixelsWhileTheInsertionPositionUpdatesImmediately() throws Exception {
         SwingUtilities.invokeAndWait(() -> {

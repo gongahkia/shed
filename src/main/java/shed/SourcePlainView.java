@@ -32,11 +32,18 @@ final class SourcePlainView extends PlainView {
     private SourcePlainView(Element element) { super(element); }
 
     static View adapt(View stock) {
-        if (stock != null && stock.getClass() == PlainView.class) return new SourcePlainView(stock.getElement());
-        if (stock != null && stock.getClass() == WrappedPlainView.class) {
-            return new WrappedForeground(stock.getElement(), ((JTextArea) stock.getContainer()).getWrapStyleWord());
-        }
-        return stock;
+        return stock != null && stock.getClass() == PlainView.class ? new SourcePlainView(stock.getElement()) : stock;
+    }
+
+    static View adapt(View stock, boolean wrapWords) {
+        return stock != null && stock.getClass() == WrappedPlainView.class
+            ? new WrappedForeground(stock.getElement(), wrapWords) : adapt(stock);
+    }
+
+    static boolean paintsForeground(JTextArea area) {
+        View root = area.getUI().getRootView(area);
+        return root.getViewCount() > 0 && (root.getView(0) instanceof SourcePlainView
+            || root.getView(0) instanceof WrappedForeground);
     }
 
     @Override @SuppressWarnings("deprecation")

@@ -21,6 +21,15 @@ final class CaretMotion {
         moving = false;
     }
 
+    void translate(int dx, int dy) {
+        if (target == null) return;
+        target.translate(dx, dy);
+        for (int i = 0; i < 4; i++) {
+            x[i] += dx; fromX[i] += dx;
+            y[i] += dy; fromY[i] += dy;
+        }
+    }
+
     void moveTo(Rectangle bounds, long now) {
         if (target == null) { snap(bounds); return; }
         if (target.equals(bounds)) return;

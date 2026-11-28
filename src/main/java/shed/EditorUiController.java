@@ -221,7 +221,7 @@ final class EditorUiController {
         editor.outlinePanel = new OutlinePanel(editor);
         editor.explorerSidebar.outline(editor.outlinePanel, Boolean.parseBoolean(editor.configManager.get("ui.outline.visible", "false")));
         editor.add(editor.explorerSidebar, BorderLayout.CENTER);
-        editor.add(editor.workbenchHeader, BorderLayout.NORTH);
+        if (editor.getJMenuBar() != null) editor.workbenchHeader.attachTo(editor.getJMenuBar());
         if (!editor.stagedStartupPending) editor.add(editor.footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
@@ -436,8 +436,11 @@ final class EditorUiController {
                         }
                     } catch (Exception ignored) {}
                 }
-                paintSyntaxForegroundOverlay(g, this);
-                editor.paintLspSemanticOverlay(g, this);
+                // complex bidirectional documents can use Swing's i18n view instead
+                if (!SourcePlainView.paintsForeground(this)) {
+                    paintSyntaxForegroundOverlay(g, this);
+                    editor.paintLspSemanticOverlay(g, this);
+                }
                 editor.paintLimelightOverlay(g, this);
                 paintDiagnosticOverlay(g, this);
                 paintVisualBlockOverlay(g, this);
@@ -452,6 +455,11 @@ final class EditorUiController {
             }
         };
         textArea.putClientProperty(SourcePlainView.SOURCE_PROPERTY, Boolean.TRUE);
+        SourceTextForeground.install(textArea,
+            () -> textArea == editor.writingArea && (editor.syntaxUiController == null
+                || editor.syntaxUiController.markdownSyntaxIsCurrent(textArea.getDocument()))
+                ? editor.syntaxForegroundSpans : List.of(),
+            () -> textArea == editor.writingArea ? editor.lspSemanticSpans : List.of());
         textArea.addKeyListener(editor);
         editor.installAiCompletion(textArea);
         editor.inputController.watchComposition(textArea);

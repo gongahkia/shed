@@ -161,10 +161,11 @@ final class TerminalController {
     private String openTerminal(String label, File startDirectory, List<String> command, String successMessage,
                                 TerminalLinkResolver.SourcePathMapper sourcePathMapper, WindowLayoutNode.Orientation orientation,
                                 Map<String, String> toolchainEnvironment) {
-        String title = nextTerminalTitle(label);
+        List<String> actualCommand = command == null || command.isEmpty() ? ShellCommand.interactiveCommand() : command;
+        String title = nextTerminalTitle("Terminal".equals(label) ? ShellCommand.displayName(actualCommand.getFirst()) : label);
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command, this::openTerminalLink,
+            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), actualCommand, this::openTerminalLink,
                 sourcePathMapper, toolchainEnvironment);
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();

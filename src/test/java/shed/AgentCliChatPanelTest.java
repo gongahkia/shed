@@ -13,6 +13,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** In-process Swing/chat doubles only: no CLI, shell, real account or native window. */
 class AgentCliChatPanelTest {
+    @Test void emptyChatHasNoWelcomeInstructions()throws Exception{
+        var jobs=new AsyncJobService(10);var host=new Host(temporary);var panel=ui(()->new AgentCliChatPanel(jobs,host,(command,a,prompt,live,chunk)->{throw new AssertionError("No turn requested");},()->new Font(Font.DIALOG,0,13)));
+        try{ui(()->{var empty=(JPanel)find(panel.component(),"agent.chat.empty");assertNotNull(empty);assertEquals(0,empty.getComponentCount());return null;});}
+        finally{ui(()->{panel.close();return null;});jobs.shutdownNow();}
+    }
     @TempDir Path temporary;
     static class Host implements AgentCliChatPanel.Host {
         Path root;boolean live;Runnable ended=()->{};int done;

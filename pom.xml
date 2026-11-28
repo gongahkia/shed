@@ -36,6 +36,7 @@
         <includes>
           <include>logo/shed.png</include>
           <include>providers/**</include>
+          <include>icons/codicons/**</include>
           <include>fonts/JetBrainsMono-Regular.ttf</include>
           <include>fonts/JetBrainsMono-OFL.txt</include>
         </includes>
@@ -47,6 +48,7 @@
           <include>NIB_THEME_LICENSE.txt</include>
           <include>UNICODE_LICENSE.txt</include>
           <include>SWINGX_LICENSE.txt</include>
+          <include>CODICONS_LICENSE.txt</include>
         </includes>
       </resource>
     </resources>

@@ -1,36 +1,65 @@
 package shed;
 
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.*;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.apache.batik.parser.AWTPathProducer;
+import org.apache.batik.parser.PathParser;
 
-/** Small outline actions, painted at UI scale and inheriting their control's foreground. */
+/** Bundled Microsoft Codicons, painted as vectors at the current UI scale. */
 enum WorkbenchIcons implements Icon {
-    CLOSE, DETACH, SEARCH, COMMANDS, SPLIT, TOOLS, SETTINGS, PLAY, STOP, REFRESH, PREVIOUS, NEXT, ADD, SEND, COPY;
+    CLOSE("close"), DETACH("link-external"), SEARCH("search"), COMMANDS("terminal"),
+    SPLIT("split-horizontal"), TOOLS("layout-panel"), SETTINGS("settings-gear"), PLAY("play"),
+    STOP("debug-stop"), REFRESH("refresh"), PREVIOUS("chevron-left"), NEXT("chevron-right"),
+    ADD("add"), SEND("send"), COPY("copy"), FOLDER("folder"), FOLDER_OPEN("folder-opened"),
+    FILE("file"), CODE("file-code"), IMAGE("file-media"), MARKDOWN("markdown"), JSON("json"),
+    CHEVRON_DOWN("chevron-down");
 
-    public int getIconWidth() { return WorkbenchStyle.px(16); }
-    public int getIconHeight() { return WorkbenchStyle.px(16); }
-    public void paintIcon(Component c, Graphics graphics, int x, int y) {
-        Graphics2D g = (Graphics2D) graphics.create();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.translate(x, y); g.scale(getIconWidth() / 16.0, getIconHeight() / 16.0);
-        g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g.setColor(c.isEnabled() ? c.getForeground() : UIManager.getColor("shed.muted"));
-        if (this == PLAY) {g.drawLine(5,3,12,8);g.drawLine(12,8,5,13);g.drawLine(5,13,5,3);}
-        else if(this == STOP){g.drawRect(4,4,8,8);}
-        else if(this == REFRESH){g.drawArc(3,3,10,10,40,290);g.drawLine(12,2,12,6);g.drawLine(12,6,8,6);}
-        else if(this == PREVIOUS || this == NEXT){int a=this==NEXT?5:11,b=this==NEXT?11:5;g.drawLine(a,3,b,8);g.drawLine(b,8,a,13);}
-        else if(this == ADD){g.drawLine(3,8,13,8);g.drawLine(8,3,8,13);}
-        else if(this == SEND){g.drawLine(3,3,14,8);g.drawLine(14,8,3,13);g.drawLine(3,13,5,8);g.drawLine(5,8,3,3);g.drawLine(5,8,14,8);}
-        else if(this == COPY){g.drawRect(6,5,7,9);g.drawLine(3,11,3,2);g.drawLine(3,2,10,2);}
-        else if (this == CLOSE) { g.drawLine(4, 4, 12, 12); g.drawLine(12, 4, 4, 12); }
-        else if (this == SEARCH) { g.drawOval(3, 2, 8, 8); g.drawLine(10, 10, 14, 14); }
-        else if (this == COMMANDS) { g.drawLine(3, 4, 7, 8); g.drawLine(7, 8, 3, 12); g.drawLine(9, 12, 14, 12); }
-        else if (this == SPLIT) { g.drawRect(2, 3, 12, 10); g.drawLine(8, 3, 8, 13); }
-        else if (this == TOOLS) { g.drawRect(2, 3, 12, 10); g.drawLine(2, 9, 14, 9); }
-        else if (this == SETTINGS) { g.drawLine(2, 4, 14, 4); g.drawLine(2, 8, 14, 8); g.drawLine(2, 12, 14, 12);
-            g.drawOval(5, 2, 3, 4); g.drawOval(10, 6, 3, 4); g.drawOval(3, 10, 3, 4); }
-        else { g.drawLine(8, 8, 13, 3); g.drawLine(9, 3, 13, 3); g.drawLine(13, 3, 13, 7);
-            g.drawLine(7, 4, 3, 4); g.drawLine(3, 4, 3, 13); g.drawLine(3, 13, 12, 13); g.drawLine(12, 13, 12, 9); }
-        g.dispose();
+    private record Vector(double width,double height,List<Shape> paths) { }
+    private final String resource;
+    private volatile Vector vector;
+    WorkbenchIcons(String resource){this.resource=resource;}
+    public int getIconWidth(){return WorkbenchStyle.px(16);}
+    public int getIconHeight(){return WorkbenchStyle.px(16);}
+    private Vector vector(){
+        var result=vector;if(result!=null)return result;
+        try(var input=WorkbenchIcons.class.getResourceAsStream("/assets/icons/codicons/"+resource+".svg")){
+            if(input==null)throw new IllegalStateException("Missing bundled Codicon: "+resource);
+            var factory=DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD,"");factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA,"");
+            factory.setXIncludeAware(false);factory.setExpandEntityReferences(false);
+            var root=factory.newDocumentBuilder().parse(input).getDocumentElement();
+            var box=root.getAttribute("viewBox").trim().split("\\s+");var paths=new ArrayList<Shape>();
+            var elements=root.getElementsByTagName("path");
+            for(int i=0;i<elements.getLength();i++){
+                var path=(org.w3c.dom.Element)elements.item(i);var producer=new AWTPathProducer();
+                producer.setWindingRule("evenodd".equals(path.getAttribute("fill-rule"))?java.awt.geom.Path2D.WIND_EVEN_ODD:java.awt.geom.Path2D.WIND_NON_ZERO);
+                var parser=new PathParser();parser.setPathHandler(producer);parser.parse(path.getAttribute("d"));paths.add(producer.getShape());
+            }
+            if(box.length!=4||paths.isEmpty())throw new IllegalStateException("Invalid bundled Codicon: "+resource);
+            result=new Vector(Double.parseDouble(box[2]),Double.parseDouble(box[3]),List.copyOf(paths));vector=result;return result;
+        }catch(Exception failure){throw new IllegalStateException("Could not load bundled Codicon: "+resource,failure);}
+    }
+    public void paintIcon(Component component,Graphics graphics,int x,int y){
+        var data=vector();var g=(Graphics2D)graphics.create();
+        try{
+            g.clipRect(x,y,getIconWidth(),getIconHeight());
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+            g.translate(x,y);g.scale(getIconWidth()/data.width(),getIconHeight()/data.height());
+            Color color=component!=null&&!component.isEnabled()?UIManager.getColor("shed.muted"):component==null?UIManager.getColor("Label.foreground"):component.getForeground();
+            g.setColor(color==null?Color.GRAY:color);for(var path:data.paths())g.fill(path);
+        }finally{g.dispose();}
+    }
+    static Icon file(String name){
+        String value=name.toLowerCase(java.util.Locale.ROOT);
+        if(value.endsWith(".md")||value.endsWith(".markdown"))return MARKDOWN;
+        if(value.endsWith(".json")||value.endsWith(".jsonc"))return JSON;
+        if(value.matches(".*\\.(png|jpe?g|gif|svg|webp|ico)$"))return IMAGE;
+        if(value.matches(".*\\.(java|kt|go|rs|py|js|jsx|ts|tsx|c|cpp|h|sh|zsh|xml|html|css|toml|ya?ml)$")||value.equals("makefile"))return CODE;
+        return FILE;
     }
 }

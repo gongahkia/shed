@@ -21,6 +21,13 @@ final class BuiltInTerminalProfiles {
     private BuiltInTerminalProfiles() {
     }
 
+    static List<String> settingChoices(String current,List<Profile> profiles) {
+        var values=new ArrayList<String>();values.add("system");
+        for(var profile:profiles)values.add("builtin:"+profile.id());
+        if(current!=null&&!current.isBlank()&&!values.contains(current))values.add(current);
+        return List.copyOf(values);
+    }
+
     static List<Profile> detect() {
         return detect(System.getenv(), path -> new File(path).canExecute(), windowsHost());
     }

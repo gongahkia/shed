@@ -9,6 +9,13 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class BuiltInTerminalProfilesTest {
+    @Test void settingsOfferDetectedZshInsteadOfALiteralProfilePlaceholder(){
+        var profiles=List.of(new BuiltInTerminalProfiles.Profile("bash","Bash",List.of("/usr/bin/bash","-l")),new BuiltInTerminalProfiles.Profile("zsh","Zsh",List.of("/usr/bin/zsh","-l")));
+        assertEquals(List.of("system","builtin:bash","builtin:zsh"),BuiltInTerminalProfiles.settingChoices("system",profiles));
+        assertEquals(List.of("system","builtin:bash","builtin:zsh","builtin:fish"),BuiltInTerminalProfiles.settingChoices("builtin:fish",profiles));
+        assertEquals(List.of("/usr/bin/zsh","-l"),ShellCommand.interactiveCommand(Map.of("SHELL","/usr/bin/zsh"),"/usr/bin/zsh"::equals,false));
+        assertEquals("Zsh",ShellCommand.displayName("/usr/bin/zsh"));assertEquals("Bash",ShellCommand.displayName("/usr/bin/bash"));
+    }
     @Test
     void detectsExecutablePosixProfilesWithoutStartingThem() {
         org.junit.jupiter.api.Assumptions.assumeFalse(File.separatorChar == '\\', "POSIX path fixture");

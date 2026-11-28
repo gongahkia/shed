@@ -36,7 +36,6 @@ final class FileTreePanel extends JPanel {
     private final JScrollPane scrollPane;
     private final Consumer<java.io.File> openFile;
     private final Runnable onActivate;
-    private Font iconFont;
     private final Function<java.io.File,java.io.File[]> childLoader;
     private boolean refreshingExternal,refreshAgain;
     private volatile java.util.Map<java.nio.file.Path,FileChangeMarks.Mark> changeMarks=java.util.Map.of();
@@ -62,6 +61,7 @@ final class FileTreePanel extends JPanel {
         tree.setName("agent.explorer");
         tree.setRootVisible(true);
         tree.setShowsRootHandles(true);
+        tree.putClientProperty("JTree.lineStyle", "None");
         tree.setToggleClickCount(2);
         tree.setCellRenderer(new ExplorerRenderer());
         tree.setDragEnabled(true);
@@ -227,7 +227,6 @@ final class FileTreePanel extends JPanel {
         Color surface = editor.configManager.getNormalColor();
         Color foreground = editor.configManager.getEditorForeground();
         Font textFont = editor.resolveUiFont();
-        iconFont = FileFinderIcons.availableNerdFont(textFont);
         setBackground(surface);
         tree.setBackground(surface);
         tree.setForeground(foreground);
@@ -267,18 +266,17 @@ final class FileTreePanel extends JPanel {
             var mark=file==null?null:changeMarks.get(file.toPath());Color accent=mark==null?null:ChangePulse.color(mark.code());
             if(mark!=null){surface=ChangePulse.tint(surface,accent,changePulse.strength(file.toPath().toString()));foreground=AccessibilitySupport.readableText(selected||accent==null?foreground:accent,surface);}
             Font textFont = editor.resolveUiFont();
-            boolean hasNerdIcons = iconFont != null;
-            int iconWidth = hasNerdIcons ? UiZoom.scale(24, editor.configManager.getUiZoom()) : 0;
+            int iconWidth = UiZoom.scale(22, editor.configManager.getUiZoom());
 
             setOpaque(true);
             setBackground(surface);
             setBorder(BorderFactory.createEmptyBorder(0, UiZoom.scale(2, editor.configManager.getUiZoom()), 0, UiZoom.scale(4, editor.configManager.getUiZoom())));
             icon.setPreferredSize(new Dimension(iconWidth, 1));
-            icon.setForeground(selected ? foreground : editor.configManager.getCaretColor());
-            icon.setFont(hasNerdIcons ? iconFont.deriveFont((float) Math.max(textFont.getSize(), UiZoom.scale(14, editor.configManager.getUiZoom()))) : textFont);
-            icon.setText(!hasNerdIcons || file == null ? "" : file.isDirectory()
-                ? FileFinderIcons.iconForDirectory(file, expanded)
-                : FileFinderIcons.iconFor(file.getName()));
+            icon.setForeground(foreground);
+            icon.setText("");
+            icon.setIcon(file == null ? null : file.isDirectory()
+                ? expanded ? WorkbenchIcons.FOLDER_OPEN : WorkbenchIcons.FOLDER
+                : WorkbenchIcons.file(file.getName()));
             label.setForeground(foreground);
             label.setFont(mark!=null&&mark.removed()?textFont.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.STRIKETHROUGH,java.awt.font.TextAttribute.STRIKETHROUGH_ON)):textFont);
             label.setText(node == null ? "" : node.toString());

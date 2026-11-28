@@ -12,6 +12,7 @@ public final class WorkbenchStyle {
     private WorkbenchStyle() { }
 
     static void install(ConfigManager config) {
+        SwingTextRendering.install();
         UIManager.put("shed.zoom", config.getUiZoom());
         color("shed.surface", config.getNormalColor());
         color("shed.chrome", config.getStatusBarBackground());
@@ -38,9 +39,9 @@ public final class WorkbenchStyle {
         UIManager.put("SplitPaneUI", SplitUI.class.getName());
         UIManager.put("ListUI", ListUI.class.getName());
         UIManager.put("TableUI", TableUI.class.getName());
-        UIManager.put("TreeUI", "javax.swing.plaf.basic.BasicTreeUI");
+        UIManager.put("TreeUI", ExplorerTreeUI.class.getName());
         UIManager.put("FileChooserUI", "javax.swing.plaf.metal.MetalFileChooserUI");
-        UIManager.put("Menu.arrowIcon", new DisclosureIcon(false));
+        UIManager.put("Menu.arrowIcon", WorkbenchIcons.NEXT);
         UIManager.put("MenuBar.border", new BorderUIResource.EmptyBorderUIResource(0, 0, 1, 0));
         for (String type : new String[] {"Label", "TextArea", "TextPane", "EditorPane", "TextField", "PasswordField", "FormattedTextField", "TableHeader",
             "ProgressBar", "Spinner", "Slider", "ToolTip", "Separator", "PopupMenuSeparator", "PopupMenu",
@@ -80,8 +81,10 @@ public final class WorkbenchStyle {
         UIManager.put("Tree.selectionBackground", config.getSelectionColor());
         UIManager.put("Tree.selectionForeground", config.getSelectionTextColor());
         UIManager.put("Tree.selectionBorderColor", config.getFocusColor());
-        UIManager.put("Tree.expandedIcon", new DisclosureIcon(true));
-        UIManager.put("Tree.collapsedIcon", new DisclosureIcon(false));
+        UIManager.put("Tree.expandedIcon", WorkbenchIcons.CHEVRON_DOWN);
+        UIManager.put("Tree.collapsedIcon", WorkbenchIcons.NEXT);
+        UIManager.put("Tree.leftChildIndent", px(6));
+        UIManager.put("Tree.rightChildIndent", px(10));
         UIManager.put("TitledBorder.border", new BorderUIResource.MatteBorderUIResource(1, 0, 0, 0, config.getSubtleBorderColor()));
         UIManager.put("PopupMenu.border", new BorderUIResource.CompoundBorderUIResource(
             new BorderUIResource.LineBorderUIResource(config.getSubtleBorderColor()), padding(4, 4)));
@@ -173,6 +176,19 @@ public final class WorkbenchStyle {
         return UiZoom.scale(value, zoom instanceof Number n ? n.doubleValue() : 1.0);
     }
 
+    public static class ExplorerTreeUI extends BasicTreeUI {
+        public static ComponentUI createUI(JComponent component){return new ExplorerTreeUI();}
+        @Override protected void paintHorizontalLine(Graphics g,JComponent c,int y,int left,int right){ }
+        @Override protected void paintVerticalLine(Graphics g,JComponent c,int x,int top,int bottom){ }
+        @Override protected void paintRow(Graphics g,Rectangle clip,Insets insets,Rectangle bounds,javax.swing.tree.TreePath path,int row,boolean expanded,boolean hasExpanded,boolean leaf){
+            if(tree.isRowSelected(row)){
+                Color selection=UIManager.getColor("Tree.selectionBackground");g.setColor(selection==null?tree.getBackground():selection);
+                g.fillRect(0,bounds.y,tree.getWidth(),bounds.height);
+            }
+            super.paintRow(g,clip,insets,bounds,path,row,expanded,hasExpanded,leaf);
+        }
+    }
+
     private static void color(String key, Color color) { UIManager.put(key, new ColorUIResource(color)); }
     private static Color color(String key) { return UIManager.getColor("shed." + key); }
     private static BorderUIResource.EmptyBorderUIResource padding(int vertical, int horizontal) {
@@ -216,19 +232,6 @@ public final class WorkbenchStyle {
             super.paint(g, c); if (((JTable) c).getRowCount() == 0) paintEmpty(g, c);
         }
     }
-    private record DisclosureIcon(boolean expanded) implements Icon, UIResource {
-        public int getIconWidth() { return px(16); }
-        public int getIconHeight() { return px(16); }
-        public void paintIcon(Component c, Graphics graphics, int x, int y) {
-            Graphics2D g = brush(graphics); g.setColor(color("muted")); g.translate(x, y);
-            g.setStroke(new BasicStroke(Math.max(1f, px(1)), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            Path2D path = new Path2D.Float();
-            if (expanded) { path.moveTo(px(4), px(6)); path.lineTo(px(8), px(10)); path.lineTo(px(12), px(6)); }
-            else { path.moveTo(px(6), px(4)); path.lineTo(px(10), px(8)); path.lineTo(px(6), px(12)); }
-            g.draw(path); g.dispose();
-        }
-    }
-
     /** Padding and focus are painted by a border so text editing and native key actions remain Swing's. */
     static final class FieldBorder extends AbstractBorder implements UIResource {
         @Override public Insets getBorderInsets(Component c) { return getBorderInsets(c, new Insets(0, 0, 0, 0)); }
@@ -294,7 +297,7 @@ public final class WorkbenchStyle {
         @Override protected void paintText(Graphics g, JComponent c, Rectangle bounds, String text) {
             AbstractButton b = (AbstractButton) c;
             g.setColor(b.isEnabled() ? b.getForeground() : color("muted"));
-            BasicGraphicsUtils.drawStringUnderlineCharAt(g, text, b.getDisplayedMnemonicIndex(), bounds.x,
+            BasicGraphicsUtils.drawStringUnderlineCharAt(c, (Graphics2D) g, text, b.getDisplayedMnemonicIndex(), bounds.x,
                 bounds.y + g.getFontMetrics().getAscent());
         }
     }
@@ -338,12 +341,9 @@ public final class WorkbenchStyle {
         @Override protected JButton createArrowButton() {
             JButton arrow = new JButton() {
                 @Override protected void paintComponent(Graphics graphics) {
-                    Graphics2D g = brush(graphics);
-                    g.setColor(color(isEnabled() ? "muted" : "border"));
-                    g.setStroke(new BasicStroke(Math.max(1f, px(1)), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    int x = getWidth() / 2, y = getHeight() / 2;
-                    g.drawLine(x - px(4), y - px(2), x, y + px(2)); g.drawLine(x, y + px(2), x + px(4), y - px(2));
-                    g.dispose();
+                    WorkbenchIcons.CHEVRON_DOWN.paintIcon(this,graphics,
+                        (getWidth()-WorkbenchIcons.CHEVRON_DOWN.getIconWidth())/2,
+                        (getHeight()-WorkbenchIcons.CHEVRON_DOWN.getIconHeight())/2);
                 }
             };
             arrow.setName("ComboBox.arrowButton"); arrow.setFocusable(false); arrow.setBorder(BorderFactory.createEmptyBorder());

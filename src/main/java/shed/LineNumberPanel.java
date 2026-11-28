@@ -36,6 +36,11 @@ class LineNumberPanel extends JPanel {
 
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
+        setOpaque(true);
+        addHierarchyListener(event -> {
+            if (getParent() instanceof javax.swing.JViewport viewport)
+                viewport.setScrollMode(javax.swing.JViewport.SIMPLE_SCROLL_MODE);
+        });
         setPreferredSize(new Dimension(50, Integer.MAX_VALUE));
         setBackground(Color.decode("#161B22"));
         this.lineNumberColor = Color.decode("#8B949E");
@@ -88,6 +93,11 @@ class LineNumberPanel extends JPanel {
     protected void paintComponent(Graphics g) {
         applyLineNumberTextRenderingHints(g);
         super.paintComponent(g);
+        // the gutter owns every pixel, including exposed strips during animated scrolling
+        g.setColor(getBackground());
+        Rectangle clip = g.getClipBounds();
+        if (clip == null) g.fillRect(0, 0, getWidth(), getHeight());
+        else g.fillRect(clip.x, clip.y, clip.width, clip.height);
         updatePreferredWidth();
         g.setColor(lineNumberColor);
         g.setFont(textArea.getFont());

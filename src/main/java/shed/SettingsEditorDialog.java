@@ -289,13 +289,22 @@ final class SettingsEditorDialog extends JDialog {
             box.addActionListener(event -> persist(descriptor.key(), Boolean.toString(box.isSelected())));
             return box;
         }
-        String[] choices = choices(descriptor.allowedValues());
+        var profiles = descriptor.key().equals("terminal.default.profile") ? BuiltInTerminalProfiles.detect() : List.<BuiltInTerminalProfiles.Profile>of();
+        String systemShell = descriptor.key().equals("terminal.default.profile") ? ShellCommand.displayName(ShellCommand.interactiveCommand().getFirst()) : "";
+        String[] choices = descriptor.key().equals("terminal.default.profile")
+            ? BuiltInTerminalProfiles.settingChoices(descriptor.currentValue(), profiles).toArray(String[]::new) : choices(descriptor.allowedValues());
         if (choices != null) {
             JComboBox<String> combo = new JComboBox<>(choices);
             combo.setPreferredSize(new Dimension(uiPixels(220), combo.getPreferredSize().height));
             combo.setEditable(false);
             combo.setRenderer((list, value, index, selected, focused) -> {
-                JLabel item = new JLabel(value == null ? "" : value);
+                String title=value==null?"":value;
+                if(descriptor.key().equals("terminal.default.profile") && value!=null) {
+                    var profile=BuiltInTerminalProfiles.resolve(value,profiles);
+                    title="system".equals(value)?"System shell ("+systemShell+")"
+                        : profile==null?value+" (unavailable)":profile.displayName()+" — "+profile.command().getFirst();
+                }
+                JLabel item = new JLabel(title);
                 item.setOpaque(true);
                 item.setBorder(BorderFactory.createEmptyBorder(uiPixels(2), uiPixels(7), uiPixels(2), uiPixels(7)));
                 item.setBackground(selected ? theme.selection() : theme.field());

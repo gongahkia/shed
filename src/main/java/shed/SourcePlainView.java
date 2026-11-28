@@ -2,6 +2,7 @@ package shed;
 
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.Graphics;
 import java.awt.Shape;
 import java.util.Arrays;
 import java.util.Objects;
@@ -13,6 +14,8 @@ import javax.swing.text.Segment;
 import javax.swing.text.Utilities;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
+import javax.swing.text.WrappedPlainView;
+import javax.swing.JTextArea;
 
 /** PlainView painting/geometry with a bounded summary of widest source lines. EDT-owned, like PlainView. */
 final class SourcePlainView extends PlainView {
@@ -29,7 +32,28 @@ final class SourcePlainView extends PlainView {
     private SourcePlainView(Element element) { super(element); }
 
     static View adapt(View stock) {
-        return stock != null && stock.getClass() == PlainView.class ? new SourcePlainView(stock.getElement()) : stock;
+        if (stock != null && stock.getClass() == PlainView.class) return new SourcePlainView(stock.getElement());
+        if (stock != null && stock.getClass() == WrappedPlainView.class) {
+            return new WrappedForeground(stock.getElement(), ((JTextArea) stock.getContainer()).getWrapStyleWord());
+        }
+        return stock;
+    }
+
+    @Override @SuppressWarnings("deprecation")
+    protected int drawUnselectedText(Graphics graphics, int x, int y, int start, int end) throws BadLocationException {
+        SourceTextForeground foreground = SourceTextForeground.forArea(getContainer());
+        return foreground == null ? super.drawUnselectedText(graphics, x, y, start, end)
+            : foreground.draw((JTextArea) getContainer(), graphics, x, y, start, end, this);
+    }
+
+    private static final class WrappedForeground extends WrappedPlainView {
+        WrappedForeground(Element element, boolean words) { super(element, words); }
+        @Override @SuppressWarnings("deprecation")
+        protected int drawUnselectedText(Graphics graphics, int x, int y, int start, int end) throws BadLocationException {
+            SourceTextForeground foreground = SourceTextForeground.forArea(getContainer());
+            return foreground == null ? super.drawUnselectedText(graphics, x, y, start, end)
+                : foreground.draw((JTextArea) getContainer(), graphics, x, y, start, end, this);
+        }
     }
 
     @Override public void setParent(View parent) {

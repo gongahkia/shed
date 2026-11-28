@@ -124,6 +124,15 @@ final class ShellCommand {
         return interactiveCommand(System.getenv(), path -> new File(path).canExecute());
     }
 
+    static String displayName(String executable) {
+        String name=basename(executable);
+        return switch(name.toLowerCase(Locale.ROOT)) {
+            case "bash" -> "Bash"; case "zsh" -> "Zsh"; case "fish" -> "Fish";
+            case "pwsh", "pwsh.exe" -> "PowerShell 7"; case "powershell", "powershell.exe" -> "PowerShell";
+            case "cmd", "cmd.exe" -> "Command Prompt"; default -> name;
+        };
+    }
+
     static List<String> interactiveCommand(Map<String, String> env, Predicate<String> executable) {
         return interactiveCommand(env, executable, windowsHost());
     }

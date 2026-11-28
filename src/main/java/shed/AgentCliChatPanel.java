@@ -42,7 +42,6 @@ final class AgentCliChatPanel implements ToolWindowHost.ToolSurface {
     private final JScrollPane messageInput=new JScrollPane(composer);
     private final JScrollPane conversation=new JScrollPane(transcript);
     private final JPanel threadBody=new JPanel(new CardLayout()),actionSlot=new JPanel(new CardLayout()),composerBox=new JPanel(new BorderLayout(0,6));
-    private final JLabel welcomeTitle=new JLabel("What are we working on?");
     private final JTextArea status=new JTextArea("Enter to send · Shift+Enter for a newline",2,0);
     private final JButton send=new JButton("Send",WorkbenchIcons.PLAY),stop=new JButton("Stop",WorkbenchIcons.STOP),fresh=new JButton("New chat",WorkbenchIcons.ADD),changes=new JButton("Changes");
     private final List<SelectionContext> selections=new ArrayList<>();
@@ -86,7 +85,7 @@ final class AgentCliChatPanel implements ToolWindowHost.ToolSurface {
         var customize=new JButton(WorkbenchIcons.SETTINGS);customize.setToolTipText("CLI executable settings");customize.getAccessibleContext().setAccessibleName(customize.getToolTipText());customize.addActionListener(e->{paths.setVisible(!paths.isVisible());panel.revalidate();});WorkbenchStyle.quiet(customize);
         var controls=new JPanel(new FlowLayout(FlowLayout.TRAILING,4,0));controls.add(changes);controls.add(fresh);controls.add(customize);
         var top=new JPanel(new BorderLayout(6,6));top.add(controls,BorderLayout.NORTH);top.add(paths,BorderLayout.SOUTH);panel.add(top,BorderLayout.NORTH);
-        var welcome=new JPanel(new GridBagLayout());var greeting=new JPanel();greeting.setLayout(new BoxLayout(greeting,BoxLayout.Y_AXIS));greeting.add(welcomeTitle);greeting.add(Box.createVerticalStrut(8));var description=new JLabel("Ask a question or add selected code.");description.putClientProperty("shed.muted",true);greeting.add(description);welcome.add(greeting);welcome.setName("agent.chat.empty");
+        var welcome=new JPanel();welcome.setName("agent.chat.empty");
         threadBody.add(welcome,"empty");threadBody.add(conversation,"conversation");panel.add(threadBody);
         actionSlot.add(send,"send");actionSlot.add(stop,"stop");
         contextChips.setName("agent.chat.context");contextChips.setLayout(new BoxLayout(contextChips,BoxLayout.Y_AXIS));
@@ -165,6 +164,6 @@ final class AgentCliChatPanel implements ToolWindowHost.ToolSurface {
     @Override public JPanel component(){return panel;}
     @Override public void focus(){composer.requestFocusInWindow();}
     @Override public void refresh(){}
-    @Override public void refreshAppearance(){for(var c:List.of(composer,providers,executable,status,send,stop,fresh,changes))c.setFont(font.get());welcomeTitle.setFont(font.get().deriveFont(Font.BOLD,font.get().getSize2D()+2));var muted=UIManager.getColor("Label.disabledForeground");if(muted!=null)status.setForeground(muted);transcript.appearance(font.get(),codeFont.get());var border=UIManager.getColor("Separator.foreground");composerBox.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(border==null?composer.getForeground():border),BorderFactory.createEmptyBorder(8,8,8,8)));messageInput.setBorder(BorderFactory.createEmptyBorder());refreshContext();}
+    @Override public void refreshAppearance(){for(var c:List.of(composer,providers,executable,status,send,stop,fresh,changes))c.setFont(font.get());var muted=UIManager.getColor("Label.disabledForeground");if(muted!=null)status.setForeground(muted);transcript.appearance(font.get(),codeFont.get());var border=UIManager.getColor("Separator.foreground");composerBox.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(border==null?composer.getForeground():border),BorderFactory.createEmptyBorder(8,8,8,8)));messageInput.setBorder(BorderFactory.createEmptyBorder());refreshContext();}
     @Override public void close(){if(closed)return;host.stop();turnLive.set(false);++generation;if(job>=0)jobs.cancel(job);closed=true;paint.stop();stream=null;reply="";controls();}
 }

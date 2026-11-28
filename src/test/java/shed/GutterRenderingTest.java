@@ -16,6 +16,32 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
 class GutterRenderingTest {
+    @Test void reusedScrollPixelsMatchFreshPaintEvenWithoutAPanelUi()throws Exception{
+        SwingUtilities.invokeAndWait(()->{
+            class ScrollingArea extends JTextArea {
+                int scroll;
+                ScrollingArea(){super("source line\n".repeat(200));setFont(new Font(Font.MONOSPACED,0,16));setSize(400,5000);}
+                @Override public Rectangle getVisibleRect(){return new Rectangle(0,scroll,400,180);}
+            }
+            for(int scale:new int[]{1,2}){
+                var area=new ScrollingArea();var gutter=new LineNumberPanel(area);gutter.setSize(80,5000);gutter.setColors(Color.WHITE,Color.BLACK,Color.BLUE);gutter.setUI(null);
+                var actual=new BufferedImage(80*scale,180*scale,BufferedImage.TYPE_INT_RGB);int previous=0;
+                for(int scroll:new int[]{0,7,19,25,43,28,12,0,151,300}){
+                    int delta=scroll-previous;area.scroll=scroll;var g=actual.createGraphics();
+                    try{
+                        if(scroll!=0||previous!=0)g.copyArea(0,0,actual.getWidth(),actual.getHeight(),0,-delta*scale);
+                        g.scale(scale,scale);g.translate(0,-scroll);
+                        int top=delta>0?180-delta:0,height=delta==0?180:Math.abs(delta);
+                        g.clipRect(0,scroll+top,80,height);gutter.paint(g);
+                    }finally{g.dispose();}
+                    var expected=new BufferedImage(80*scale,180*scale,BufferedImage.TYPE_INT_RGB);g=expected.createGraphics();
+                    try{g.scale(scale,scale);g.translate(0,-scroll);g.clipRect(0,scroll,80,180);gutter.paint(g);}finally{g.dispose();}
+                    assertPixelsEqual(expected,actual);previous=scroll;
+                }
+                var pane=new JScrollPane(area);pane.setRowHeaderView(gutter);assertEquals(JViewport.SIMPLE_SCROLL_MODE,pane.getRowHeader().getScrollMode());
+            }
+        });
+    }
     static final String MIXED = "# Source alpha\nUnicode: e\u0301, क्ष, 👩\u200d💻, 中文\n".repeat(10);
 
     @Test void impliedEndMappingPaintsExactlyLikeDocumentEnd() throws Exception {

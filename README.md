@@ -27,6 +27,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Multi-root workspaces, portable [`.shed-workspace` / `.code-workspace` folder lists](./docs/WORKSPACE_MANIFESTS.md), project file trees, drag-to-split editor panes, notebooks, integrated terminals, and explicit [remote](./docs/REMOTE_WORKSPACES.md)/Dev Container workflows
 * Explicit local [toolchain selection](./docs/TOOLCHAINS.md) for new local development processes across twenty runtime/compiler families
 * No [telemetry](https://en.wikipedia.org/wiki/Telemetry) whatsoever
+* Detailed API for [UI Actions](https://www.servicenow.com/docs/r/platform-administration/c_UIActions.html) *(initiated by agents!)*
 * Bundled-runtime platform installers
 
 ## Video of `Shed` editing its own source code

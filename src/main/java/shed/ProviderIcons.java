@@ -35,8 +35,34 @@ final class ProviderIcons {
                 image=new BufferedImage(decoded.getWidth(),decoded.getHeight(),BufferedImage.TYPE_INT_ARGB);
                 var tint=image.createGraphics();try{tint.drawImage(decoded,0,0,null);tint.setComposite(AlphaComposite.SrcIn);tint.setColor(new Color(0xD97757));tint.fillRect(0,0,image.getWidth(),image.getHeight());}finally{tint.dispose();decoded.flush();}
             }else image=decoded;
-            return new Icon(){public int getIconWidth(){return WorkbenchStyle.px(18);}public int getIconHeight(){return WorkbenchStyle.px(18);}
-                public void paintIcon(Component c,Graphics graphics,int x,int y){var g=(Graphics2D)graphics.create();try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);g.drawImage(image,x,y,getIconWidth(),getIconHeight(),null);}finally{g.dispose();}}};
+            return new ProviderIcon(image);
         }catch(java.io.IOException failure){return WorkbenchIcons.COMMANDS;}
+    }
+    static final class ProviderIcon implements Icon {
+        private final BufferedImage source;
+        private BufferedImage scaled;
+        ProviderIcon(BufferedImage source){this.source=source;}
+        public int getIconWidth(){return WorkbenchStyle.px(18);}
+        public int getIconHeight(){return WorkbenchStyle.px(18);}
+        synchronized BufferedImage raster(int width,int height){
+            width=Math.clamp(width,1,256);height=Math.clamp(height,1,256);
+            if(scaled==null||scaled.getWidth()!=width||scaled.getHeight()!=height){
+                var next=new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);var g=next.createGraphics();
+                try{g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);g.drawImage(source,0,0,width,height,null);}finally{g.dispose();}
+                // retain one device-sized raster per brand/theme, including after zoom or monitor changes
+                scaled=next;
+            }
+            return scaled;
+        }
+        public void paintIcon(Component c,Graphics graphics,int x,int y){
+            var g=(Graphics2D)graphics.create();
+            try{
+                var transform=g.getTransform();
+                int width=(int)Math.ceil(getIconWidth()*Math.hypot(transform.getScaleX(),transform.getShearY()));
+                int height=(int)Math.ceil(getIconHeight()*Math.hypot(transform.getShearX(),transform.getScaleY()));
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.drawImage(raster(width,height),x,y,getIconWidth(),getIconHeight(),null);
+            }finally{g.dispose();}
+        }
     }
 }

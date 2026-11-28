@@ -77,3 +77,20 @@ class AgentDelegationAdmissionTest(unittest.TestCase):
         output = self.root / 'existing-ui'
         output.mkdir()
         self.reject(output, ('--ui',))
+
+    def test_settings_fixture_cannot_mix_other_workflows(self):
+        for mode in ('--chat', '--ui', '--workbench', '--workbench-readonly', '--workbench-context', '--inline'):
+            output = self.root / 'not-created-settings'
+            self.reject(output, ('--settings', mode))
+            self.assertFalse(output.exists())
+
+    def test_settings_fixture_retains_existing_output_protection(self):
+        output = self.root / 'existing-settings'
+        output.mkdir()
+        self.reject(output, ('--settings',))
+
+    def test_settings_diagnostics_require_settings_fixture(self):
+        for mode in ('--settings-profile', '--settings-paint-only'):
+            output = self.root / 'not-created-diagnostic'
+            self.reject(output, (mode,))
+            self.assertFalse(output.exists())

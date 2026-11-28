@@ -5,11 +5,8 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.KeyboardFocusManager;
-import java.awt.Rectangle;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.util.LinkedHashSet;
@@ -24,7 +21,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
-import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
@@ -57,7 +53,7 @@ final class SettingsEditorDialog extends JDialog {
     private final java.util.Map<String, String> drafts = new java.util.HashMap<>();
     private final java.util.Set<String> invalidKeys = new java.util.HashSet<>();
     private final java.util.Map<String, JButton> resetButtons = new java.util.HashMap<>();
-    private final JPanel settings = new SettingsList();
+    private final SettingsRows settings = new SettingsRows();
     private JScrollPane settingsScroll;
     private final Timer searchRefresh = new Timer(120, event -> { resetScroll(); refresh(); });
     private int laidOutDetailWidth = -1;
@@ -175,42 +171,31 @@ final class SettingsEditorDialog extends JDialog {
             ? (String) component.getClientProperty("shed.setting.key") : null;
         refreshing = true;
         try {
-            settings.removeAll();
-            resetButtons.clear();
-            laidOutDetailWidth = -1;
             theme = DialogTheme.from(editor.configManager);
             String category = (String) categories.getSelectedItem();
-            List<SettingsApplication.Setting> descriptors = application.search(search.getText());
-            int row = 0;
-            for (SettingsApplication.Setting descriptor : descriptors) {
-                if (category != null && !"All".equals(category) && !category.equals(descriptor.category())) continue;
-                if (modifiedOnly.isSelected() && descriptor.currentValue().equals(descriptor.defaultValue())) continue;
-                addDescriptor(descriptor, row++);
+            var catalog = application.search("");
+            var keys = new java.util.HashSet<String>();
+            for (var descriptor : catalog) keys.add(descriptor.key());
+            resetButtons.keySet().retainAll(keys);
+            List<SettingsApplication.Setting> descriptors = application.search(search.getText()).stream()
+                .filter(d -> category == null || "All".equals(category) || category.equals(d.category()))
+                .filter(d -> !modifiedOnly.isSelected() || !d.currentValue().equals(d.defaultValue())).toList();
+            boolean restyle = settings.showRows(catalog, descriptors,
+                List.of(theme, editor.resolveUiFont(), editor.configManager.getUiZoom(), editor.configManager.getUiDensity()),
+                this::createDescriptor, new Insets(uiPixels(2), uiPixels(2), uiPixels(2), uiPixels(2)));
+            count.setText(descriptors.size() + (descriptors.size() == 1 ? " setting" : " settings"));
+            if (restyle) {
+                laidOutDetailWidth = -1;
+                applyTheme(settings);
+                editor.editorUiController.applyUiFont(settings);
             }
-            count.setText(row + (row == 1 ? " setting" : " settings"));
-            if (row == 0) {
-                JLabel empty = new JLabel("No settings match this search.");
-                GridBagConstraints emptyCell = constraints(0, row++);
-                emptyCell.weightx = 1;
-                settings.add(empty, emptyCell);
-            }
-            GridBagConstraints fill = constraints(0, row);
-            fill.weighty = 1;
-            JPanel filler = new JPanel();
-            filler.setOpaque(true);
-            filler.setBackground(theme.surface());
-            settings.add(filler, fill);
-            applyTheme(settings);
-            editor.editorUiController.applyUiFont(settings);
-            settings.revalidate();
-            settings.repaint();
             if (settingsScroll != null) SwingUtilities.invokeLater(() -> {
                 updateDetailWidths();
                 int max = Math.max(0, settings.getPreferredSize().height - settingsScroll.getViewport().getHeight());
                 settingsScroll.getViewport().setViewPosition(new java.awt.Point(0, Math.min(scrollY, max)));
                 if (focusedKey != null) {
                     JComponent control = settingControl(settings, focusedKey);
-                    if (control != null) control.requestFocusInWindow();
+                    if (control != null && control.isShowing()) control.requestFocusInWindow();
                 }
             });
         } finally {
@@ -256,7 +241,7 @@ final class SettingsEditorDialog extends JDialog {
         settings.repaint();
     }
 
-    private void addDescriptor(SettingsApplication.Setting descriptor, int row) {
+    private JComponent createDescriptor(SettingsApplication.Setting descriptor) {
         JPanel panel = new JPanel(new BorderLayout(0, uiPixels(4)));
         panel.setOpaque(true);
         panel.setBackground(theme.surface());
@@ -294,10 +279,7 @@ final class SettingsEditorDialog extends JDialog {
         detail.setVerticalAlignment(SwingConstants.TOP);
         detail.setOpaque(false);
         panel.add(detail, BorderLayout.CENTER);
-        GridBagConstraints target = constraints(0, row);
-        target.weightx = 1;
-        target.fill = GridBagConstraints.HORIZONTAL;
-        settings.add(panel, target);
+        return panel;
     }
 
     private JComponent control(SettingsApplication.Setting descriptor) {
@@ -366,6 +348,7 @@ final class SettingsEditorDialog extends JDialog {
         WorkbenchStyle.intent(feedback, result.contains("(self-healed ") ? "warning" : "success");
         drafts.remove(key);
         invalidKeys.remove(key);
+        settings.invalidate(key);
         theme = DialogTheme.from(editor.configManager);
         applyTheme(this);
         SwingUtilities.invokeLater(() -> { if (isDisplayable()) refresh(); });
@@ -396,16 +379,6 @@ final class SettingsEditorDialog extends JDialog {
         return values;
     }
 
-    private GridBagConstraints constraints(int x, int y) {
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.gridx = x;
-        constraints.gridy = y;
-        constraints.anchor = GridBagConstraints.WEST;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.insets = new Insets(uiPixels(2), uiPixels(2), uiPixels(2), uiPixels(2));
-        return constraints;
-    }
-
     private int uiPixels(int value) {
         return UiZoom.scale(value, editor.configManager.getUiZoom());
     }
@@ -419,15 +392,4 @@ final class SettingsEditorDialog extends JDialog {
             .replace(">", "&gt;").replace("\n", "<br>");
     }
 
-    private static final class SettingsList extends JPanel implements Scrollable {
-        private SettingsList() { super(new GridBagLayout()); }
-
-        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
-        @Override public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction) { return 32; }
-        @Override public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) {
-            return Math.max(32, visible.height - 32);
-        }
-        @Override public boolean getScrollableTracksViewportWidth() { return true; }
-        @Override public boolean getScrollableTracksViewportHeight() { return false; }
-    }
 }
